@@ -16,11 +16,11 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: \`\${doc.title} - 帮助文档 | OfficeGPT\`,
-    description: \`阅读关于 \${doc.title} 的详细介绍。OfficeGPT 官方帮助中心为您提供最权威的解答。\`,
+    title: `${doc.title} - 帮助文档 | OfficeGPT`,
+    description: `阅读关于 ${doc.title} 的详细介绍。OfficeGPT 官方帮助中心为您提供最权威的解答。`,
     keywords: [doc.title, 'OfficeGPT 教程', '帮助文档'],
     openGraph: {
-      title: \`\${doc.title} - 帮助文档 | OfficeGPT\`,
+      title: `${doc.title} - 帮助文档 | OfficeGPT`,
     }
   }
 }

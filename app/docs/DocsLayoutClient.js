@@ -3,6 +3,7 @@
 import { docsData } from '@/lib/docsData';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Footer from '@/app/components/Footer';
 
 export default function DocsLayout({ children }) {
   const pathname = usePathname();
@@ -76,10 +77,11 @@ export default function DocsLayout({ children }) {
       </aside>
 
       {/* Docs Content Area */}
-      <main style={{ flex: 1, padding: '48px', overflowY: 'auto', background: 'white' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <main style={{ flex: 1, overflowY: 'auto', background: 'white', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, padding: '48px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
           {children}
         </div>
+        <Footer />
       </main>
     </div>
   );

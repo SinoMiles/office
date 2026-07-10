@@ -17,6 +17,7 @@ export default function Footer() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.95rem' }}>
             <a href="/#solutions" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>核心工作流</a>
             <a href="/#pricing" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>按量计费方案</a>
+            <a href="/docs" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>帮助文档中心</a>
           </div>
         </div>
         <div>
