@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - ./uploads:/app/uploads
+      - ./storage:/app/storage
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongo:27017/officecli_saas
+      # 在本机环境通过 export DEEPSEEK_API_KEY=xxx 传入，或者新建一个 .env 文件
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - STORAGE_DIR=/app/storage
+    command: npm run dev -- -H 0.0.0.0
+    depends_on:
+      - mongo
+      - gotenberg
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3001:3000"
+    command:
+      - "gotenberg"
+      - "--api-port=3000"
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
