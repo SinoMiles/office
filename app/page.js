@@ -3,6 +3,7 @@
 import { ArrowRight, Zap, Shield, Sparkles, BarChart3, Clock, CheckCircle2, MessageSquare, LineChart, FileText, Bot, Database, Workflow } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Footer from './components/Footer';
+import FAQ from './components/FAQ';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -214,6 +215,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* FAQ Section */}
+      <FAQ />
 
       <Footer />
     </main>
