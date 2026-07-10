@@ -201,6 +201,11 @@ h1, h2, h3, h4 {
   100% { transform: translateY(40px); }
 }
 
+@keyframes slideGrid {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 50px; }
+}
+
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-20px); }
   to { opacity: 1; transform: translateY(0); }

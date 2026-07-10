@@ -2,6 +2,7 @@
 
 import { ArrowRight, Zap, Shield, Sparkles, BarChart3, Clock, CheckCircle2, MessageSquare, LineChart, FileText, Bot, Database, Workflow } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Footer from './components/Footer';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function LandingPage() {
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Dynamic Cool Morphing Blobs Background */}
+        {/* Dynamic Cool Morphing Blobs Background & Animated Grid */}
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0 }}>
           {/* Animated Blob 1 (Blue/Purple) */}
           <div className="blob" style={{ top: '-10%', left: '-10%', width: '600px', height: '600px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' }}></div>
@@ -27,8 +28,20 @@ export default function LandingPage() {
           {/* Animated Blob 3 (Rose/Orange) */}
           <div className="blob" style={{ top: '30%', left: '40%', width: '500px', height: '500px', background: 'linear-gradient(135deg, #f43f5e, #f59e0b)', animationDelay: '-8s', animationDuration: '25s' }}></div>
           
-          {/* Frosted Glass Overlay to keep content readable and blend the colors */}
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(248, 250, 252, 0.7)', backdropFilter: 'blur(100px)', WebkitBackdropFilter: 'blur(100px)' }}></div>
+          {/* Frosted Glass Overlay to blend the colors FIRST */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(248, 250, 252, 0.7)', backdropFilter: 'blur(80px)', WebkitBackdropFilter: 'blur(80px)' }}></div>
+
+          {/* Animated Tech Grid (Rendered ON TOP of the blur so it stays crisp) */}
+          <div style={{ 
+            position: 'absolute', 
+            inset: '-50%', 
+            backgroundImage: 'linear-gradient(rgba(16, 185, 129, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.15) 1px, transparent 1px)', 
+            backgroundSize: '50px 50px',
+            animation: 'slideGrid 3s linear infinite',
+            maskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)',
+            transform: 'perspective(1000px) rotateX(60deg)'
+          }}></div>
         </div>
 
         {/* 2-Column Split Layout */}
@@ -36,10 +49,6 @@ export default function LandingPage() {
           
           {/* Left Column: Content */}
           <div style={{ textAlign: 'left' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 20px', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(255,255,255,0.8)', color: 'var(--text-main)', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: '0.9rem', marginBottom: '32px', animation: 'slideUp 0.5s ease-out', backdropFilter: 'blur(10px)', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', background: 'var(--primary)', color: 'white', borderRadius: '50%' }}><Sparkles size={14} /></span>
-              搭载次世代 Deepseek 大模型推理引擎
-            </div>
             
             <h1 style={{ fontSize: 'clamp(3rem, 5vw, 5rem)', fontWeight: 800, lineHeight: 1.1, marginBottom: '24px', letterSpacing: '-0.04em', animation: 'slideUp 0.6s ease-out' }}>
               与你的数据 <br />
@@ -113,8 +122,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-
-
       {/* How it Works Section - Flow Design */}
       <section id="solutions" style={{ padding: '120px 24px', background: 'white', position: 'relative', overflow: 'hidden' }}>
         <div className="container">
@@ -124,41 +131,33 @@ export default function LandingPage() {
             <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto' }}>打破软件操作壁垒，将您的意图直接转化为精准的计算结果。</p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', position: 'relative', maxWidth: '1000px', margin: '0 auto', zIndex: 2 }}>
-            {/* Connection Line */}
-            <div style={{ position: 'absolute', top: '50px', bottom: '50px', left: '40px', width: '2px', background: 'linear-gradient(to bottom, var(--primary), #3b82f6)', opacity: 0.3, zIndex: -1, display: 'none' }} className="flow-line"></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px', position: 'relative', maxWidth: '1100px', margin: '0 auto', zIndex: 2 }}>
             
             {/* Step 1 */}
-            <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', background: 'rgba(255,255,255,0.6)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', backdropFilter: 'blur(10px)' }}>
-              <div style={{ width: '80px', height: '80px', flexShrink: 0, background: 'linear-gradient(135deg, var(--primary) 0%, #10b981 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.6)', padding: '40px 32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.3s ease', cursor: 'default' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
+              <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, var(--primary) 0%, #10b981 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)', marginBottom: '24px', transform: 'rotate(-5deg)' }}>
                 <Database size={32} />
               </div>
-              <div>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', fontWeight: 700 }}>1. 丢入任何杂乱数据</h3>
-                <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1.1rem' }}>一键上传您的 Excel、Word 或 PPT 文件。底层沙箱环境瞬间接管数据结构，确保绝对的隐私安全与极速解析。</p>
-              </div>
+              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>1. 丢入任何杂乱数据</h3>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>一键上传您的 Excel、Word 或 PPT 文件。底层沙箱环境瞬间接管数据结构，确保绝对的隐私安全与极速解析。</p>
             </div>
 
             {/* Step 2 */}
-            <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', background: 'rgba(255,255,255,0.6)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', backdropFilter: 'blur(10px)' }}>
-              <div style={{ width: '80px', height: '80px', flexShrink: 0, background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(59,130,246,0.4)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.6)', padding: '40px 32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.3s ease', cursor: 'default' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
+              <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(59,130,246,0.4)', marginBottom: '24px', transform: 'rotate(5deg)' }}>
                 <Bot size={32} />
               </div>
-              <div>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', fontWeight: 700 }}>2. 输入自然语言指令</h3>
-                <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1.1rem' }}>告诉 AI：“把 C 列的电话号码去重，如果 D 列是空值则填充为未知，最后生成一张根据城市汇总的柱状图。”</p>
-              </div>
+              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>2. 输入自然语言指令</h3>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>告诉 AI：“把 C 列的电话号码去重，如果 D 列是空值则填充为未知，最后生成根据城市汇总的柱状图。”</p>
             </div>
 
             {/* Step 3 */}
-            <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', background: 'rgba(255,255,255,0.6)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', backdropFilter: 'blur(10px)' }}>
-              <div style={{ width: '80px', height: '80px', flexShrink: 0, background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(139,92,246,0.4)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.6)', padding: '40px 32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.3s ease', cursor: 'default' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
+              <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(139,92,246,0.4)', marginBottom: '24px', transform: 'rotate(-5deg)' }}>
                 <Workflow size={32} />
               </div>
-              <div>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', fontWeight: 700 }}>3. 秒级实时渲染反馈</h3>
-                <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1.1rem' }}>基于 OfficeCLI 的底层驱动引擎，所有复杂的宏与公式被瞬间执行，修改后的成品文档将实时通过网页展现在你眼前。</p>
-              </div>
+              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>3. 秒级实时渲染反馈</h3>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>基于自研的底层驱动引擎，所有复杂的宏与公式被瞬间执行，修改后的成品文档将实时展现在你眼前。</p>
             </div>
           </div>
         </div>
@@ -216,51 +215,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer Section */}
-      <footer style={{ background: '#0a0f1c', color: '#94a3b8', padding: '100px 24px 40px 24px' }}>
-        <div className="container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '48px', marginBottom: '80px' }}>
-          <div style={{ maxWidth: '300px' }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: 'white', marginBottom: '24px' }}>
-              <span style={{ color: 'var(--primary)' }}>✦</span>
-              OfficeGPT
-            </div>
-            <p style={{ lineHeight: 1.6, fontSize: '0.95rem' }}>基于最新大语言模型驱动的下一代数据处理与办公自动化 SaaS 平台。</p>
-          </div>
-          <div>
-            <h4 style={{ color: 'white', marginBottom: '24px', fontSize: '1.1rem' }}>产品</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.95rem' }}>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>核心功能</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>价格方案</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>企业服务</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>API 接口</a>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ color: 'white', marginBottom: '24px', fontSize: '1.1rem' }}>资源</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.95rem' }}>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>帮助文档</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>最佳提示词模板</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>开发者博客</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>社区论坛</a>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ color: 'white', marginBottom: '24px', fontSize: '1.1rem' }}>公司</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.95rem' }}>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>关于我们</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>联系销售</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>隐私政策</a>
-              <a href="#" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>服务条款</a>
-            </div>
-          </div>
-        </div>
-        <div className="container" style={{ borderTop: '1px solid #1e293b', paddingTop: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', fontSize: '0.9rem' }}>
-          <div>© 2026 OfficeGPT Inc. 保留所有权利.</div>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 10px var(--primary)' }}></div> 系统运行正常</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toolCategories } from '@/lib/toolsData';
+import Footer from '@/app/components/Footer';
 
 export default function ToolboxPage() {
   const router = useRouter();
@@ -21,8 +22,22 @@ export default function ToolboxPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)' }}>
-      <div style={{ maxWidth: '1200px', margin: '40px auto 120px auto', padding: '0 24px', position: 'relative', zIndex: 2 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--background)', position: 'relative', overflow: 'hidden' }}>
+      {/* Decorative Background Effects */}
+      <div style={{ position: 'absolute', top: '-10%', left: '50%', transform: 'translateX(-50%)', width: '80%', height: '500px', background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.15) 0%, rgba(255,255,255,0) 70%)', zIndex: 0, pointerEvents: 'none' }}></div>
+      <div style={{ position: 'absolute', top: '10%', right: '10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(255,255,255,0) 70%)', zIndex: 0, pointerEvents: 'none', filter: 'blur(40px)' }}></div>
+      
+      {/* Hero Section */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '80px 24px 60px 24px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '3.5rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-1px', background: 'linear-gradient(135deg, var(--text-main) 0%, #475569 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          全能文档处理大厅
+        </h1>
+        <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto', lineHeight: 1.6 }}>
+          探索为现代办公量身打造的极速处理工具。无论是格式转换还是 AI 深度排版，均在完全安全的沙盒环境中瞬间完成。
+        </p>
+      </div>
+
+      <div style={{ maxWidth: '1200px', margin: '0 auto 120px auto', padding: '0 24px', position: 'relative', zIndex: 2 }}>
         {toolCategories.map((category, idx) => (
           <div key={idx} style={{ marginBottom: '64px', animation: `slideUp ${0.5 + idx * 0.1}s ease-out` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
@@ -73,7 +88,6 @@ export default function ToolboxPage() {
             </div>
           </div>
         ))}
-        
         <style dangerouslySetInnerHTML={{__html: `
           .premium-stat-card:hover .tool-arrow {
             opacity: 1 !important;
@@ -81,6 +95,7 @@ export default function ToolboxPage() {
           }
         `}} />
       </div>
+      <Footer />
     </div>
   );
 }

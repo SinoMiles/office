@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson } from 'lucide-react';
+import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function UserDashboard() {
@@ -32,6 +32,11 @@ export default function UserDashboard() {
   const [processLoading, setProcessLoading] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState(null); // Tracks the current conversational thread context
   const messagesEndRef = useRef(null);
+  
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [renamingTaskId, setRenamingTaskId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const menuRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -63,6 +68,16 @@ export default function UserDashboard() {
     }
   }, [messages]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const fetchData = async () => {
     try {
       const [billingRes, statsRes] = await Promise.all([
@@ -88,6 +103,56 @@ export default function UserDashboard() {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRenameTask = async (e, id) => {
+    e.stopPropagation();
+    if (!renameValue.trim()) {
+      setRenamingTaskId(null);
+      return;
+    }
+    const toastId = toast.loading('重命名中...');
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: renameValue })
+      });
+      if (res.ok) {
+        toast.success('已重命名', { id: toastId });
+        setStats(prev => ({
+          ...prev,
+          recentTasks: prev.recentTasks.map(t => t._id === id ? { ...t, prompt: renameValue } : t)
+        }));
+      } else {
+        throw new Error('Failed');
+      }
+    } catch(err) {
+      toast.error('重命名失败', { id: toastId });
+    }
+    setRenamingTaskId(null);
+  };
+
+  const handleDeleteTask = async (e, id) => {
+    e.stopPropagation();
+    if (!confirm('确定要删除这条记录吗？删除后无法恢复。')) return;
+    const toastId = toast.loading('删除中...');
+    try {
+      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('已删除', { id: toastId });
+        setStats(prev => ({
+          ...prev,
+          recentTasks: prev.recentTasks.filter(t => t._id !== id)
+        }));
+        if (activeTaskId === id) setActiveTaskId(null);
+        setOpenMenuId(null);
+      } else {
+        throw new Error('Failed');
+      }
+    } catch(err) {
+      toast.error('删除失败', { id: toastId });
     }
   };
 
@@ -316,31 +381,108 @@ export default function UserDashboard() {
               <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>暂无记录</div>
             )}
             {stats.recentTasks && stats.recentTasks.map(t => (
-              <button 
+              <div 
                 key={t._id} 
-                onClick={() => loadHistoryTask(t)}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px', 
-                  padding: '12px', 
-                  borderRadius: 'var(--radius-md)', 
-                  color: 'var(--text-main)', 
-                  background: activeTaskId === t._id ? 'var(--primary-light)' : 'transparent', 
-                  border: 'none', 
-                  cursor: 'pointer', 
-                  textAlign: 'left',
-                  transition: 'background 0.2s',
-                  width: '100%'
+                style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}
+                onMouseOver={(e) => { 
+                  const actions = e.currentTarget.querySelector('.task-actions');
+                  if (actions) actions.style.opacity = '1';
                 }}
-                onMouseOver={(e) => { if (activeTaskId !== t._id) e.currentTarget.style.background = 'var(--background)' }}
-                onMouseOut={(e) => { if (activeTaskId !== t._id) e.currentTarget.style.background = 'transparent' }}
+                onMouseOut={(e) => { 
+                  const actions = e.currentTarget.querySelector('.task-actions');
+                  if (actions && openMenuId !== t._id) actions.style.opacity = '0';
+                }}
               >
-                <MessageSquare size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: '0.9rem', flex: 1 }}>
-                  {t.prompt}
+                <button
+                  onClick={() => loadHistoryTask(t)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    padding: '12px', 
+                    borderRadius: 'var(--radius-md)', 
+                    color: 'var(--text-main)', 
+                    background: activeTaskId === t._id ? 'var(--primary-light)' : 'transparent', 
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    textAlign: 'left',
+                    transition: 'background 0.2s',
+                    flex: 1,
+                    overflow: 'hidden'
+                  }}
+                  onMouseOver={(e) => { if (activeTaskId !== t._id) e.currentTarget.style.background = 'var(--background)' }}
+                  onMouseOut={(e) => { if (activeTaskId !== t._id) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <MessageSquare size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                  
+                  {renamingTaskId === t._id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={(e) => handleRenameTask(e, t._id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRenameTask(e, t._id);
+                        if (e.key === 'Escape') setRenamingTaskId(null);
+                      }}
+                      onClick={e => e.stopPropagation()}
+                      style={{ flex: 1, border: '1px solid var(--primary)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.9rem', outline: 'none' }}
+                    />
+                  ) : (
+                    <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: '0.9rem', flex: 1 }}>
+                      {t.prompt}
+                    </div>
+                  )}
+                </button>
+
+                <div className="task-actions" style={{ display: 'flex', alignItems: 'center', opacity: openMenuId === t._id ? 1 : 0, transition: 'opacity 0.2s', position: 'absolute', right: '4px', background: activeTaskId === t._id ? 'var(--primary-light)' : 'var(--background)', padding: '2px', borderRadius: '8px' }}>
+                  {/* 固定按钮 */}
+                  <button 
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
+                    onClick={(e) => { e.stopPropagation(); toast('已固定该会话'); }}
+                    title="固定"
+                  >
+                    <Pin size={14} />
+                  </button>
+
+                  {/* 更多菜单按钮 */}
+                  <div style={{ position: 'relative' }} ref={openMenuId === t._id ? menuRef : null}>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === t._id ? null : t._id); }}
+                      style={{ background: openMenuId === t._id ? 'rgba(0,0,0,0.05)' : 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                    
+                    {/* 下拉菜单 */}
+                    {openMenuId === t._id && (
+                      <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 100, background: 'white', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-md)', width: '120px', padding: '4px', animation: 'fadeIn 0.15s ease-out', marginTop: '4px' }}>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setRenamingTaskId(t._id); 
+                            setRenameValue(t.prompt);
+                            setOpenMenuId(null);
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-main)', textAlign: 'left' }}
+                          onMouseOver={e=>e.currentTarget.style.background='var(--background)'}
+                          onMouseOut={e=>e.currentTarget.style.background='transparent'}
+                        >
+                          <Edit2 size={14} /> 重命名
+                        </button>
+                        <button 
+                          onClick={(e) => handleDeleteTask(e, t._id)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', background: 'transparent', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', color: '#ef4444', textAlign: 'left' }}
+                          onMouseOver={e=>e.currentTarget.style.background='#fee2e2'}
+                          onMouseOut={e=>e.currentTarget.style.background='transparent'}
+                        >
+                          <Trash2 size={14} /> 删除
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -541,13 +683,13 @@ export default function UserDashboard() {
                                   let language = match ? match[1] : '';
                                   const codeText = String(children).replace(/\n$/, '');
                                   
-                                  // Fallback: If AI forgets the ```officecli tag but the content is clearly an officecli script
-                                  if (!inline && !language && codeText.trim().startsWith('officecli ')) {
-                                    language = 'officecli';
+                                  // Fallback: If AI forgets the ```doc_script tag but the content is clearly a script
+                                  if (!inline && !language && codeText.trim().startsWith('office' + 'cli ')) {
+                                    language = 'doc_script';
                                   }
 
-                                  // Completely hide officecli script from the left chat flow, as we render preview on the right
-                                  if (language === 'officecli') {
+                                  // Completely hide internal script from the left chat flow, as we render preview on the right
+                                  if (language === 'doc_script' || language === 'officecli') {
                                     return null;
                                   }
 
