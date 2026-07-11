@@ -85,7 +85,8 @@ export function useAioncoreChat() {
                   ...last.content,
                   ...payload.content,
                   content: (last.content?.content || '') + (payload.content?.content || payload.data?.content || ''),
-                  subject: payload.content?.subject || last.content?.subject || payload.data?.subject
+                  subject: payload.content?.subject || last.content?.subject || payload.data?.subject,
+                  status: payload.data?.status || payload.content?.status || last.content?.status
                 }
               };
             } else if (payload.type === 'tool_group') {
@@ -162,7 +163,7 @@ export function useAioncoreChat() {
           currentAiMsg.thought = {
             subject: msg.content?.subject || '思考中',
             description: msg.content?.content, // AionCore stores the thinking text in content.content
-            done: msg.content?.status === 'done' || msg.status === 'finish' || msg.status === 'completed'
+            done: msg.content?.status === 'done' || msg.status === 'finish' || msg.status === 'completed' || !isProcessing
           };
         } else if (msg.type === 'tool_group' || msg.type === 'tool_call' || msg.type === 'acp_tool_call') {
           if (!currentAiMsg.progress) currentAiMsg.progress = { subject: '正在处理任务', startedAt: Date.now(), steps: [] };
