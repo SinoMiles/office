@@ -46,23 +46,34 @@ export function useAioncoreChat() {
           if (!payload?.msg_id) continue;
           if (conversationId && payload.conversation_id && payload.conversation_id !== conversationId) continue;
 
-          if (payload.status === 'finished' || payload.status === 'error' || payload.data?.type === 'error' || payload.type === 'error') {
+          if (payload.status === 'finished' || payload.type === 'finish' || payload.status === 'error' || payload.data?.type === 'error' || payload.type === 'error') {
             setIsProcessing(false);
           }
 
           if (payload.type === 'acp_permission' || payload.type === 'permission') {
-            const permId = payload.data?.id || payload.content?.id;
-            if (permId) {
-              ws.send('chat:permission:action', {
-                conversation_id: payload.conversation_id,
-                permission_id: permId,
-                action: 'proceed_always'
-              });
+            const callId = payload.data?.call_id || payload.content?.call_id;
+            if (callId) {
+              fetch(`http://127.0.0.1:9123/api/conversations/${payload.conversation_id}/confirmations/${encodeURIComponent(callId)}/confirm`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  msg_id: payload.msg_id,
+                  data: 'proceed_always',
+                  always_allow: true
+                })
+              }).catch(err => console.error('Failed to auto-approve permission:', err));
             }
             continue;
           }
 
-          const exists = next.findIndex(m => m.msg_id === payload.msg_id && m.type === payload.type);
+          // Custom matching for tool calls to prevent overwriting different tools in the same msg_id
+          let exists = -1;
+          if (payload.type === 'tool_call' || payload.type === 'acp_tool_call') {
+            const incomingCallId = payload.data?.call_id || payload.data?.update?.tool_call_id;
+            exists = next.findIndex(m => m.msg_id === payload.msg_id && m.type === payload.type && (m.data?.call_id === incomingCallId || m.data?.update?.tool_call_id === incomingCallId));
+          } else {
+            exists = next.findIndex(m => m.msg_id === payload.msg_id && m.type === payload.type);
+          }
           
           if (exists >= 0) {
             const last = next[exists];
@@ -86,7 +97,7 @@ export function useAioncoreChat() {
               });
               next[exists] = { ...last, ...payload, content: mergedTools };
             } else {
-              next[exists] = { ...last, ...payload };
+              next[exists] = { ...last, ...payload, data: { ...last.data, ...payload.data } };
             }
           } else {
             next.push(payload);
@@ -180,6 +191,9 @@ export function useAioncoreChat() {
               status: update.status === 'completed' ? 'completed' : update.status === 'error' ? 'failed' : 'running'
             });
           }
+          
+          const allStepsCompleted = currentAiMsg.progress.steps.every(s => s.status === 'completed' || s.status === 'failed');
+          currentAiMsg.progress.done = !isProcessing || allStepsCompleted;
         } else if (msg.type === 'text' || msg.type === 'content') {
           currentAiMsg.content = msg.content?.content || msg.content || '';
         } else if (msg.type === 'error' || (msg.type === 'tips' && msg.status === 'error')) {
