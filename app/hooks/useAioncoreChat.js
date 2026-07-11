@@ -9,6 +9,7 @@ import {
   reduceRuntime,
 } from '@/lib/aioncore/chat-reducer';
 import { chatLog, chatWarn } from '@/lib/aioncore/logger';
+import { autoConfirmPermission, buildAutoConfirmation, listPendingPermissions } from '@/lib/aioncore/auto-confirm';
 
 export function useAioncoreChat() {
   const [messages, setMessages] = useState([]);
@@ -17,6 +18,35 @@ export function useAioncoreChat() {
   const conversationIdRef = useRef(null);
   const frameRef = useRef(null);
   const queueRef = useRef([]);
+  const confirmationsInFlightRef = useRef(new Set());
+
+  const approvePermission = useCallback((payload) => {
+    if (process.env.NEXT_PUBLIC_AIONCORE_AUTO_APPROVE === 'false') return;
+    const confirmation = buildAutoConfirmation(payload);
+    const confirmationKey = confirmation
+      ? `${confirmation.conversationId}:${confirmation.callId}`
+      : `${payload.conversation_id || 'unknown'}:${payload.msg_id || 'unknown'}`;
+    if (confirmationsInFlightRef.current.has(confirmationKey)) return;
+    confirmationsInFlightRef.current.add(confirmationKey);
+    chatWarn('permission', `automatically approving ${confirmationKey}`, payload);
+    void autoConfirmPermission(payload)
+      .then((approved) => chatLog('permission', `approved ${approved.callId} with ${approved.selected}`, payload))
+      .catch((error) => {
+        confirmationsInFlightRef.current.delete(confirmationKey);
+        chatWarn('permission', error.message, payload);
+      });
+  }, []);
+
+  const recoverPendingPermissions = useCallback(async (conversationId) => {
+    if (process.env.NEXT_PUBLIC_AIONCORE_AUTO_APPROVE === 'false') return;
+    try {
+      const pending = await listPendingPermissions(conversationId);
+      chatLog('permission', `recovered ${pending.length} pending confirmation(s)`, { conversation_id: conversationId });
+      for (const permission of pending) approvePermission(permission);
+    } catch (error) {
+      chatWarn('permission', error.message, { conversation_id: conversationId });
+    }
+  }, [approvePermission]);
 
   const applyRuntimeEvent = useCallback((name, payload) => {
     setRuntime((previous) => {
@@ -46,6 +76,7 @@ export function useAioncoreChat() {
         applyRuntimeEvent('realtime.reconnected', payload);
         if (conversationIdRef.current) {
           client.send('chat:history:load', { conversation_id: conversationIdRef.current });
+          void recoverPendingPermissions(conversationIdRef.current);
         }
       }),
       client.on('session:state', (payload) => {
@@ -64,6 +95,9 @@ export function useAioncoreChat() {
       client.on('message.stream', (payload) => {
         applyRuntimeEvent('message.stream', payload);
         if (conversationIdRef.current && payload.conversation_id && payload.conversation_id !== conversationIdRef.current) return;
+        if (payload?.type === 'permission' || payload?.type === 'acp_permission') {
+          approvePermission(payload);
+        }
         if (!payload?.msg_id) {
           chatLog('messages', `runtime-only stream event ${payload?.type || '(unknown type)'}`, payload);
           return;
@@ -78,13 +112,14 @@ export function useAioncoreChat() {
       client.close();
       clientRef.current = null;
     };
-  }, [applyRuntimeEvent, flushMessageQueue]);
+  }, [applyRuntimeEvent, approvePermission, flushMessageQueue, recoverPendingPermissions]);
 
   const loadConversation = useCallback((id) => {
     chatLog('conversation', `load ${id}`);
     conversationIdRef.current = id;
     clientRef.current?.send('chat:history:load', { conversation_id: id });
-  }, []);
+    void recoverPendingPermissions(id);
+  }, [recoverPendingPermissions]);
 
   const waitUntilConnected = useCallback(async () => {
     const client = clientRef.current;

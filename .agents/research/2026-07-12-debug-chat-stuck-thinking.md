@@ -24,6 +24,7 @@
 | AionUi payload mismatch | High | Medium: missing thought/content/tool display | Excellent | Chat message rendering only |
 | No end-to-end console trace | High | Low runtime risk, high diagnostic cost | Good | Process, WS proxy, browser bridge and reducer |
 | AionCore starts before browser WebSocket is ready | Critical | High: early and terminal events can all be lost | Excellent | Message submission path |
+| Permission events were rendered but never confirmed | Critical | High: command/tool execution waits forever | Excellent | Tool execution and skill invocation |
 
 ## Root Cause
 
@@ -39,6 +40,7 @@ Runtime console evidence also confirmed a sequencing race: `chat:history:load` w
 - Added structured `[OfficeWeb:AionChat]` console logs across process initiation, WS proxy, browser socket, inbound/outbound events, history, reducer transitions and cancellation.
 - Logs summarize identifiers and keys rather than printing prompts, document contents, cookies or tokens.
 - Added an explicit WebSocket readiness promise. Dashboard submission now waits up to eight seconds for `/ws` to open before calling `/api/process`; timeout becomes a visible error instead of an infinite loading state.
+- Added automatic one-time confirmation for `permission` and `acp_permission`, including pending-confirmation recovery on conversation load/reconnect. It prefers `proceed_once` and never persists `always_allow`, so no permission UI is required without weakening future backend policy.
 
 ## Verification
 
