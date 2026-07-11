@@ -6,8 +6,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, Edit2, Trash2 } from 'lucide-react';
+import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, Edit2, Trash2, StopCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import TaskProgress from '@/app/components/TaskProgress';
 
 export default function UserDashboard() {
   const [data, setData] = useState({ records: [], balance: 0 });
@@ -36,6 +37,7 @@ export default function UserDashboard() {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [renamingTaskId, setRenamingTaskId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ isOpen: false, taskId: null });
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -60,6 +62,64 @@ export default function UserDashboard() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/tasks/active').then((res) => res.json()).then((payload) => {
+      if (cancelled || !payload.task) return;
+      const task = payload.task;
+      setActiveTaskId(task._id);
+      setProcessLoading(true);
+      setMessages([
+        { role: 'user', content: task.prompt, filename: task.filename },
+        {
+          role: 'ai', content: task.runtime?.streamedText || '', loading: true,
+          progress: task.runtime?.progress ? { subject: task.runtime.progress.title || '正在处理任务', startedAt: new Date(task.createdAt).getTime(), steps: [task.runtime.progress] } : undefined,
+        },
+      ]);
+      if (task.previewFile) {
+        setActiveArtifact({ previewUrl: `/api/tasks/${task._id}/preview`, previewVersion: new Date(task.runtime?.updatedAt || task.updatedAt).getTime() });
+        setRightPanelMode('preview');
+        setShowRightPanel(true);
+      }
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!activeTaskId || !processLoading) return undefined;
+    const poll = async () => {
+      const response = await fetch(`/api/tasks/${activeTaskId}`);
+      const payload = await response.json().catch(() => null);
+      const task = payload?.task;
+      if (!task) return;
+      setMessages((previous) => {
+        if (!previous.length) return previous;
+        const next = [...previous];
+        const last = next[next.length - 1];
+        if (last.role !== 'ai') return previous;
+        next[next.length - 1] = {
+          ...last,
+          content: task.runtime?.streamedText || task.aiTextResponse || last.content,
+          loading: ['processing', 'cancelling'].includes(task.status),
+          ...(task.runtime?.progress ? { progress: { ...(last.progress || { startedAt: new Date(task.createdAt).getTime(), steps: [] }), subject: task.runtime.progress.title || '正在处理任务', steps: [task.runtime.progress] } } : {}),
+        };
+        return next;
+      });
+      if (task.previewFile) {
+        setActiveArtifact((current) => ({ ...(current || {}), filename: task.outputFilename, previewUrl: `/api/tasks/${task._id}/preview`, downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined, previewVersion: new Date(task.runtime?.updatedAt || task.updatedAt).getTime() }));
+        setRightPanelMode('preview');
+        setShowRightPanel(true);
+      }
+      if (!['processing', 'cancelling'].includes(task.status)) {
+        setProcessLoading(false);
+        fetchData();
+      }
+    };
+    const timer = window.setInterval(() => { void poll(); }, 1500);
+    void poll();
+    return () => window.clearInterval(timer);
+  }, [activeTaskId, processLoading]);
 
   useEffect(() => {
     // Auto scroll to bottom of chat
@@ -136,7 +196,14 @@ export default function UserDashboard() {
 
   const handleDeleteTask = async (e, id) => {
     e.stopPropagation();
-    if (!confirm('确定要删除这条记录吗？删除后无法恢复。')) return;
+    setDeleteConfirmDialog({ isOpen: true, taskId: id });
+  };
+
+  const executeDeleteTask = async () => {
+    const id = deleteConfirmDialog.taskId;
+    setDeleteConfirmDialog({ isOpen: false, taskId: null });
+    if (!id) return;
+    
     const toastId = toast.loading('删除中...');
     try {
       const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
@@ -202,11 +269,13 @@ export default function UserDashboard() {
     setActiveArtifact(null);
   };
 
-  const loadHistoryTask = (task) => {
-    setMessages([
-      { role: 'user', content: task.prompt, filename: task.filename },
-      { role: 'ai', content: task.aiTextResponse || '处理完成。', html: task.htmlResult }
-    ]);
+  const loadHistoryTask = async (task) => {
+    const payload = await fetch(`/api/tasks/${task._id}/conversation`).then((res) => res.json()).catch(() => null);
+    const conversation = payload?.tasks || [task];
+    setMessages(conversation.flatMap((turn) => [
+      { role: 'user', content: turn.prompt, filename: turn.filename },
+      { role: 'ai', content: turn.aiTextResponse || (turn.status === 'cancelled' ? '任务已取消。' : '处理完成。'), html: turn.htmlResult, error: turn.status === 'failed' },
+    ]));
     setActiveTaskId(task._id);
     setActiveTab('workspace');
     if (task.outputFile) {
@@ -222,6 +291,13 @@ export default function UserDashboard() {
     }
   };
 
+  const handleCancel = async () => {
+    if (!activeTaskId) return;
+    const response = await fetch(`/api/tasks/${activeTaskId}/cancel`, { method: 'POST' });
+    if (response.ok) toast.success('正在停止任务…');
+    else toast.error((await response.json().catch(() => ({}))).error || '停止失败');
+  };
+
   const handleProcess = async () => {
     if (!prompt.trim()) return toast.error('请输入处理需求');
     // Removed strict file check to allow pure text chatting
@@ -235,8 +311,10 @@ export default function UserDashboard() {
     setPrompt('');
     setProcessLoading(true);
 
-    // Add loading AI message
-    setMessages([...newMessages, { role: 'ai', content: '', loading: true }]);
+    // Progress is created only by real OfficeCLI events, never as a placeholder.
+    setMessages([...newMessages, {
+      role: 'ai', content: '', loading: true,
+    }]);
     
     try {
       const formData = new FormData();
@@ -254,77 +332,92 @@ export default function UserDashboard() {
         throw new Error(resData.error || '处理失败');
       }
 
+      if (!response.body) throw new Error('服务器未返回任务进度流');
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
-      let aiText = '';
+      let buffer = '';
+      const updateAssistant = (updater) => setMessages((previous) => {
+        const next = [...previous];
+        next[next.length - 1] = updater(next[next.length - 1]);
+        return next;
+      });
+      const updateProgress = (event) => updateAssistant((message) => {
+        const progress = message.progress || { subject: '正在处理任务', startedAt: Date.now(), steps: [] };
+        const steps = [...progress.steps];
+        if (event.id) {
+          const index = steps.findIndex((step) => step.id === event.id);
+          const nextStep = { ...(index >= 0 ? steps[index] : {}), ...event };
+          if (index >= 0) steps[index] = nextStep;
+          else steps.push(nextStep);
+        }
+        return { ...message, progress: { ...progress, subject: event.subject || event.title || progress.subject, steps } };
+      });
+      const handleEvent = (eventName, event) => {
+        if (eventName === 'task') {
+          if (event.taskId) setActiveTaskId(event.taskId);
+        } else if (eventName === 'status') {
+          // Reserved for server-reported status that is backed by actual work.
+          if (!event.title) return;
+          updateAssistant((message) => ({ ...message, progress: { ...message.progress, subject: event.title || message.progress.subject } }));
+        } else if (['plan', 'thinking', 'tool', 'progress'].includes(eventName)) {
+          if (eventName === 'plan') {
+            updateAssistant((message) => ({ ...message, progress: { ...message.progress, subject: event.subject, steps: event.steps || [] } }));
+          } else updateProgress(event);
+        } else if (eventName === 'preview') {
+          updateProgress(event);
+          setActiveArtifact((current) => ({ ...(current || {}), previewUrl: event.previewUrl, previewVersion: event.version }));
+          setRightPanelMode('preview');
+          setShowRightPanel(true);
+        } else if (eventName === 'text') {
+          updateAssistant((message) => ({ ...message, content: event.content || '' }));
+        } else if (eventName === 'text_delta') {
+          updateAssistant((message) => ({ ...message, content: `${message.content || ''}${event.content || ''}` }));
+        } else if (eventName === 'complete') {
+          if (event.taskId) setActiveTaskId(event.taskId);
+          if (event.artifact) setActiveArtifact(event.artifact);
+          updateAssistant((message) => ({
+            ...message,
+            loading: false,
+            ...(message.progress ? {
+              progress: {
+                ...message.progress,
+                subject: '任务已完成',
+                done: true,
+                steps: (message.progress.steps || []).map((step) => step.status === 'running' ? { ...step, status: 'completed' } : step),
+              },
+            } : {}),
+          }));
+          setFile(null);
+          fetchData();
+        } else if (eventName === 'error') {
+          throw new Error(event.error || '处理失败');
+        } else if (eventName === 'cancelled') {
+          updateAssistant((message) => ({ ...message, content: message.content || '任务已取消。', loading: false, error: false, ...(message.progress ? { progress: { ...message.progress, subject: '任务已取消', done: true } } : {}) }));
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        
-        aiText += chunk;
-        
-        let displayAiText = aiText;
-        let msgSearchData = null;
-        
-        const searchRegex = /\[SEARCH_DATA\](.*?)\[\/SEARCH_DATA\]/;
-        const searchMatch = displayAiText.match(searchRegex);
-        if (searchMatch) {
-          try {
-            msgSearchData = JSON.parse(searchMatch[1]).searchData;
-          } catch(e) {}
-          displayAiText = displayAiText.replace(searchRegex, '');
-        }
-
-        const metaIdx = displayAiText.indexOf('[METADATA]');
-        
-        if (metaIdx !== -1) {
-          const actualText = displayAiText.substring(0, metaIdx);
-          const metaStr = displayAiText.substring(metaIdx + 10);
-          
-          try {
-            const meta = JSON.parse(metaStr);
-            if (meta.taskId) setActiveTaskId(meta.taskId);
-            if (meta.artifact) {
-              setActiveArtifact(meta.artifact);
-              setRightPanelMode('preview');
-              setShowRightPanel(true);
-            }
-            // Notice: dashboard's user state is actually fetched via fetchData()
-            // but we can let fetchData() update balance by calling it below
-          } catch(e) {}
-
-          setMessages(prev => {
-            const newMsgs = [...prev];
-            newMsgs[newMsgs.length - 1] = { 
-              role: 'ai', 
-              content: actualText, 
-              loading: false,
-              searchData: msgSearchData || newMsgs[newMsgs.length - 1].searchData 
-            };
-            return newMsgs;
-          });
-          
-          setFile(null); // Clear file upload since context is established
-          fetchData(); // Refresh history and stats
-          break;
-        } else {
-          setMessages(prev => {
-            const newMsgs = [...prev];
-            newMsgs[newMsgs.length - 1] = { 
-              role: 'ai', 
-              content: displayAiText, 
-              loading: false,
-              searchData: msgSearchData || newMsgs[newMsgs.length - 1].searchData 
-            };
-            return newMsgs;
-          });
+        buffer += decoder.decode(value, { stream: true });
+        const packets = buffer.split('\n\n');
+        buffer = packets.pop() || '';
+        for (const packet of packets) {
+          const lines = packet.split('\n');
+          const eventName = lines.find((line) => line.startsWith('event:'))?.slice(6).trim() || 'message';
+          const rawData = lines.filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).join('\n');
+          if (!rawData) continue;
+          handleEvent(eventName, JSON.parse(rawData));
         }
       }
+      updateAssistant((message) => message.loading ? {
+        ...message,
+        loading: false,
+        ...(message.progress ? { progress: { ...message.progress, subject: '任务已结束', done: true } } : {}),
+      } : message);
     } catch (err) {
-      setMessages([...newMessages, { role: 'ai', content: '网络错误: ' + err.message, error: true }]);
+      setMessages([...newMessages, { role: 'ai', content: '处理失败：' + err.message, error: true }]);
     } finally {
       setProcessLoading(false);
     }
@@ -640,7 +733,8 @@ export default function UserDashboard() {
                       )}
 
                       {/* Text Content */}
-                      {msg.loading && !msg.searchData ? (
+                      {msg.progress && <TaskProgress progress={msg.progress} />}
+                      {msg.loading && !msg.searchData && !msg.progress ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
                           <Loader2 size={16} className="spin-anim" /> 思考中...
                         </div>
@@ -782,13 +876,14 @@ export default function UserDashboard() {
                   </label>
                 </div>
 
-                {/* Send Button */}
+                {/* Send / Stop Button */}
                 <button 
-                  onClick={handleProcess}
-                  disabled={processLoading || !prompt.trim()}
-                  style={{ position: 'absolute', right: '12px', bottom: '12px', width: '32px', height: '32px', borderRadius: '50%', background: prompt.trim() && !processLoading ? 'var(--primary)' : 'var(--background)', color: prompt.trim() && !processLoading ? 'white' : 'var(--text-muted)', border: 'none', cursor: prompt.trim() && !processLoading ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                  onClick={processLoading ? handleCancel : handleProcess}
+                  disabled={!processLoading && !prompt.trim()}
+                  title={processLoading ? '停止生成' : '发送'}
+                  style={{ position: 'absolute', right: '12px', bottom: '12px', width: '32px', height: '32px', borderRadius: '50%', background: processLoading || prompt.trim() ? 'var(--primary)' : 'var(--background)', color: processLoading || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: processLoading || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                 >
-                  <Send size={16} style={{ marginLeft: '2px' }} />
+                  {processLoading ? <StopCircle size={16} /> : <Send size={16} style={{ marginLeft: '2px' }} />}
                 </button>
               </div>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
@@ -832,22 +927,50 @@ export default function UserDashboard() {
               {rightPanelMode === 'preview' && activeArtifact && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
                   <iframe
-                    key={activeArtifact.previewUrl}
-                    src={activeArtifact.previewUrl}
+                    key={`${activeArtifact.previewUrl}:${activeArtifact.previewVersion || 0}`}
+                    src={`${activeArtifact.previewUrl}?v=${activeArtifact.previewVersion || 0}`}
                     title="Office document preview"
                     sandbox="allow-scripts"
                     style={{ width: '100%', minHeight: '560px', flex: 1, border: '1px solid var(--border)', borderRadius: '8px', background: 'white' }}
                   />
-                  <a
-                    href={activeArtifact.downloadUrl}
-                    className="btn btn-primary"
-                    style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                  >
-                    <Download size={18} /> 下载 {activeArtifact.filename || 'Office 文件'}
-                  </a>
+                  {activeArtifact.downloadUrl ? (
+                    <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <Download size={18} /> 下载 {activeArtifact.filename || 'Office 文件'}
+                    </a>
+                  ) : <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>正在生成，右侧预览会随 OfficeCLI 的渲染结果更新…</div>}
                 </div>
               )}
 
+            </div>
+          </div>
+        )}
+
+        {/* Custom Confirm Modal for Delete */}
+        {deleteConfirmDialog.isOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })}></div>
+            <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', zIndex: 1, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Trash2 size={24} style={{ color: 'var(--danger, #ef4444)' }} />
+                删除确认
+              </h3>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
+                您确定要删除这条历史记录吗？<br/>删除后该文档及对话上下文将无法恢复。
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button 
+                  onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })}
+                  style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 500 }}
+                >
+                  取消
+                </button>
+                <button 
+                  onClick={executeDeleteTask}
+                  style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'var(--danger, #ef4444)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
+                >
+                  确认删除
+                </button>
+              </div>
             </div>
           </div>
         )}

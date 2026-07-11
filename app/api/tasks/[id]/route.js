@@ -3,6 +3,16 @@ import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import Task from '@/models/Task';
 
+export async function GET(_request, { params }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  await connectToDatabase();
+  const { id } = await params;
+  const task = await Task.findOne({ _id: id, userId: user._id }).lean();
+  if (!task) return NextResponse.json({ error: 'Task not found or permission denied' }, { status: 404 });
+  return NextResponse.json({ success: true, task });
+}
+
 export async function PUT(request, { params }) {
   try {
     const user = await getCurrentUser();

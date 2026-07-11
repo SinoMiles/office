@@ -14,6 +14,9 @@ export default function AdminUsersPage() {
     email: '', password: '', role: 'user', membershipLevel: 'FREE', balance: 0
   });
 
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, email: '' });
+  const [rechargeDialog, setRechargeDialog] = useState({ isOpen: false, userId: null, amountStr: '' });
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -87,8 +90,14 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleDelete = async (id, email) => {
-    if (!confirm(`确定要永久删除用户 ${email} 吗？\n注意：相关日志仍会保留以便审计。`)) return;
+  const handleDeleteClick = (id, email) => {
+    setDeleteDialog({ isOpen: true, id, email });
+  };
+
+  const executeDelete = async () => {
+    const { id } = deleteDialog;
+    setDeleteDialog({ isOpen: false, id: null, email: '' });
+    if (!id) return;
     
     try {
       const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
@@ -104,9 +113,15 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleRecharge = async (userId) => {
-    const amountStr = prompt('请输入充值数量 (Tokens)，支持负数扣款:');
-    if (!amountStr) return;
+  const handleRechargeClick = (userId) => {
+    setRechargeDialog({ isOpen: true, userId, amountStr: '' });
+  };
+
+  const executeRecharge = async () => {
+    const { userId, amountStr } = rechargeDialog;
+    setRechargeDialog({ isOpen: false, userId: null, amountStr: '' });
+    if (!userId) return;
+
     const amount = parseInt(amountStr, 10);
     if (isNaN(amount)) return toast.error('请输入有效数字');
 
@@ -181,23 +196,23 @@ export default function AdminUsersPage() {
                   <td style={{ textAlign: 'right', paddingRight: '24px' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       <button 
-                        title="快捷加款"
-                        onClick={() => handleRecharge(u._id)}
-                        style={{ padding: '8px', borderRadius: '8px', background: '#f8fafc', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--primary)' }}
+                        onClick={() => handleRechargeClick(u._id)}
+                        style={{ padding: '8px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--primary)', cursor: 'pointer' }}
+                        title="充值/扣款"
                       >
                         <DollarSign size={16} />
                       </button>
                       <button 
-                        title="编辑用户"
                         onClick={() => openModal(u)}
-                        style={{ padding: '8px', borderRadius: '8px', background: '#f8fafc', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-main)' }}
+                        style={{ padding: '8px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-main)', cursor: 'pointer' }}
+                        title="编辑"
                       >
                         <Edit size={16} />
                       </button>
                       <button 
-                        title="删除用户"
-                        onClick={() => handleDelete(u._id, u.email)}
-                        style={{ padding: '8px', borderRadius: '8px', background: '#fee2e2', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', color: '#ef4444' }}
+                        onClick={() => handleDeleteClick(u._id, u.email)}
+                        style={{ padding: '8px', background: 'transparent', border: '1px solid #fee2e2', borderRadius: '8px', color: '#ef4444', cursor: 'pointer' }}
+                        title="删除"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -270,6 +285,76 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirm Dialog */}
+      {deleteDialog.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setDeleteDialog({ isOpen: false, id: null, email: '' })}></div>
+          <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', zIndex: 1, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Trash2 size={24} style={{ color: 'var(--danger, #ef4444)' }} />
+              删除确认
+            </h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
+              确定要永久删除用户 <strong>{deleteDialog.email}</strong> 吗？<br/>注意：相关日志仍会保留以便审计。
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button 
+                onClick={() => setDeleteDialog({ isOpen: false, id: null, email: '' })}
+                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                取消
+              </button>
+              <button 
+                onClick={executeDelete}
+                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'var(--danger, #ef4444)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recharge Prompt Dialog */}
+      {rechargeDialog.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setRechargeDialog({ isOpen: false, userId: null, amountStr: '' })}></div>
+          <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', zIndex: 1, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <DollarSign size={24} style={{ color: 'var(--primary)' }} />
+              后台手工充值/扣款
+            </h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5 }}>
+              请输入充值数量 (Tokens)，支持输入负数进行扣款操作。
+            </p>
+            <input 
+              type="number" 
+              autoFocus
+              value={rechargeDialog.amountStr}
+              onChange={e => setRechargeDialog({ ...rechargeDialog, amountStr: e.target.value })}
+              onKeyDown={e => e.key === 'Enter' && executeRecharge()}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '2px solid var(--primary)', outline: 'none', fontSize: '1.1rem', marginBottom: '24px' }}
+              placeholder="例如: 1000 或 -500"
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button 
+                onClick={() => setRechargeDialog({ isOpen: false, userId: null, amountStr: '' })}
+                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                取消
+              </button>
+              <button 
+                onClick={executeRecharge}
+                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
+              >
+                确认执行
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
