@@ -39,6 +39,7 @@ export default function UserDashboard() {
   const [renameValue, setRenameValue] = useState('');
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ isOpen: false, taskId: null });
   const menuRef = useRef(null);
+  const lastPreviewVersionRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -78,7 +79,9 @@ export default function UserDashboard() {
         },
       ]);
       if (task.previewFile) {
-        setActiveArtifact({ previewUrl: `/api/tasks/${task._id}/preview`, previewVersion: new Date(task.runtime?.updatedAt || task.updatedAt).getTime() });
+        const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
+        setActiveArtifact({ previewUrl: `/api/tasks/${task._id}/preview`, previewVersion: version });
+        lastPreviewVersionRef.current = version;
         setRightPanelMode('preview');
         setShowRightPanel(true);
       }
@@ -107,9 +110,14 @@ export default function UserDashboard() {
         return next;
       });
       if (task.previewFile) {
-        setActiveArtifact((current) => ({ ...(current || {}), filename: task.outputFilename, previewUrl: `/api/tasks/${task._id}/preview`, downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined, previewVersion: new Date(task.runtime?.updatedAt || task.updatedAt).getTime() }));
-        setRightPanelMode('preview');
-        setShowRightPanel(true);
+        const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
+        setActiveArtifact((current) => ({ ...(current || {}), filename: task.outputFilename, previewUrl: `/api/tasks/${task._id}/preview`, downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined, previewVersion: version }));
+        
+        if (lastPreviewVersionRef.current !== version) {
+          lastPreviewVersionRef.current = version;
+          setRightPanelMode('preview');
+          setShowRightPanel(true);
+        }
       }
       if (!['processing', 'cancelling'].includes(task.status)) {
         setProcessLoading(false);
@@ -301,12 +309,15 @@ export default function UserDashboard() {
     ]));
     setActiveTaskId(task._id);
     setActiveTab('workspace');
-    if (task.outputFile) {
+    if (task.outputFile || task.previewFile) {
+      const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
       setActiveArtifact({
         filename: task.outputFilename,
         previewUrl: `/api/tasks/${task._id}/preview`,
-        downloadUrl: `/api/tasks/${task._id}/download`,
+        downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined,
+        previewVersion: version,
       });
+      lastPreviewVersionRef.current = version;
       setRightPanelMode('preview');
       setShowRightPanel(true);
     } else {
@@ -389,6 +400,7 @@ export default function UserDashboard() {
         } else if (eventName === 'preview') {
           updateProgress(event);
           setActiveArtifact((current) => ({ ...(current || {}), previewUrl: event.previewUrl, previewVersion: event.version }));
+          lastPreviewVersionRef.current = event.version;
           setRightPanelMode('preview');
           setShowRightPanel(true);
         } else if (eventName === 'text') {
