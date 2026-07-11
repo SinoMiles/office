@@ -93,6 +93,13 @@ export function useAioncoreChat() {
     clientRef.current?.send('chat:history:load', { conversation_id: id });
   }, []);
 
+  const waitUntilConnected = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client) throw new Error('实时连接尚未初始化，请稍后重试');
+    await client.ready();
+    chatLog('conversation', 'realtime connection confirmed ready');
+  }, []);
+
   const sendMessage = useCallback((text, attachedFile, overrideConversationId = null) => {
     const activeId = overrideConversationId || conversationIdRef.current;
     if (!activeId) {
@@ -138,6 +145,7 @@ export function useAioncoreChat() {
     runtime,
     sendMessage,
     loadConversation,
+    waitUntilConnected,
     stopGeneration,
     cancelGeneration,
   };

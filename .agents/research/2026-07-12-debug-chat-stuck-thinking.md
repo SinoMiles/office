@@ -23,10 +23,13 @@
 | Missing `turn.completed` subscription | Critical | High: no canonical recovery path | Excellent | Chat runtime only |
 | AionUi payload mismatch | High | Medium: missing thought/content/tool display | Excellent | Chat message rendering only |
 | No end-to-end console trace | High | Low runtime risk, high diagnostic cost | Good | Process, WS proxy, browser bridge and reducer |
+| AionCore starts before browser WebSocket is ready | Critical | High: early and terminal events can all be lost | Excellent | Message submission path |
 
 ## Root Cause
 
 The refactored hook treated every `message.stream` payload as a renderable message and required `msg_id` before updating runtime. Control events such as `finish` do not need to be renderable and may not carry a message ID. The implementation also omitted AionUi's canonical `turn.completed` event and did not fully match AionUi's `thought`/`data` wire shapes.
+
+Runtime console evidence also confirmed a sequencing race: `chat:history:load` was queued because the socket was not open, while `/api/process` had already instructed AionCore to generate. A short response could therefore complete before the browser subscribed to any event.
 
 ## Fix
 
@@ -35,6 +38,7 @@ The refactored hook treated every `message.stream` payload as a renderable messa
 - Added `thought`, string `data`, and tool-group `data[]` compatibility.
 - Added structured `[OfficeWeb:AionChat]` console logs across process initiation, WS proxy, browser socket, inbound/outbound events, history, reducer transitions and cancellation.
 - Logs summarize identifiers and keys rather than printing prompts, document contents, cookies or tokens.
+- Added an explicit WebSocket readiness promise. Dashboard submission now waits up to eight seconds for `/ws` to open before calling `/api/process`; timeout becomes a visible error instead of an infinite loading state.
 
 ## Verification
 
@@ -43,4 +47,3 @@ The refactored hook treated every `message.stream` payload as a renderable messa
 | Unit tests | 8/8 passed |
 | Targeted ESLint | Passed |
 | Production build | Passed |
-

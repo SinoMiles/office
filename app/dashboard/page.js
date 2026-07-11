@@ -27,7 +27,7 @@ export default function UserDashboard() {
   const router = useRouter();
 
   // AionCore hook
-  const { messages: aionMessages, isProcessing: aionIsProcessing, sendMessage, loadConversation, cancelGeneration } = useAioncoreChat();
+  const { messages: aionMessages, isProcessing: aionIsProcessing, sendMessage, loadConversation, waitUntilConnected, cancelGeneration } = useAioncoreChat();
 
   // Chat UI states
   const [messages, setMessages] = useState([]);
@@ -356,6 +356,10 @@ export default function UserDashboard() {
     setProcessLoading(true);
 
     try {
+      // AionCore starts streaming as soon as /api/process returns. Ensure the
+      // realtime channel is ready first so no start/content/finish event is lost.
+      await waitUntilConnected();
+
       const formData = new FormData();
       if (currentFile) formData.append('file', currentFile);
       formData.append('prompt', currentPrompt);
