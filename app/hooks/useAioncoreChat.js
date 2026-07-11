@@ -37,17 +37,19 @@ export function useAioncoreChat() {
         return;
       }
       
+      const queue = [...updateQueue];
+      updateQueue = [];
+      let shouldStopProcessing = false;
+
       setMessages(prev => {
         let next = [...prev];
-        const queue = updateQueue;
-        updateQueue = [];
         
         for (const payload of queue) {
           if (!payload?.msg_id) continue;
           if (conversationId && payload.conversation_id && payload.conversation_id !== conversationId) continue;
 
           if (payload.status === 'finished' || payload.type === 'finish' || payload.status === 'error' || payload.data?.type === 'error' || payload.type === 'error') {
-            setIsProcessing(false);
+            shouldStopProcessing = true;
           }
 
           if (payload.type === 'acp_permission' || payload.type === 'permission') {
@@ -107,7 +109,10 @@ export function useAioncoreChat() {
         return next;
       });
       
-      // Process any new messages that arrived during the render
+      if (shouldStopProcessing) {
+        setIsProcessing(false);
+      }
+      
       requestAnimationFrame(processQueue);
     };
 
