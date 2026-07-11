@@ -8,6 +8,7 @@ import SystemSetting from '@/models/SystemSetting';
 import BillingRecord from '@/models/BillingRecord';
 import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
+import { chatError, chatLog } from '@/lib/aioncore/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -33,6 +34,7 @@ export async function POST(request) {
     const parentTaskId = String(formData.get('taskId') || '').trim();
     const file = formData.get('file');
     if (!prompt) return NextResponse.json({ error: '请输入处理需求' }, { status: 400 });
+    chatLog('process', 'request accepted', { parentTaskId: parentTaskId || undefined, hasFile: Boolean(file) });
 
     const parentTask = parentTaskId
       ? await Task.findOne({ _id: parentTaskId, userId: user._id })
@@ -60,6 +62,7 @@ export async function POST(request) {
     let aionModelPayload = null;
     try {
       const providersRes = await fetch(`${AIONCORE_URL}/api/providers`);
+      chatLog('process', `providers response ${providersRes.status}`);
       if (providersRes.ok) {
         const providersJson = await providersRes.json();
         if (providersJson.success && Array.isArray(providersJson.data)) {
@@ -94,6 +97,7 @@ export async function POST(request) {
       if (!convRes.ok) throw new Error('创建 AionCore 会话失败');
       const convJson = await convRes.json();
       aionConversationId = convJson.data?.id || crypto.randomUUID();
+      chatLog('process', `conversation created ${aionConversationId}`, { conversation_id: aionConversationId });
     }
 
     task = await Task.create({
@@ -104,6 +108,7 @@ export async function POST(request) {
       status: 'processing',
       runtime: { state: 'running', updatedAt: new Date() },
     });
+    chatLog('process', `task created ${task._id}`, { conversation_id: aionConversationId });
 
     let filename = parentTask?.filename || '';
     let aionFilePath = '';
@@ -151,6 +156,7 @@ export async function POST(request) {
         files: filename ? [filename] : [],
       })
     });
+    chatLog('process', `message start response ${aiRes.status}`, { conversation_id: aionConversationId });
 
     if (!aiRes.ok) {
       const errText = await aiRes.text();
@@ -166,7 +172,7 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error('Task initiation failed:', error);
+    chatError('process', 'task initiation failed', error);
     return NextResponse.json({ error: error.message || '内部处理错误' }, { status: 500 });
   }
 }

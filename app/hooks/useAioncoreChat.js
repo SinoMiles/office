@@ -8,6 +8,7 @@ import {
   mergeStreamMessages,
   reduceRuntime,
 } from '@/lib/aioncore/chat-reducer';
+import { chatLog, chatWarn } from '@/lib/aioncore/logger';
 
 export function useAioncoreChat() {
   const [messages, setMessages] = useState([]);
@@ -20,13 +21,18 @@ export function useAioncoreChat() {
   const queueRef = useRef([]);
 
   const applyRuntimeEvent = useCallback((name, payload) => {
-    setRuntime((previous) => reduceRuntime(previous, name, payload));
+    setRuntime((previous) => {
+      const next = reduceRuntime(previous, name, payload);
+      chatLog('runtime', `${name}: ${previous.state}/${previous.isProcessing} -> ${next.state}/${next.isProcessing}`, payload);
+      return next;
+    });
   }, []);
 
   const flushMessageQueue = useCallback(() => {
     frameRef.current = null;
     const queued = queueRef.current.splice(0);
     if (!queued.length) return;
+    chatLog('messages', `merging ${queued.length} stream event(s)`);
     setMessages((previous) => queued.reduce(mergeStreamMessages, previous));
   }, []);
 
@@ -54,14 +60,21 @@ export function useAioncoreChat() {
         }
       }),
       client.on('chat:history:page', (payload) => {
-        if (Array.isArray(payload?.items)) setMessages(payload.items);
+        if (Array.isArray(payload?.items)) {
+          chatLog('history', `loaded ${payload.items.length} message(s)`, payload);
+          setMessages(payload.items);
+        }
       }),
       client.on('chat:turn:state', (payload) => applyRuntimeEvent('chat:turn:state', payload)),
+      client.on('turn.completed', (payload) => applyRuntimeEvent('turn.completed', payload)),
       client.on('message.stream', (payload) => {
-        if (!payload?.msg_id) return;
-        if (conversationIdRef.current && payload.conversation_id && payload.conversation_id !== conversationIdRef.current) return;
-        queueRef.current.push(payload);
         applyRuntimeEvent('message.stream', payload);
+        if (conversationIdRef.current && payload.conversation_id && payload.conversation_id !== conversationIdRef.current) return;
+        if (!payload?.msg_id) {
+          chatLog('messages', `runtime-only stream event ${payload?.type || '(unknown type)'}`, payload);
+          return;
+        }
+        queueRef.current.push(payload);
         if (!frameRef.current) frameRef.current = requestAnimationFrame(flushMessageQueue);
       }),
     ];
@@ -74,6 +87,7 @@ export function useAioncoreChat() {
   }, [applyRuntimeEvent, flushMessageQueue]);
 
   const loadConversation = useCallback((id) => {
+    chatLog('conversation', `load ${id}`);
     conversationIdRef.current = id;
     setConversationId(id);
     clientRef.current?.send('chat:history:load', { conversation_id: id });
@@ -81,7 +95,11 @@ export function useAioncoreChat() {
 
   const sendMessage = useCallback((text, attachedFile, overrideConversationId = null) => {
     const activeId = overrideConversationId || conversationIdRef.current;
-    if (!activeId) return;
+    if (!activeId) {
+      chatWarn('conversation', 'send ignored because conversation id is missing');
+      return;
+    }
+    chatLog('conversation', `optimistic send to ${activeId}`, { conversation_id: activeId, attachment: Boolean(attachedFile) });
     conversationIdRef.current = activeId;
     setConversationId(activeId);
     applyRuntimeEvent('local.send', {});
@@ -103,7 +121,10 @@ export function useAioncoreChat() {
 
   const cancelGeneration = useCallback((overrideConversationId = null) => {
     const activeId = overrideConversationId || conversationIdRef.current;
-    if (activeId) clientRef.current?.send('chat:cancel', { conversation_id: activeId });
+    if (activeId) {
+      chatLog('conversation', `cancel ${activeId}`);
+      clientRef.current?.send('chat:cancel', { conversation_id: activeId });
+    }
   }, []);
 
   const uiMessages = useMemo(() => mapMessagesToUi(messages, runtime), [messages, runtime]);

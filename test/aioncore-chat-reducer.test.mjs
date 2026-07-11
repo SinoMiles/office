@@ -31,6 +31,34 @@ test('runtime starts optimistically and releases on terminal stream event', () =
   assert.equal(completed.canSendMessage, true);
 });
 
+test('finish without a message id is still a terminal runtime event', () => {
+  const started = reduceRuntime(createRuntimeState(), 'local.send');
+  const completed = reduceRuntime(started, 'message.stream', { type: 'finish' });
+  assert.equal(completed.isProcessing, false);
+});
+
+test('turn.completed releases processing using the canonical AionUi event', () => {
+  const started = reduceRuntime(createRuntimeState(), 'local.send');
+  const completed = reduceRuntime(started, 'turn.completed', {
+    status: 'finished',
+    state: 'ai_waiting_input',
+    can_send_message: true,
+  });
+  assert.equal(completed.state, 'ai_waiting_input');
+  assert.equal(completed.isProcessing, false);
+  assert.equal(completed.canSendMessage, true);
+});
+
+test('AionUi thought and data payload shapes map to the existing UI shell', () => {
+  const raw = [
+    { msg_id: 'thought', type: 'thought', data: { subject: '分析', description: '正在判断' } },
+    { msg_id: 'answer', type: 'content', data: '完成' },
+  ];
+  const ui = mapMessagesToUi(raw, { isProcessing: false });
+  assert.equal(ui[0].thought.description, '正在判断');
+  assert.equal(ui[0].content, '完成');
+});
+
 test('UI mapping preserves thinking and deduplicates tool steps', () => {
   const raw = [
     { role: 'assistant', msg_id: 'thought', type: 'thinking', content: { subject: '分析', content: '处理中' } },
@@ -42,4 +70,3 @@ test('UI mapping preserves thinking and deduplicates tool steps', () => {
   assert.equal(ui[0].progress.steps.length, 1);
   assert.equal(ui[0].progress.steps[0].status, 'completed');
 });
-
