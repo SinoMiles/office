@@ -7,12 +7,14 @@ import { getCurrentUser } from '@/lib/auth';
 import SystemSetting from '@/models/SystemSetting';
 import BillingRecord from '@/models/BillingRecord';
 import Task from '@/models/Task';
+import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.pptx']);
+const AIONCORE_URL = getAioncoreBaseUrl();
 
 function storageRoot() {
   return path.resolve(process.env.STORAGE_DIR || path.join(process.cwd(), 'storage'));
@@ -57,7 +59,7 @@ export async function POST(request) {
     // Fetch AionCore providers to find the matching provider ID
     let aionModelPayload = null;
     try {
-      const providersRes = await fetch('http://127.0.0.1:9123/api/providers');
+      const providersRes = await fetch(`${AIONCORE_URL}/api/providers`);
       if (providersRes.ok) {
         const providersJson = await providersRes.json();
         if (providersJson.success && Array.isArray(providersJson.data)) {
@@ -84,7 +86,7 @@ export async function POST(request) {
         payload.model = aionModelPayload;
       }
       
-      const convRes = await fetch('http://127.0.0.1:9123/api/conversations', {
+      const convRes = await fetch(`${AIONCORE_URL}/api/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -120,7 +122,7 @@ export async function POST(request) {
       uploadData.append('file_name', filename);
       uploadData.append('conversation_id', aionConversationId);
 
-      const aioncoreRes = await fetch('http://127.0.0.1:9123/api/fs/upload', {
+      const aioncoreRes = await fetch(`${AIONCORE_URL}/api/fs/upload`, {
         method: 'POST',
         body: uploadData,
       });
@@ -141,7 +143,7 @@ export async function POST(request) {
 
     // Return successfully so frontend can spawn WebSocket connection
     // Tell AionCore to start generating
-    const aiRes = await fetch(`http://127.0.0.1:9123/api/conversations/${aionConversationId}/messages`, {
+    const aiRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
