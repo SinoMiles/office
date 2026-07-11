@@ -9,6 +9,7 @@ import BillingRecord from '@/models/BillingRecord';
 import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { chatError, chatLog } from '@/lib/aioncore/logger';
+import { buildConversationExtra, isExplicitFileGenerationRequest, OFFICEWEB_AGENT_CONTEXT } from '@/lib/aioncore/request-policy';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -35,6 +36,7 @@ export async function POST(request) {
     const file = formData.get('file');
     if (!prompt) return NextResponse.json({ error: '请输入处理需求' }, { status: 400 });
     chatLog('process', 'request accepted', { parentTaskId: parentTaskId || undefined, hasFile: Boolean(file) });
+    const explicitFileGeneration = isExplicitFileGenerationRequest(prompt);
 
     const parentTask = parentTaskId
       ? await Task.findOne({ _id: parentTaskId, userId: user._id })
@@ -84,7 +86,7 @@ export async function POST(request) {
     // Create a unique aionConversationId for the whole task chain, or inherit
     let aionConversationId = parentTask?.aionConversationId;
     if (!aionConversationId) {
-      const payload = { type: 'aionrs', extra: {} };
+      const payload = { type: 'aionrs', extra: buildConversationExtra() };
       if (aionModelPayload) {
         payload.model = aionModelPayload;
       }
@@ -98,6 +100,15 @@ export async function POST(request) {
       const convJson = await convRes.json();
       aionConversationId = convJson.data?.id || crypto.randomUUID();
       chatLog('process', `conversation created ${aionConversationId}`, { conversation_id: aionConversationId });
+    } else {
+      // Existing task chains may predate the OfficeWeb response policy. Keep
+      // the instruction in conversation context instead of polluting user text.
+      const policyRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extra: { context: OFFICEWEB_AGENT_CONTEXT, context_file_name: 'OfficeWeb response policy' }, merge_extra: true }),
+      });
+      chatLog('process', `conversation policy response ${policyRes.status}`, { conversation_id: aionConversationId });
     }
 
     task = await Task.create({
@@ -175,6 +186,7 @@ export async function POST(request) {
       body: JSON.stringify({
         content: prompt,
         files: filename ? [filename] : [],
+        inject_skills: explicitFileGeneration ? ['officecli'] : [],
       })
     });
     chatLog('process', `message start response ${aiRes.status}`, { conversation_id: aionConversationId });
