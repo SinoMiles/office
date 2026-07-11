@@ -39,10 +39,10 @@ export default function TaskProgress({ progress }) {
       </button>
       {!collapsed && (
         <div style={{ padding: '0 13px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {steps.map((step) => {
+          {steps.map((step, index) => {
             const StepIcon = step.status === 'completed' ? CheckCircle2 : step.status === 'error' ? XCircle : Loader2;
             return (
-              <div key={step.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: step.status === 'error' ? '#dc2626' : '#475569' }}>
+              <div key={`${step.id || step.title || 'step'}-${index}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: step.status === 'error' ? '#dc2626' : '#475569' }}>
                 <StepIcon size={15} className={step.status === 'running' ? 'spin-anim' : ''} color={step.status === 'completed' ? '#16a34a' : step.status === 'error' ? '#dc2626' : '#64748b'} style={{ marginTop: '2px', flexShrink: 0 }} />
                 <div>
                   <div>{step.title}</div>

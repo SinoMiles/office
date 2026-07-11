@@ -71,14 +71,15 @@ export default function UserDashboard() {
       const task = payload.task;
       setActiveTaskId(task._id);
       setProcessLoading(true);
+      const runtimeProgress = ['tool', 'progress', 'preview'].includes(task.runtime?.progress?.type) ? task.runtime.progress : null;
       setMessages([
         { role: 'user', content: task.prompt, filename: task.filename },
         {
           role: 'ai', content: task.runtime?.streamedText || '', loading: true,
-          progress: task.runtime?.progress ? { subject: task.runtime.progress.title || '正在处理任务', startedAt: new Date(task.createdAt).getTime(), steps: [task.runtime.progress] } : undefined,
+          progress: runtimeProgress ? { subject: runtimeProgress.title || '正在处理任务', startedAt: new Date(task.createdAt).getTime(), steps: [runtimeProgress] } : undefined,
         },
       ]);
-      if (task.previewFile) {
+      if (task.previewFile && task.runtime?.progress?.type === 'preview') {
         const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
         setActiveArtifact({ previewUrl: `/api/tasks/${task._id}/preview`, previewVersion: version });
         lastPreviewVersionRef.current = version;
@@ -105,11 +106,11 @@ export default function UserDashboard() {
           ...last,
           content: task.runtime?.streamedText || task.aiTextResponse || last.content,
           loading: ['processing', 'cancelling'].includes(task.status),
-          ...(task.runtime?.progress ? { progress: { ...(last.progress || { startedAt: new Date(task.createdAt).getTime(), steps: [] }), subject: task.runtime.progress.title || '正在处理任务', steps: [task.runtime.progress] } } : {}),
+          ...(['tool', 'progress', 'preview'].includes(task.runtime?.progress?.type) ? { progress: { ...(last.progress || { startedAt: new Date(task.createdAt).getTime(), steps: [] }), subject: task.runtime.progress.title || '正在处理任务', steps: [task.runtime.progress] } } : {}),
         };
         return next;
       });
-      if (task.previewFile) {
+      if (task.previewFile && (task.outputFile || task.runtime?.progress?.type === 'preview')) {
         const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
         setActiveArtifact((current) => ({ ...(current || {}), filename: task.outputFilename, previewUrl: `/api/tasks/${task._id}/preview`, downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined, previewVersion: version }));
         
@@ -338,11 +339,17 @@ export default function UserDashboard() {
 
     const currentFile = file;
     const currentPrompt = prompt;
+    const parentTaskId = activeTaskId;
     
     // Add user message immediately
     const newMessages = [...messages, { role: 'user', content: currentPrompt, filename: currentFile ? currentFile.name : null }];
     setMessages(newMessages);
     setPrompt('');
+    // Do not let the recovery poll render the parent task's artifact while the
+    // new turn is still waiting for its own server-issued task id.
+    setActiveTaskId(null);
+    setActiveArtifact(null);
+    setShowRightPanel(false);
     setProcessLoading(true);
 
     // Progress is created only by real OfficeCLI events, never as a placeholder.
@@ -354,7 +361,7 @@ export default function UserDashboard() {
       const formData = new FormData();
       if (currentFile) formData.append('file', currentFile);
       formData.append('prompt', currentPrompt);
-      if (activeTaskId) formData.append('taskId', activeTaskId); // Pass context!
+      if (parentTaskId) formData.append('taskId', parentTaskId); // Pass context without polling its old preview.
 
       const response = await fetch('/api/process', {
         method: 'POST',
@@ -452,6 +459,7 @@ export default function UserDashboard() {
         ...(message.progress ? { progress: { ...message.progress, subject: '任务已结束', done: true } } : {}),
       } : message);
     } catch (err) {
+      if (parentTaskId) setActiveTaskId(parentTaskId);
       setMessages([...newMessages, { role: 'ai', content: '处理失败：' + err.message, error: true }]);
     } finally {
       setProcessLoading(false);
@@ -778,7 +786,7 @@ export default function UserDashboard() {
 
                       {/* Text Content */}
                       {msg.progress && <TaskProgress progress={msg.progress} />}
-                      {msg.loading && !msg.searchData && !msg.progress ? (
+                      {msg.loading && !msg.searchData && !msg.progress && !msg.content ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
                           <Loader2 size={16} className="spin-anim" /> 思考中...
                         </div>
@@ -867,7 +875,12 @@ export default function UserDashboard() {
                               {msg.content}
                             </ReactMarkdown>
                           )}
-                        </div>
+                          </div>
+                          {msg.loading && !msg.searchData && !msg.progress && msg.content && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                              <Loader2 size={14} className="spin-anim" /> 正在继续生成…
+                            </div>
+                          )}
                       </div>
                       )}
 
@@ -909,12 +922,11 @@ export default function UserDashboard() {
                   onKeyDown={handleKeyDown}
                   placeholder={activeTaskId ? "在此文件基础上，继续补充处理需求..." : "上传 Excel、Word 或 PPT 文档并描述您的需求..."}
                   style={{ width: '100%', minHeight: '60px', maxHeight: '200px', padding: '16px 48px 16px 48px', border: 'none', borderRadius: 'var(--radius-lg)', resize: 'none', outline: 'none', fontSize: '1rem', lineHeight: '1.5', background: 'transparent' }}
-                  disabled={processLoading}
                 />
                 
                 {/* Upload Button */}
                 <div style={{ position: 'absolute', left: '12px', bottom: '12px' }}>
-                  <input type="file" id="file-upload" accept=".xlsx,.docx,.pptx" onChange={handleFileChange} style={{ display: 'none' }} disabled={processLoading} />
+                  <input type="file" id="file-upload" accept=".xlsx,.docx,.pptx" onChange={handleFileChange} style={{ display: 'none' }} />
                   <label htmlFor="file-upload" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: 'var(--background)', color: 'var(--text-muted)', transition: 'all 0.2s' }}>
                     <Paperclip size={18} />
                   </label>
@@ -925,9 +937,9 @@ export default function UserDashboard() {
                   onClick={processLoading ? handleCancel : handleProcess}
                   disabled={!processLoading && !prompt.trim()}
                   title={processLoading ? '停止生成' : '发送'}
-                  style={{ position: 'absolute', right: '12px', bottom: '12px', width: '32px', height: '32px', borderRadius: '50%', background: processLoading || prompt.trim() ? 'var(--primary)' : 'var(--background)', color: processLoading || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: processLoading || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                  style={{ position: 'absolute', right: '12px', bottom: '12px', minWidth: processLoading ? '88px' : '32px', height: '32px', padding: processLoading ? '0 11px' : 0, borderRadius: processLoading ? '8px' : '50%', background: processLoading ? '#ef4444' : prompt.trim() ? 'var(--primary)' : 'var(--background)', color: processLoading || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: processLoading || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: processLoading ? '6px' : 0, transition: 'all 0.2s', fontWeight: 600, fontSize: '0.8rem' }}
                 >
-                  {processLoading ? <StopCircle size={16} /> : <Send size={16} style={{ marginLeft: '2px' }} />}
+                  {processLoading ? <><StopCircle size={16} /> 停止生成</> : <Send size={16} style={{ marginLeft: '2px' }} />}
                 </button>
               </div>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>

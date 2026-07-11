@@ -160,7 +160,8 @@ export async function POST(request) {
 
     const encoder = new TextEncoder();
     return new Response(new ReadableStream({
-      async start(controller) {
+      start(controller) {
+        void (async () => {
         const runtimeController = startTaskRuntime(task._id);
         let partialText = '';
         let lastRuntimeWrite = 0;
@@ -176,7 +177,6 @@ export async function POST(request) {
         try {
           send('task', { taskId: String(task._id) });
           const previewUrl = `/api/tasks/${task._id}/preview`;
-          await Task.updateOne({ _id: task._id }, { $set: { previewFile: path.join(taskDir, 'preview.html'), 'runtime.updatedAt': new Date() } });
           const result = await runOfficeAgent({
             apiKey,
             baseUrl: llm.baseUrl || process.env.DEEPSEEK_BASE_URL,
@@ -189,9 +189,16 @@ export async function POST(request) {
             signal: runtimeController.signal,
             onEvent(event) {
               if (event.type === 'text_delta') partialText += event.content || '';
-              persistRuntime({ 'runtime.progress': event, 'runtime.streamedText': partialText });
+              const runtimePatch = { 'runtime.streamedText': partialText };
+              if (['tool', 'progress', 'preview'].includes(event.type)) {
+                runtimePatch['runtime.progress'] = event;
+              }
+              persistRuntime(runtimePatch);
               if (event.type === 'preview') {
-                send('preview', { ...event, previewUrl, version: Date.now() });
+                Task.updateOne(
+                  { _id: task._id },
+                  { $set: { previewFile: path.join(taskDir, 'preview.html'), 'runtime.updatedAt': new Date() } },
+                ).then(() => send('preview', { ...event, previewUrl, version: Date.now() })).catch(() => undefined);
               } else {
                 send(event.type, event);
               }
@@ -245,6 +252,7 @@ export async function POST(request) {
           finishTaskRuntime(task._id);
           controller.close();
         }
+        })();
       },
     }), {
       headers: {
