@@ -12,8 +12,6 @@ import { chatLog, chatWarn } from '@/lib/aioncore/logger';
 
 export function useAioncoreChat() {
   const [messages, setMessages] = useState([]);
-  const [conversationId, setConversationId] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [runtime, setRuntime] = useState(createRuntimeState);
   const clientRef = useRef(null);
   const conversationIdRef = useRef(null);
@@ -40,23 +38,19 @@ export function useAioncoreChat() {
     const client = createAioncoreRealtimeClient();
     clientRef.current = client;
     const subscriptions = [
-      client.on('realtime.connected', () => setIsConnected(true)),
+      client.on('realtime.connected', () => applyRuntimeEvent('realtime.connected', {})),
       client.on('realtime.disconnected', (payload) => {
-        setIsConnected(false);
         applyRuntimeEvent('realtime.disconnected', payload);
       }),
       client.on('realtime.reconnected', (payload) => {
-        setIsConnected(true);
         applyRuntimeEvent('realtime.reconnected', payload);
         if (conversationIdRef.current) {
           client.send('chat:history:load', { conversation_id: conversationIdRef.current });
         }
       }),
       client.on('session:state', (payload) => {
-        setIsConnected(true);
         if (payload?.conversation_id && !conversationIdRef.current) {
           conversationIdRef.current = payload.conversation_id;
-          setConversationId(payload.conversation_id);
         }
       }),
       client.on('chat:history:page', (payload) => {
@@ -89,7 +83,6 @@ export function useAioncoreChat() {
   const loadConversation = useCallback((id) => {
     chatLog('conversation', `load ${id}`);
     conversationIdRef.current = id;
-    setConversationId(id);
     clientRef.current?.send('chat:history:load', { conversation_id: id });
   }, []);
 
@@ -108,7 +101,6 @@ export function useAioncoreChat() {
     }
     chatLog('conversation', `optimistic send to ${activeId}`, { conversation_id: activeId, attachment: Boolean(attachedFile) });
     conversationIdRef.current = activeId;
-    setConversationId(activeId);
     applyRuntimeEvent('local.send', {});
     setMessages((previous) => [
       ...previous,
@@ -122,10 +114,6 @@ export function useAioncoreChat() {
     ]);
   }, [applyRuntimeEvent]);
 
-  const stopGeneration = useCallback(() => {
-    if (conversationIdRef.current) clientRef.current?.send('chat:stop', { conversation_id: conversationIdRef.current });
-  }, []);
-
   const cancelGeneration = useCallback((overrideConversationId = null) => {
     const activeId = overrideConversationId || conversationIdRef.current;
     if (activeId) {
@@ -138,15 +126,10 @@ export function useAioncoreChat() {
 
   return {
     messages: uiMessages,
-    rawMessages: messages,
-    conversationId,
-    isConnected,
     isProcessing: runtime.isProcessing,
-    runtime,
     sendMessage,
     loadConversation,
     waitUntilConnected,
-    stopGeneration,
     cancelGeneration,
   };
 }
