@@ -8,7 +8,6 @@ const TaskSchema = new mongoose.Schema({
   processedFile: { type: String }, // Path to the modified file
   prompt: { type: String },
   aiTextResponse: { type: String }, // AI's conversational text response
-  htmlResult: { type: String }, // Final HTML table result for playback
   outputFilename: { type: String },
   outputFile: { type: String },
   previewFile: { type: String },
@@ -17,6 +16,7 @@ const TaskSchema = new mongoose.Schema({
   runtime: {
     state: { type: String, enum: ['running', 'cancelling', 'cancelled', 'completed', 'failed'], default: undefined },
     progress: { type: mongoose.Schema.Types.Mixed },
+    thought: { type: mongoose.Schema.Types.Mixed },
     streamedText: { type: String, default: '' },
     cancelRequested: { type: Boolean, default: false },
     updatedAt: { type: Date },

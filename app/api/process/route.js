@@ -188,8 +188,11 @@ export async function POST(request) {
             sourceArtifact: parentTask?.outputFile ? { filePath: parentTask.outputFile, filename: parentTask.outputFilename || path.basename(parentTask.outputFile) } : null,
             signal: runtimeController.signal,
             onEvent(event) {
-              if (event.type === 'text_delta') partialText += event.content || '';
+              if (event.type === 'content') partialText += event.content || '';
               const runtimePatch = { 'runtime.streamedText': partialText };
+              if (event.type === 'thought') {
+                runtimePatch['runtime.thought'] = { subject: event.subject, description: event.description, done: Boolean(event.done) };
+              }
               if (['tool', 'progress', 'preview'].includes(event.type)) {
                 runtimePatch['runtime.progress'] = event;
               }
@@ -226,14 +229,16 @@ export async function POST(request) {
                 tokensUsed: result.totalTokens,
                 cost,
                 status: 'completed',
-                runtime: { state: 'completed', progress: null, streamedText: result.text, updatedAt: new Date() },
+                runtime: { state: 'completed', progress: null, thought: null, streamedText: result.text, updatedAt: new Date() },
               },
             ),
           ]);
 
-          if (!result.streamedText) send('text', { content: result.text });
-          send('complete', {
+          if (!result.streamedText) send('content', { content: result.text });
+          send('finish', {
             taskId: String(task._id),
+            text: result.text,
+            usage: { total_tokens: result.totalTokens },
             balance: updatedUser.balance,
             cost,
             artifact: result.artifact ? { filename: result.artifact.filename, previewUrl, downloadUrl: `/api/tasks/${task._id}/download` } : null,

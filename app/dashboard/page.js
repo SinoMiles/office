@@ -9,6 +9,7 @@ import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
+import Thinking from '@/app/components/Thinking';
 
 export default function UserDashboard() {
   const [data, setData] = useState({ records: [], balance: 0 });
@@ -18,9 +19,7 @@ export default function UserDashboard() {
   const [activeTab, setActiveTab] = useState('workspace');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState(null); // 'profile' | 'settings' | 'upgrade' | null
-  const [activeSearchData, setActiveSearchData] = useState(null);
   const [showRightPanel, setShowRightPanel] = useState(false);
-  const [rightPanelMode, setRightPanelMode] = useState('search'); // 'search' | 'preview'
   const [activeArtifact, setActiveArtifact] = useState(null);
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -76,6 +75,7 @@ export default function UserDashboard() {
         { role: 'user', content: task.prompt, filename: task.filename },
         {
           role: 'ai', content: task.runtime?.streamedText || '', loading: true,
+          thought: task.runtime?.thought?.description ? task.runtime.thought : undefined,
           progress: runtimeProgress ? { subject: runtimeProgress.title || '正在处理任务', startedAt: new Date(task.createdAt).getTime(), steps: [runtimeProgress] } : undefined,
         },
       ]);
@@ -83,7 +83,6 @@ export default function UserDashboard() {
         const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
         setActiveArtifact({ previewUrl: `/api/tasks/${task._id}/preview`, previewVersion: version });
         lastPreviewVersionRef.current = version;
-        setRightPanelMode('preview');
         setShowRightPanel(true);
       }
     }).catch(() => undefined);
@@ -106,6 +105,7 @@ export default function UserDashboard() {
           ...last,
           content: task.runtime?.streamedText || task.aiTextResponse || last.content,
           loading: ['processing', 'cancelling'].includes(task.status),
+          ...(task.runtime?.thought?.description ? { thought: task.runtime.thought } : {}),
           ...(['tool', 'progress', 'preview'].includes(task.runtime?.progress?.type) ? { progress: { ...(last.progress || { startedAt: new Date(task.createdAt).getTime(), steps: [] }), subject: task.runtime.progress.title || '正在处理任务', steps: [task.runtime.progress] } } : {}),
         };
         return next;
@@ -116,7 +116,6 @@ export default function UserDashboard() {
         
         if (lastPreviewVersionRef.current !== version) {
           lastPreviewVersionRef.current = version;
-          setRightPanelMode('preview');
           setShowRightPanel(true);
         }
       }
@@ -297,7 +296,6 @@ export default function UserDashboard() {
     setActiveTaskId(null);
     setActiveTab('workspace');
     setShowRightPanel(false);
-    setActiveSearchData(null);
     setActiveArtifact(null);
   };
 
@@ -306,7 +304,7 @@ export default function UserDashboard() {
     const conversation = payload?.tasks || [task];
     setMessages(conversation.flatMap((turn) => [
       { role: 'user', content: turn.prompt, filename: turn.filename },
-      { role: 'ai', content: turn.aiTextResponse || (turn.status === 'cancelled' ? '任务已取消。' : '处理完成。'), html: turn.htmlResult, error: turn.status === 'failed' },
+      { role: 'ai', content: turn.aiTextResponse || (turn.status === 'cancelled' ? '任务已取消。' : '处理完成。'), error: turn.status === 'failed' },
     ]));
     setActiveTaskId(task._id);
     setActiveTab('workspace');
@@ -319,7 +317,6 @@ export default function UserDashboard() {
         previewVersion: version,
       });
       lastPreviewVersionRef.current = version;
-      setRightPanelMode('preview');
       setShowRightPanel(true);
     } else {
       setActiveArtifact(null);
@@ -396,30 +393,26 @@ export default function UserDashboard() {
       const handleEvent = (eventName, event) => {
         if (eventName === 'task') {
           if (event.taskId) setActiveTaskId(event.taskId);
-        } else if (eventName === 'status') {
-          // Reserved for server-reported status that is backed by actual work.
-          if (!event.title) return;
-          updateAssistant((message) => ({ ...message, progress: { ...message.progress, subject: event.title || message.progress.subject } }));
-        } else if (['plan', 'thinking', 'tool', 'progress'].includes(eventName)) {
-          if (eventName === 'plan') {
-            updateAssistant((message) => ({ ...message, progress: { ...message.progress, subject: event.subject, steps: event.steps || [] } }));
-          } else updateProgress(event);
+        } else if (eventName === 'start') {
+          // Turn began; the assistant bubble is already in its loading state.
+        } else if (eventName === 'thought') {
+          updateAssistant((message) => ({ ...message, thought: { subject: event.subject, description: event.description, done: Boolean(event.done) } }));
+        } else if (eventName === 'tool' || eventName === 'progress') {
+          updateProgress(event);
         } else if (eventName === 'preview') {
           updateProgress(event);
-          setActiveArtifact((current) => ({ ...(current || {}), previewUrl: event.previewUrl, previewVersion: event.version }));
+          setActiveArtifact((current) => ({ ...(current || {}), previewUrl: event.previewUrl, live: event.live, previewVersion: event.version }));
           lastPreviewVersionRef.current = event.version;
-          setRightPanelMode('preview');
           setShowRightPanel(true);
-        } else if (eventName === 'text') {
-          updateAssistant((message) => ({ ...message, content: event.content || '' }));
-        } else if (eventName === 'text_delta') {
-          updateAssistant((message) => ({ ...message, content: `${message.content || ''}${event.content || ''}` }));
-        } else if (eventName === 'complete') {
+        } else if (eventName === 'content') {
+          updateAssistant((message) => ({ ...message, content: `${message.content || ''}${event.content || ''}`, thought: message.thought ? { ...message.thought, done: true } : message.thought }));
+        } else if (eventName === 'finish') {
           if (event.taskId) setActiveTaskId(event.taskId);
           if (event.artifact) setActiveArtifact(event.artifact);
           updateAssistant((message) => ({
             ...message,
             loading: false,
+            thought: message.thought ? { ...message.thought, done: true } : message.thought,
             ...(message.progress ? {
               progress: {
                 ...message.progress,
@@ -434,7 +427,7 @@ export default function UserDashboard() {
         } else if (eventName === 'error') {
           throw new Error(event.error || '处理失败');
         } else if (eventName === 'cancelled') {
-          updateAssistant((message) => ({ ...message, content: message.content || '任务已取消。', loading: false, error: false, ...(message.progress ? { progress: { ...message.progress, subject: '任务已取消', done: true } } : {}) }));
+          updateAssistant((message) => ({ ...message, content: message.content || '任务已取消。', loading: false, error: false, thought: message.thought ? { ...message.thought, done: true } : message.thought, ...(message.progress ? { progress: { ...message.progress, subject: '任务已取消', done: true } } : {}) }));
         }
       };
 
@@ -785,38 +778,14 @@ export default function UserDashboard() {
                       )}
 
                       {/* Text Content */}
+                      {msg.thought && <Thinking thought={msg.thought} />}
                       {msg.progress && <TaskProgress progress={msg.progress} />}
-                      {msg.loading && !msg.searchData && !msg.progress && !msg.content ? (
+                      {msg.loading && !msg.progress && !msg.thought && !msg.content ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
                           <Loader2 size={16} className="spin-anim" /> 思考中...
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          {/* Search Data Tool Block */}
-                          {msg.searchData && (
-                            <div style={{ padding: '12px 16px', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', fontSize: '0.9rem' }}>
-                                <div style={{ background: 'var(--primary-light)', padding: '6px', borderRadius: '8px' }}>
-                                  <Sparkles size={16} color="var(--primary)" />
-                                </div>
-                                <span style={{ fontWeight: 600 }}>使用工具：实时搜索网络</span>
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>关键词："{msg.searchData.keyword}" ({msg.searchData.results?.length || 0}条结果)</span>
-                              </div>
-                              <button 
-                                onClick={() => { setActiveSearchData(msg.searchData); setRightPanelMode('search'); setShowRightPanel(true); }}
-                                style={{ background: 'white', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}
-                              >
-                                查看详情
-                              </button>
-                            </div>
-                          )}
-                          
-                          {msg.loading && msg.searchData && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
-                              <Loader2 size={16} className="spin-anim" /> 阅读并总结网络资料中...
-                            </div>
-                          )}
-
                           <div className="markdown-body" style={{ lineHeight: '1.6', color: msg.error ? '#ef4444' : 'var(--text-main)' }}>
                           {msg.error ? (
                             <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
@@ -826,18 +795,8 @@ export default function UserDashboard() {
                               components={{
                                 code({node, inline, className, children, ...props}) {
                                   const match = /language-(\w+)/.exec(className || '');
-                                  let language = match ? match[1] : '';
+                                  const language = match ? match[1] : '';
                                   const codeText = String(children).replace(/\n$/, '');
-                                  
-                                  // Fallback: If AI forgets the ```doc_script tag but the content is clearly a script
-                                  if (!inline && !language && codeText.trim().startsWith('office' + 'cli ')) {
-                                    language = 'doc_script';
-                                  }
-
-                                  // Completely hide internal script from the left chat flow, as we render preview on the right
-                                  if (language === 'doc_script' || language === 'officecli') {
-                                    return null;
-                                  }
 
                                   if (!inline && language) {
                                     return (
@@ -876,25 +835,12 @@ export default function UserDashboard() {
                             </ReactMarkdown>
                           )}
                           </div>
-                          {msg.loading && !msg.searchData && !msg.progress && msg.content && (
+                          {msg.loading && !msg.progress && msg.content && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                               <Loader2 size={14} className="spin-anim" /> 正在继续生成…
                             </div>
                           )}
                       </div>
-                      )}
-
-                      {/* HTML Result View */}
-                      {msg.html && (
-                        <div style={{ marginTop: '16px', background: 'white', padding: '24px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', overflowX: 'auto', boxShadow: 'var(--shadow-sm)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-muted)' }}>处理结果预览</span>
-                            <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                              <Download size={14} /> 下载结果文档
-                            </button>
-                          </div>
-                          <div dangerouslySetInnerHTML={{ __html: msg.html }} />
-                        </div>
                       )}
                     </div>
                   </div>
@@ -948,55 +894,30 @@ export default function UserDashboard() {
             </div>
           </div>
 
-        {/* Right Dynamic Panel (Search / Preview) */}
+        {/* Right Panel: real OfficeCLI preview */}
         {showRightPanel && (
           <div style={{ width: '400px', flexShrink: 0, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
             <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.2rem', margin: 0 }}>
-                {rightPanelMode === 'search' ? '网页搜索参考资料' : 'Office 真实预览'}
-              </h3>
+              <h3 style={{ fontSize: '1.2rem', margin: 0 }}>Office 真实预览</h3>
               <button onClick={() => setShowRightPanel(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
             </div>
             <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-              
-              {/* Mode: Search Results */}
-              {rightPanelMode === 'search' && activeSearchData && (
-                <>
-                  <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                    搜索关键词：<strong style={{ color: 'var(--primary)' }}>{activeSearchData.keyword}</strong>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {activeSearchData.results.map((r, idx) => (
-                      <div key={idx} style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '12px', background: '#f8fafc' }}>
-                        <a href={r.link} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontWeight: 600, fontSize: '1.05rem', color: '#2563eb', marginBottom: '8px', textDecoration: 'none' }}>
-                          {r.title}
-                        </a>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: '1.5' }}>
-                          {r.snippet}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {rightPanelMode === 'preview' && activeArtifact && (
+              {activeArtifact && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
                   <iframe
-                    key={`${activeArtifact.previewUrl}:${activeArtifact.previewVersion || 0}`}
-                    src={`${activeArtifact.previewUrl}?v=${activeArtifact.previewVersion || 0}`}
+                    key={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}:${activeArtifact.previewVersion || 0}`}
+                    src={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}?v=${activeArtifact.previewVersion || 0}`}
                     title="Office document preview"
-                    sandbox="allow-scripts"
+                    sandbox="allow-scripts allow-same-origin"
                     style={{ width: '100%', minHeight: '560px', flex: 1, border: '1px solid var(--border)', borderRadius: '8px', background: 'white' }}
                   />
                   {activeArtifact.downloadUrl ? (
                     <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                       <Download size={18} /> 下载 {activeArtifact.filename || 'Office 文件'}
                     </a>
-                  ) : <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>正在生成，右侧预览会随 OfficeCLI 的渲染结果更新…</div>}
+                  ) : <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>正在生成，预览会随 OfficeCLI 的渲染实时更新…</div>}
                 </div>
               )}
-
             </div>
           </div>
         )}
