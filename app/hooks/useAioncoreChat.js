@@ -14,10 +14,14 @@ import { autoConfirmPermission, buildAutoConfirmation, listPendingPermissions } 
 export function useAioncoreChat() {
   const [messages, setMessages] = useState([]);
   const [runtime, setRuntime] = useState(createRuntimeState);
+  const [officeArtifact, setOfficeArtifact] = useState(null);
   const clientRef = useRef(null);
   const conversationIdRef = useRef(null);
   const frameRef = useRef(null);
   const queueRef = useRef([]);
+  const taskIdRef = useRef(null);
+  const workspaceRef = useRef('');
+  const pendingOfficeFilesRef = useRef([]);
   const confirmationsInFlightRef = useRef(new Set());
 
   const approvePermission = useCallback((payload) => {
@@ -47,6 +51,30 @@ export function useAioncoreChat() {
       chatWarn('permission', error.message, { conversation_id: conversationId });
     }
   }, [approvePermission]);
+
+  const openOfficePreview = useCallback(async (event) => {
+    const taskId = taskIdRef.current;
+    const workspace = workspaceRef.current || event.workspace;
+    if (!taskId || !workspace) {
+      pendingOfficeFilesRef.current.push(event);
+      chatLog('preview', 'queued Office file until task binding is ready', event);
+      return;
+    }
+    try {
+      chatLog('preview', `starting live preview for ${event.file_path}`, event);
+      const response = await fetch(`/api/tasks/${taskId}/office-preview/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: event.file_path, workspace }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '启动 Office 实时预览失败');
+      setOfficeArtifact({ ...payload, live: true, previewVersion: Date.now() });
+      chatLog('preview', `live preview ready for ${payload.filename}`, event);
+    } catch (error) {
+      chatWarn('preview', error.message, event);
+    }
+  }, []);
 
   const applyRuntimeEvent = useCallback((name, payload) => {
     setRuntime((previous) => {
@@ -92,6 +120,10 @@ export function useAioncoreChat() {
       }),
       client.on('chat:turn:state', (payload) => applyRuntimeEvent('chat:turn:state', payload)),
       client.on('turn.completed', (payload) => applyRuntimeEvent('turn.completed', payload)),
+      client.on('workspaceOfficeWatch.fileAdded', (event) => {
+        if (workspaceRef.current && event.workspace !== workspaceRef.current) return;
+        void openOfficePreview(event);
+      }),
       client.on('message.stream', (payload) => {
         applyRuntimeEvent('message.stream', payload);
         if (conversationIdRef.current && payload.conversation_id && payload.conversation_id !== conversationIdRef.current) return;
@@ -112,14 +144,18 @@ export function useAioncoreChat() {
       client.close();
       clientRef.current = null;
     };
-  }, [applyRuntimeEvent, approvePermission, flushMessageQueue, recoverPendingPermissions]);
+  }, [applyRuntimeEvent, approvePermission, flushMessageQueue, openOfficePreview, recoverPendingPermissions]);
 
-  const loadConversation = useCallback((id) => {
+  const loadConversation = useCallback((id, taskId, workspace = '') => {
     chatLog('conversation', `load ${id}`);
     conversationIdRef.current = id;
+    taskIdRef.current = taskId || taskIdRef.current;
+    workspaceRef.current = workspace || workspaceRef.current;
     clientRef.current?.send('chat:history:load', { conversation_id: id });
     void recoverPendingPermissions(id);
-  }, [recoverPendingPermissions]);
+    const pending = pendingOfficeFilesRef.current.splice(0);
+    for (const event of pending) void openOfficePreview(event);
+  }, [openOfficePreview, recoverPendingPermissions]);
 
   const waitUntilConnected = useCallback(async () => {
     const client = clientRef.current;
@@ -161,6 +197,7 @@ export function useAioncoreChat() {
 
   return {
     messages: uiMessages,
+    officeArtifact,
     isProcessing: runtime.isProcessing,
     sendMessage,
     loadConversation,

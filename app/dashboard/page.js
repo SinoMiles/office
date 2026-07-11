@@ -27,7 +27,7 @@ export default function UserDashboard() {
   const router = useRouter();
 
   // AionCore hook
-  const { messages: aionMessages, isProcessing: aionIsProcessing, sendMessage, loadConversation, waitUntilConnected, cancelGeneration } = useAioncoreChat();
+  const { messages: aionMessages, officeArtifact, isProcessing: aionIsProcessing, sendMessage, loadConversation, waitUntilConnected, cancelGeneration } = useAioncoreChat();
 
   // Chat UI states
   const [messages, setMessages] = useState([]);
@@ -111,6 +111,12 @@ export default function UserDashboard() {
        }
     }
   }, [aionMessages, aionIsProcessing]);
+
+  useEffect(() => {
+    if (!officeArtifact) return;
+    setActiveArtifact(officeArtifact);
+    setShowRightPanel(true);
+  }, [officeArtifact]);
 
   useEffect(() => {
     // Sync completion status back to MongoDB when aioncore finishes generating
@@ -384,7 +390,7 @@ export default function UserDashboard() {
       // Let's just pass the conversation ID explicitly or rely on the hook's current state.
       
       // Since useAioncoreChat is tied to a conversationId, we might need to load it first.
-      loadConversation(resData.aionConversationId);
+      loadConversation(resData.aionConversationId, resData.taskId, resData.aionWorkspace);
       
       // Now send the message through AionCore WebSocket
       sendMessage(currentPrompt, currentFile, resData.aionConversationId);

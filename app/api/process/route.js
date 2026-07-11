@@ -147,6 +147,27 @@ export async function POST(request) {
     }
 
     // Return successfully so frontend can spawn WebSocket connection
+    // Mirror AionUi WebUI: start the workspace Office watcher before generation
+    // so newly created pptx/docx/xlsx files cannot race ahead of fileAdded.
+    let aionWorkspace = '';
+    try {
+      const conversationRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`);
+      if (conversationRes.ok) {
+        const conversationPayload = await conversationRes.json();
+        aionWorkspace = conversationPayload.data?.extra?.workspace || conversationPayload.data?.workspace || '';
+      }
+      if (aionWorkspace) {
+        const watchRes = await fetch(`${AIONCORE_URL}/api/fs/office-watch/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workspace: aionWorkspace }),
+        });
+        chatLog('preview', `workspace watcher start response ${watchRes.status}`, { conversation_id: aionConversationId });
+      }
+    } catch (error) {
+      chatError('preview', 'failed to start workspace Office watcher', error);
+    }
+
     // Tell AionCore to start generating
     const aiRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}/messages`, {
       method: 'POST',
@@ -168,6 +189,7 @@ export async function POST(request) {
       success: true,
       taskId: String(task._id),
       aionConversationId,
+      aionWorkspace,
       reservedCost,
     });
 
