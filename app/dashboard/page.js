@@ -21,6 +21,7 @@ export default function UserDashboard() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState(null); // 'profile' | 'settings' | 'upgrade' | null
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeArtifact, setActiveArtifact] = useState(null);
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -68,6 +69,18 @@ export default function UserDashboard() {
   }, []);
 
   useEffect(() => {
+    const setFromEvent = (event) => setSidebarCollapsed(Boolean(event.detail?.collapsed));
+    const reportState = () => window.dispatchEvent(new CustomEvent('office-sidebar-state', { detail: { collapsed: sidebarCollapsed } }));
+    window.addEventListener('office-sidebar-set', setFromEvent);
+    window.addEventListener('office-sidebar-query', reportState);
+    window.dispatchEvent(new CustomEvent('office-sidebar-state', { detail: { collapsed: sidebarCollapsed } }));
+    return () => {
+      window.removeEventListener('office-sidebar-set', setFromEvent);
+      window.removeEventListener('office-sidebar-query', reportState);
+    };
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
     let cancelled = false;
     fetch('/api/tasks/active').then((res) => res.json()).then((payload) => {
       if (cancelled || !payload.task) return;
@@ -88,6 +101,7 @@ export default function UserDashboard() {
         setActiveArtifact({ previewUrl: `/api/tasks/${task._id}/preview`, previewVersion: version });
         lastPreviewVersionRef.current = version;
         setShowRightPanel(true);
+        setSidebarCollapsed(true);
       }
     }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -116,6 +130,7 @@ export default function UserDashboard() {
     if (!officeArtifact) return;
     setActiveArtifact(officeArtifact);
     setShowRightPanel(true);
+    setSidebarCollapsed(true);
   }, [officeArtifact]);
 
   useEffect(() => {
@@ -300,6 +315,7 @@ export default function UserDashboard() {
     setActiveTaskId(null);
     setActiveTab('workspace');
     setShowRightPanel(false);
+    setSidebarCollapsed(false);
     setActiveArtifact(null);
   };
 
@@ -322,6 +338,7 @@ export default function UserDashboard() {
       });
       lastPreviewVersionRef.current = version;
       setShowRightPanel(true);
+      setSidebarCollapsed(true);
     } else {
       setActiveArtifact(null);
     }
@@ -431,7 +448,16 @@ export default function UserDashboard() {
     <div style={{ display: 'flex', height: 'calc(100vh - 73px)', background: 'var(--background)', overflow: 'hidden' }}>
       
       {/* Sidebar - ChatGPT Style */}
-      <aside style={{ width: '280px', background: '#f9f9f9', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+      <aside style={{ width: sidebarCollapsed ? '72px' : '280px', flexShrink: 0, background: '#f9f9f9', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', transition: 'width 0.25s ease' }}>
+        {sidebarCollapsed ? (
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 10px', gap: '10px' }}>
+            <button onClick={startNewChat} title="开启新任务" style={{ width: '42px', height: '42px', borderRadius: '12px', border: '1px solid var(--border)', background: 'white', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={20} /></button>
+            <button onClick={() => setActiveTab('overview')} title="数据概览" style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'overview' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'overview' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LayoutDashboard size={19} /></button>
+            <button onClick={() => setActiveTab('billing')} title="账单与流水" style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'billing' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'billing' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CreditCard size={19} /></button>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setShowUserMenu(!showUserMenu)} title={user?.username || '用户'} style={{ width: '42px', height: '42px', borderRadius: '50%', border: 'none', background: 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>{user?.username?.[0]?.toUpperCase() || 'U'}</button>
+          </div>
+        ) : <>
         {/* Top Nav */}
         <div style={{ padding: '16px' }}>
           <button 
@@ -655,6 +681,7 @@ export default function UserDashboard() {
             <ChevronUp size={16} color="var(--text-muted)" style={{ transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
           </button>
         </div>
+        </>}
       </aside>
 
       {/* Main Content */}
@@ -665,7 +692,7 @@ export default function UserDashboard() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}>
             
             {/* Left Column (Chat Area + Input) */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ flex: showRightPanel ? '0 0 42%' : 1, minWidth: showRightPanel ? '360px' : 0, display: 'flex', flexDirection: 'column', height: '100%', transition: 'flex-basis 0.25s ease' }}>
             
             {/* Chat Area */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -848,10 +875,10 @@ export default function UserDashboard() {
 
         {/* Right Panel: real OfficeCLI preview */}
         {showRightPanel && (
-          <div style={{ width: '400px', flexShrink: 0, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
+          <div style={{ flex: 1, minWidth: 0, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
             <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.2rem', margin: 0 }}>Office 真实预览</h3>
-              <button onClick={() => setShowRightPanel(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+              <button onClick={() => { setShowRightPanel(false); setSidebarCollapsed(false); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} title="关闭预览并展开左侧导航"><X size={20} /></button>
             </div>
             <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
               {activeArtifact && (

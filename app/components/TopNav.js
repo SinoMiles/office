@@ -1,10 +1,25 @@
 'use client';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export default function TopNav({ isLoggedIn }) {
   const pathname = usePathname();
   const isDashboard = pathname?.startsWith('/dashboard');
   const isAdmin = pathname?.startsWith('/admin');
+  const [dashboardSidebarCollapsed, setDashboardSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const handleState = (event) => setDashboardSidebarCollapsed(Boolean(event.detail?.collapsed));
+    window.addEventListener('office-sidebar-state', handleState);
+    window.dispatchEvent(new CustomEvent('office-sidebar-query'));
+    return () => window.removeEventListener('office-sidebar-state', handleState);
+  }, []);
+
+  const setSidebarCollapsed = (collapsed) => {
+    setDashboardSidebarCollapsed(collapsed);
+    window.dispatchEvent(new CustomEvent('office-sidebar-set', { detail: { collapsed } }));
+  };
 
   // 后台管理系统有自己独立的侧边栏，不需要任何顶部导航
   if (isAdmin) {
@@ -15,10 +30,13 @@ export default function TopNav({ isLoggedIn }) {
   if (isDashboard) {
     return (
       <nav style={{ padding: '0 24px', position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(0,0,0,0.05)', height: '70px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ maxWidth: '1200px', margin: '0', display: 'flex', alignItems: 'center', width: '100%' }}>
-          <a href="/" style={{ fontSize: '1.25rem', fontWeight: 800, textDecoration: 'none', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0', display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+          <button onClick={() => { if (dashboardSidebarCollapsed) setSidebarCollapsed(false); else window.location.href = '/'; }} style={{ fontSize: '1.25rem', fontWeight: 800, border: 'none', padding: 0, background: 'transparent', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', cursor: 'pointer' }} title={dashboardSidebarCollapsed ? '展开左侧导航' : 'OfficeGPT 首页'}>
             <span style={{ color: 'var(--primary)', fontSize: '1.4rem' }}>✦</span> OfficeGPT
-          </a>
+          </button>
+          <button onClick={() => setSidebarCollapsed(!dashboardSidebarCollapsed)} title={dashboardSidebarCollapsed ? '展开左侧导航' : '收起左侧导航'} aria-label={dashboardSidebarCollapsed ? '展开左侧导航' : '收起左侧导航'} style={{ width: '36px', height: '36px', border: 'none', background: 'transparent', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {dashboardSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+          </button>
         </div>
       </nav>
     );
