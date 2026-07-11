@@ -10,6 +10,7 @@ import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, 
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
+import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
 
 export default function UserDashboard() {
   const [data, setData] = useState({ records: [], balance: 0 });
@@ -24,6 +25,9 @@ export default function UserDashboard() {
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
   const router = useRouter();
+
+  // AionCore hook
+  const { messages: aionMessages, isProcessing: aionIsProcessing, sendMessage, loadConversation, cancelGeneration } = useAioncoreChat();
 
   // Chat UI states
   const [messages, setMessages] = useState([]);
@@ -90,44 +94,38 @@ export default function UserDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!activeTaskId || !processLoading) return undefined;
-    const poll = async () => {
-      const response = await fetch(`/api/tasks/${activeTaskId}`);
-      const payload = await response.json().catch(() => null);
-      const task = payload?.task;
-      if (!task) return;
-      setMessages((previous) => {
-        if (!previous.length) return previous;
-        const next = [...previous];
-        const last = next[next.length - 1];
-        if (last.role !== 'ai') return previous;
-        next[next.length - 1] = {
-          ...last,
-          content: task.runtime?.streamedText || task.aiTextResponse || last.content,
-          loading: ['processing', 'cancelling'].includes(task.status),
-          ...(task.runtime?.thought?.description ? { thought: task.runtime.thought } : {}),
-          ...(['tool', 'progress', 'preview'].includes(task.runtime?.progress?.type) ? { progress: { ...(last.progress || { startedAt: new Date(task.createdAt).getTime(), steps: [] }), subject: task.runtime.progress.title || '正在处理任务', steps: [task.runtime.progress] } } : {}),
-        };
-        return next;
-      });
-      if (task.previewFile && (task.outputFile || task.runtime?.progress?.type === 'preview')) {
-        const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
-        setActiveArtifact((current) => ({ ...(current || {}), filename: task.outputFilename, previewUrl: `/api/tasks/${task._id}/preview`, downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined, previewVersion: version }));
-        
-        if (lastPreviewVersionRef.current !== version) {
-          lastPreviewVersionRef.current = version;
-          setShowRightPanel(true);
-        }
-      }
-      if (!['processing', 'cancelling'].includes(task.status)) {
+    // We no longer poll MongoDB for real-time generation updates since AionCore streams via WS.
+    // Instead, we just sync the real-time aionMessages into our local state.
+    if (aionMessages && aionMessages.length > 0) {
+       const lastAionMsg = aionMessages[aionMessages.length - 1];
+       if (lastAionMsg && lastAionMsg.role === 'ai') {
+         setMessages(prev => {
+            const next = [...prev];
+            if (next.length > 0 && next[next.length - 1].role === 'ai') {
+               next[next.length - 1] = { ...next[next.length - 1], ...lastAionMsg, loading: aionIsProcessing };
+            } else {
+               next.push({ ...lastAionMsg, loading: aionIsProcessing });
+            }
+            return next;
+         });
+       }
+    }
+  }, [aionMessages, aionIsProcessing]);
+
+  useEffect(() => {
+    // Sync completion status back to MongoDB when aioncore finishes generating
+    if (!aionIsProcessing && processLoading && activeTaskId && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.role === 'ai') {
+        fetch(`/api/tasks/${activeTaskId}/finish`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: lastMsg.content })
+        }).catch(e => console.error('Failed to sync finish state', e));
         setProcessLoading(false);
-        fetchData();
       }
-    };
-    const timer = window.setInterval(() => { void poll(); }, 1500);
-    void poll();
-    return () => window.clearInterval(timer);
-  }, [activeTaskId, processLoading]);
+    }
+  }, [aionIsProcessing, processLoading, activeTaskId]);
 
   useEffect(() => {
     // Auto scroll to bottom of chat
@@ -325,40 +323,43 @@ export default function UserDashboard() {
 
   const handleCancel = async () => {
     if (!activeTaskId) return;
+    
+    // Tell AionCore to stop generating via WebSocket
+    cancelGeneration();
+
+    // Still notify backend to mark DB status as cancelled
     const response = await fetch(`/api/tasks/${activeTaskId}/cancel`, { method: 'POST' });
-    if (response.ok) toast.success('正在停止任务…');
-    else toast.error((await response.json().catch(() => ({}))).error || '停止失败');
+    if (response.ok) {
+      toast.success('正在停止任务…');
+      setProcessLoading(false);
+    } else {
+      toast.error((await response.json().catch(() => ({}))).error || '停止失败');
+    }
   };
 
   const handleProcess = async () => {
-    if (!prompt.trim()) return toast.error('请输入处理需求');
-    // Removed strict file check to allow pure text chatting
+    if (!prompt.trim() || processLoading) return;
 
-    const currentFile = file;
     const currentPrompt = prompt;
+    const currentFile = file;
     const parentTaskId = activeTaskId;
     
-    // Add user message immediately
-    const newMessages = [...messages, { role: 'user', content: currentPrompt, filename: currentFile ? currentFile.name : null }];
+    // Optimistically add user message and an empty AI loading message
+    const newMessages = [
+      ...messages,
+      { role: 'user', content: currentPrompt, filename: currentFile ? currentFile.name : null },
+      { role: 'ai', content: '', loading: true }
+    ];
     setMessages(newMessages);
     setPrompt('');
-    // Do not let the recovery poll render the parent task's artifact while the
-    // new turn is still waiting for its own server-issued task id.
-    setActiveTaskId(null);
-    setActiveArtifact(null);
-    setShowRightPanel(false);
+    setFile(null);
     setProcessLoading(true);
 
-    // Progress is created only by real OfficeCLI events, never as a placeholder.
-    setMessages([...newMessages, {
-      role: 'ai', content: '', loading: true,
-    }]);
-    
     try {
       const formData = new FormData();
       if (currentFile) formData.append('file', currentFile);
       formData.append('prompt', currentPrompt);
-      if (parentTaskId) formData.append('taskId', parentTaskId); // Pass context without polling its old preview.
+      if (parentTaskId) formData.append('taskId', parentTaskId);
 
       const response = await fetch('/api/process', {
         method: 'POST',
@@ -370,90 +371,31 @@ export default function UserDashboard() {
         throw new Error(resData.error || '处理失败');
       }
 
-      if (!response.body) throw new Error('服务器未返回任务进度流');
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-      const updateAssistant = (updater) => setMessages((previous) => {
-        const next = [...previous];
-        next[next.length - 1] = updater(next[next.length - 1]);
+      const resData = await response.json();
+      
+      setActiveTaskId(resData.taskId);
+      // Wait for React to apply activeTaskId before sending message,
+      // or we can just pass the aionConversationId directly to sendMessage if we update the hook.
+      // But loadConversation will be triggered by useEffect when activeTaskId changes.
+      // Let's just pass the conversation ID explicitly or rely on the hook's current state.
+      
+      // Since useAioncoreChat is tied to a conversationId, we might need to load it first.
+      loadConversation(resData.aionConversationId);
+      
+      // Now send the message through AionCore WebSocket
+      sendMessage(currentPrompt, currentFile, resData.aionConversationId);
+      
+      fetchData(); // Update billing
+
+    } catch (err) {
+      toast.error('处理失败：' + err.message);
+      setMessages(prev => {
+        const next = [...prev];
+        if (next.length > 0 && next[next.length - 1].role === 'ai') {
+          next[next.length - 1] = { ...next[next.length - 1], content: '处理失败：' + err.message, loading: false, error: true };
+        }
         return next;
       });
-      const updateProgress = (event) => updateAssistant((message) => {
-        const progress = message.progress || { subject: '正在处理任务', startedAt: Date.now(), steps: [] };
-        const steps = [...progress.steps];
-        if (event.id) {
-          const index = steps.findIndex((step) => step.id === event.id);
-          const nextStep = { ...(index >= 0 ? steps[index] : {}), ...event };
-          if (index >= 0) steps[index] = nextStep;
-          else steps.push(nextStep);
-        }
-        return { ...message, progress: { ...progress, subject: event.subject || event.title || progress.subject, steps } };
-      });
-      const handleEvent = (eventName, event) => {
-        if (eventName === 'task') {
-          if (event.taskId) setActiveTaskId(event.taskId);
-        } else if (eventName === 'start') {
-          // Turn began; the assistant bubble is already in its loading state.
-        } else if (eventName === 'thought') {
-          updateAssistant((message) => ({ ...message, thought: { subject: event.subject, description: event.description, done: Boolean(event.done) } }));
-        } else if (eventName === 'tool' || eventName === 'progress') {
-          updateProgress(event);
-        } else if (eventName === 'preview') {
-          updateProgress(event);
-          setActiveArtifact((current) => ({ ...(current || {}), previewUrl: event.previewUrl, live: event.live, previewVersion: event.version }));
-          lastPreviewVersionRef.current = event.version;
-          setShowRightPanel(true);
-        } else if (eventName === 'content') {
-          updateAssistant((message) => ({ ...message, content: `${message.content || ''}${event.content || ''}`, thought: message.thought ? { ...message.thought, done: true } : message.thought }));
-        } else if (eventName === 'finish') {
-          if (event.taskId) setActiveTaskId(event.taskId);
-          if (event.artifact) setActiveArtifact(event.artifact);
-          updateAssistant((message) => ({
-            ...message,
-            loading: false,
-            thought: message.thought ? { ...message.thought, done: true } : message.thought,
-            ...(message.progress ? {
-              progress: {
-                ...message.progress,
-                subject: '任务已完成',
-                done: true,
-                steps: (message.progress.steps || []).map((step) => step.status === 'running' ? { ...step, status: 'completed' } : step),
-              },
-            } : {}),
-          }));
-          setFile(null);
-          fetchData();
-        } else if (eventName === 'error') {
-          throw new Error(event.error || '处理失败');
-        } else if (eventName === 'cancelled') {
-          updateAssistant((message) => ({ ...message, content: message.content || '任务已取消。', loading: false, error: false, thought: message.thought ? { ...message.thought, done: true } : message.thought, ...(message.progress ? { progress: { ...message.progress, subject: '任务已取消', done: true } } : {}) }));
-        }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const packets = buffer.split('\n\n');
-        buffer = packets.pop() || '';
-        for (const packet of packets) {
-          const lines = packet.split('\n');
-          const eventName = lines.find((line) => line.startsWith('event:'))?.slice(6).trim() || 'message';
-          const rawData = lines.filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).join('\n');
-          if (!rawData) continue;
-          handleEvent(eventName, JSON.parse(rawData));
-        }
-      }
-      updateAssistant((message) => message.loading ? {
-        ...message,
-        loading: false,
-        ...(message.progress ? { progress: { ...message.progress, subject: '任务已结束', done: true } } : {}),
-      } : message);
-    } catch (err) {
-      if (parentTaskId) setActiveTaskId(parentTaskId);
-      setMessages([...newMessages, { role: 'ai', content: '处理失败：' + err.message, error: true }]);
     } finally {
       setProcessLoading(false);
     }

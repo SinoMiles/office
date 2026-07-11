@@ -7,6 +7,7 @@ const TaskSchema = new mongoose.Schema({
   originalFile: { type: String }, // Path to the uploaded file
   processedFile: { type: String }, // Path to the modified file
   prompt: { type: String },
+  aionConversationId: { type: String },
   aiTextResponse: { type: String }, // AI's conversational text response
   outputFilename: { type: String },
   outputFile: { type: String },
