@@ -23,16 +23,20 @@ export async function PUT(request, { params }) {
     const { id } = await params;
     const body = await request.json();
 
-    if (!body.prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    if (body.prompt === undefined && body.isPinned === undefined) {
+      return NextResponse.json({ error: 'Update payload is empty' }, { status: 400 });
     }
 
     await connectToDatabase();
     
+    const updateData = {};
+    if (body.prompt !== undefined) updateData.prompt = body.prompt;
+    if (body.isPinned !== undefined) updateData.isPinned = body.isPinned;
+    
     // Only allow user to update their own tasks
     const task = await Task.findOneAndUpdate(
       { _id: id, userId: user._id },
-      { $set: { prompt: body.prompt } },
+      { $set: updateData },
       { new: true }
     );
 

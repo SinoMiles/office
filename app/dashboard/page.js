@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, Edit2, Trash2, StopCircle } from 'lucide-react';
+import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 
@@ -220,6 +220,29 @@ export default function UserDashboard() {
       }
     } catch(err) {
       toast.error('删除失败', { id: toastId });
+    }
+  };
+
+  const handleTogglePin = async (e, id, currentIsPinned) => {
+    e.stopPropagation();
+    // Optimistic UI update
+    const newIsPinned = !currentIsPinned;
+    setStats(prev => {
+      const updatedTasks = prev.recentTasks.map(t => t._id === id ? { ...t, isPinned: newIsPinned } : t);
+      updatedTasks.sort((a, b) => (b.isPinned === a.isPinned ? new Date(b.createdAt) - new Date(a.createdAt) : b.isPinned ? 1 : -1));
+      return { ...prev, recentTasks: updatedTasks };
+    });
+
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPinned: newIsPinned })
+      });
+      if (!res.ok) throw new Error('Failed');
+    } catch (err) {
+      toast.error('置顶操作失败');
+      fetchData(); // Revert on failure
     }
   };
 
@@ -529,13 +552,22 @@ export default function UserDashboard() {
                 </button>
 
                 <div className="task-actions" style={{ display: 'flex', alignItems: 'center', opacity: openMenuId === t._id ? 1 : 0, transition: 'opacity 0.2s', position: 'absolute', right: '4px', background: activeTaskId === t._id ? 'var(--primary-light)' : 'var(--background)', padding: '2px', borderRadius: '8px' }}>
-                  {/* 固定按钮 */}
                   <button 
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
-                    onClick={(e) => { e.stopPropagation(); toast('已固定该会话'); }}
-                    title="固定"
+                    onClick={(e) => handleTogglePin(e, t._id, t.isPinned)}
+                    style={{ 
+                      background: 'transparent', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      color: t.isPinned ? 'var(--primary)' : 'var(--text-muted)',
+                      padding: '4px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title={t.isPinned ? '取消置顶' : '置顶对话'}
                   >
-                    <Pin size={14} />
+                    {t.isPinned ? <PinOff size={14} /> : <Pin size={14} />}
                   </button>
 
                   {/* 更多菜单按钮 */}

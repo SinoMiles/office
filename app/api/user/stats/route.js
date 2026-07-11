@@ -25,7 +25,7 @@ export async function GET() {
 
     // Fetch recent task records (files processed) for chat history
     const recentTasks = await Task.find({ userId: user._id })
-      .sort({ createdAt: -1 })
+      .sort({ isPinned: -1, createdAt: -1 })
       .limit(50);
 
     return NextResponse.json({ 

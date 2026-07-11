@@ -13,6 +13,7 @@ const TaskSchema = new mongoose.Schema({
   outputFile: { type: String },
   previewFile: { type: String },
   status: { type: String, enum: ['pending', 'processing', 'cancelling', 'cancelled', 'completed', 'failed'], default: 'pending' },
+  isPinned: { type: Boolean, default: false },
   runtime: {
     state: { type: String, enum: ['running', 'cancelling', 'cancelled', 'completed', 'failed'], default: undefined },
     progress: { type: mongoose.Schema.Types.Mixed },
