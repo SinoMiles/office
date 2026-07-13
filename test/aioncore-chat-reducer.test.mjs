@@ -70,3 +70,22 @@ test('UI mapping preserves thinking and deduplicates tool steps', () => {
   assert.equal(ui[0].progress.steps.length, 1);
   assert.equal(ui[0].progress.steps[0].status, 'completed');
 });
+
+test('thought chunks stored in data accumulate into one visible paragraph', () => {
+  const runtime = { isProcessing: true };
+  const first = { role: 'assistant', msg_id: 'thought-1', type: 'thought', data: { subject: '分析', description: '正在' } };
+  const second = { role: 'assistant', msg_id: 'thought-1', type: 'thought', data: { subject: '分析', description: '读取资料' } };
+  const merged = mergeStreamMessages(mergeStreamMessages([], first), second);
+  const ui = mapMessagesToUi(merged, runtime);
+  assert.equal(ui[0].thought.description, '正在读取资料');
+});
+
+test('separate thought messages remain visible instead of replacing each other', () => {
+  const raw = [
+    { role: 'assistant', msg_id: 'thought-1', type: 'thought', data: { subject: '分析', description: '先理解需求。' } },
+    { role: 'assistant', msg_id: 'thought-2', type: 'thought', data: { subject: '规划', description: '再制定方案。' } },
+  ];
+  const ui = mapMessagesToUi(raw, { isProcessing: true });
+  assert.equal(ui[0].thought.description, '先理解需求。\n再制定方案。');
+  assert.equal(ui[0].thought.subject, '规划');
+});

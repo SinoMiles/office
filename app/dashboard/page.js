@@ -35,6 +35,7 @@ export default function UserDashboard() {
   const [prompt, setPrompt] = useState('');
   const [file, setFile] = useState(null);
   const [processLoading, setProcessLoading] = useState(false);
+  const isGenerating = processLoading || aionIsProcessing;
   const [activeTaskId, setActiveTaskId] = useState(null); // Tracks the current conversational thread context
   const messagesEndRef = useRef(null);
   
@@ -372,7 +373,7 @@ export default function UserDashboard() {
   };
 
   const handleProcess = async () => {
-    if (!prompt.trim() || processLoading) return;
+    if (!prompt.trim() || isGenerating) return;
 
     const currentPrompt = prompt;
     const currentFile = file;
@@ -434,15 +435,13 @@ export default function UserDashboard() {
         }
         return next;
       });
-    } finally {
-      setProcessLoading(false);
     }
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!processLoading) handleProcess();
+      if (!isGenerating) handleProcess();
     }
   };
 
@@ -793,12 +792,13 @@ export default function UserDashboard() {
                                       <div style={{ margin: '16px 0', border: '1px solid var(--border)', borderRadius: '8px', overflowX: 'auto', maxWidth: '100%', background: 'transparent' }}>
                                           <SyntaxHighlighter
                                             {...props}
-                                            children={codeText}
                                             style={oneLight}
                                             language={language}
                                             PreTag="div"
                                             customStyle={{ margin: 0, padding: '16px', fontSize: '0.9rem', borderRadius: 0, border: 'none' }}
-                                          />
+                                          >
+                                            {codeText}
+                                          </SyntaxHighlighter>
                                       </div>
                                     );
                                   }
@@ -870,12 +870,12 @@ export default function UserDashboard() {
 
                 {/* Send / Stop Button */}
                 <button 
-                  onClick={processLoading ? handleCancel : handleProcess}
-                  disabled={!processLoading && !prompt.trim()}
-                  title={processLoading ? '停止生成' : '发送'}
-                  style={{ position: 'absolute', right: '12px', bottom: '12px', minWidth: processLoading ? '88px' : '32px', height: '32px', padding: processLoading ? '0 11px' : 0, borderRadius: processLoading ? '8px' : '50%', background: processLoading ? '#ef4444' : prompt.trim() ? 'var(--primary)' : 'var(--background)', color: processLoading || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: processLoading || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: processLoading ? '6px' : 0, transition: 'all 0.2s', fontWeight: 600, fontSize: '0.8rem' }}
+                  onClick={isGenerating ? handleCancel : handleProcess}
+                  disabled={!isGenerating && !prompt.trim()}
+                  title={isGenerating ? '停止生成' : '发送'}
+                  style={{ position: 'absolute', right: '12px', bottom: '12px', minWidth: isGenerating ? '88px' : '32px', height: '32px', padding: isGenerating ? '0 11px' : 0, borderRadius: isGenerating ? '8px' : '50%', background: isGenerating ? '#ef4444' : prompt.trim() ? 'var(--primary)' : 'var(--background)', color: isGenerating || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: isGenerating || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isGenerating ? '6px' : 0, transition: 'all 0.2s', fontWeight: 600, fontSize: '0.8rem' }}
                 >
-                  {processLoading ? <><StopCircle size={16} /> 停止生成</> : <Send size={16} style={{ marginLeft: '2px' }} />}
+                  {isGenerating ? <><StopCircle size={16} /> 停止生成</> : <Send size={16} style={{ marginLeft: '2px' }} />}
                 </button>
               </div>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
