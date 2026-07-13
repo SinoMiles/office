@@ -1,23 +1,24 @@
 'use client';
 
-import { ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { ArrowRight, Search, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import { toolCategories } from '@/lib/toolsData';
 import Footer from '@/app/components/Footer';
 
 export default function ToolboxPage() {
   const router = useRouter();
+  const [query, setQuery] = useState('');
+  const visibleCategories = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) return toolCategories;
+    return toolCategories.map((category) => ({ ...category, tools: category.tools.filter((tool) => `${tool.name} ${tool.desc}`.toLowerCase().includes(keyword)) })).filter((category) => category.tools.length > 0);
+  }, [query]);
+  const availableCount = toolCategories.reduce((count, category) => count + category.tools.filter((tool) => !tool.comingSoon).length, 0);
 
   const handleToolClick = (tool) => {
     if (tool.comingSoon) return;
     
-    if (tool.type === 'ai') {
-      // Navigate to dashboard chat with the chosen intent
-      router.push(`/dashboard?intent=${tool.id}`);
-      return;
-    }
-
-    // Go to dedicated tool page
     router.push(`/tools/${tool.id}`);
   };
 
@@ -33,12 +34,16 @@ export default function ToolboxPage() {
           全能文档处理大厅
         </h1>
         <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto', lineHeight: 1.6 }}>
-          探索为现代办公量身打造的极速处理工具。无论是格式转换还是 AI 深度排版，均在完全安全的沙盒环境中瞬间完成。
+          {availableCount} 个真正可用的 PDF、Office、数据转换和 AI 文档工具。免费完成基础处理，需要更进一步时交给 Office AI。
         </p>
+        <div style={{ maxWidth: '620px', margin: '32px auto 0', position: 'relative' }}>
+          <Search size={20} style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索 PDF、Word、Excel、PPT 或 AI 工具" aria-label="搜索工具" style={{ width: '100%', padding: '16px 20px 16px 52px', borderRadius: '18px', border: '1px solid var(--border)', background: 'rgba(255,255,255,.9)', boxShadow: '0 14px 40px rgba(15,23,42,.08)', fontSize: '1rem', outline: 'none' }} />
+        </div>
       </div>
 
       <div style={{ maxWidth: '1200px', margin: '0 auto 120px auto', padding: '0 24px', position: 'relative', zIndex: 2 }}>
-        {toolCategories.map((category, idx) => (
+        {visibleCategories.map((category, idx) => (
           <div key={idx} style={{ marginBottom: '64px', animation: `slideUp ${0.5 + idx * 0.1}s ease-out` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: category.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -88,6 +93,7 @@ export default function ToolboxPage() {
             </div>
           </div>
         ))}
+        {visibleCategories.length === 0 ? <div style={{ textAlign: 'center', padding: '70px 20px', color: 'var(--text-muted)' }}><Search size={34} style={{ marginBottom: '14px' }} /><p>没有找到匹配工具。你也可以进入 Office AI，直接描述想完成的任务。</p><button onClick={() => router.push('/dashboard')} className="btn btn-primary">询问 Office AI</button></div> : null}
         <style dangerouslySetInnerHTML={{__html: `
           .premium-stat-card:hover .tool-arrow {
             opacity: 1 !important;

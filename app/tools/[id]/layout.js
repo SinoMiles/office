@@ -57,8 +57,7 @@ export default function ToolLayout({ children }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {category.tools.map(tool => {
                   const isActive = pathname === `/tools/${tool.id}`;
-                  const isAi = tool.type === 'ai';
-                  const targetUrl = isAi ? `/dashboard?intent=${tool.id}` : `/tools/${tool.id}`;
+                  const targetUrl = `/tools/${tool.id}`;
                   
                   return (
                     <Link 

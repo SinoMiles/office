@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, use } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getToolById } from '@/lib/toolsData';
-import { ArrowLeft, UploadCloud, File as FileIcon, X, CheckCircle2, Download, Loader2, Sparkles } from 'lucide-react';
+import { ArrowRight, UploadCloud, File as FileIcon, X, CheckCircle2, Download, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function ToolProcessPage() {
@@ -29,6 +30,14 @@ export default function ToolProcessPage() {
   }, [tool, router]);
 
   if (!tool) return null;
+
+  const seoContent = tool.seo || {
+    summary: `${tool.name}用于快速完成${tool.desc}，文件处理完成后可以继续交给 Office AI 分析、修改或生成新文档。`,
+    useCases: [`需要${tool.desc}时快速处理`, '批量办公文件整理与交付', '处理后继续进行 AI 文档分析'],
+    faqs: [['文件安全吗？', '文件仅用于当前处理任务，不会发送到第三方转换网站。'], ['处理后还能继续编辑吗？', '可以下载结果，也可以进入 Office AI 继续处理。']],
+    related: [],
+  };
+  const relatedTools = (seoContent.related || []).map(getToolById).filter(Boolean);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -72,7 +81,8 @@ export default function ToolProcessPage() {
         if (tool.option) formData.append(tool.option.name, optionValue);
       }
 
-      const endpoint = tool.type === 'convert' ? '/api/tools/convert' : '/api/tools/pdf';
+      const endpoint = tool.type === 'convert' ? '/api/tools/convert' : tool.type === 'document-util' ? '/api/tools/document' : '/api/tools/pdf';
+      if (tool.type === 'document-util') formData.append('action', tool.id);
       const res = await fetch(endpoint, {
         method: 'POST',
         body: formData,
@@ -123,8 +133,19 @@ export default function ToolProcessPage() {
 
       <div style={{ width: '100%', maxWidth: '800px', animation: 'slideUp 0.4s ease-out' }}>
         
+        {tool.type === 'ai' ? (
+          <div style={{ background: 'white', borderRadius: '24px', padding: '48px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', textAlign: 'center' }}>
+            <Sparkles size={38} color="var(--primary)" style={{ marginBottom: '18px' }} />
+            <h2 style={{ fontSize: '1.45rem', marginBottom: '12px' }}>使用 Office AI 开始处理</h2>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: '560px', margin: '0 auto 28px' }}>{seoContent.summary}</p>
+            <button onClick={() => router.push(`/dashboard?intent=${tool.id}`)} className="btn btn-primary" style={{ padding: '14px 28px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              上传文件并开始 <ArrowRight size={18} />
+            </button>
+          </div>
+        ) : null}
+
         {/* Step 1: Upload */}
-        {!resultUrl && (
+        {tool.type !== 'ai' && !resultUrl ? (
           <div style={{ background: 'white', borderRadius: '24px', padding: '40px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)' }}>
             
               <div 
@@ -212,10 +233,10 @@ export default function ToolProcessPage() {
               )}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Step 2: Success Result */}
-        {resultUrl && (
+        {tool.type !== 'ai' && resultUrl ? (
           <div style={{ background: 'white', borderRadius: '24px', padding: '60px 40px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', textAlign: 'center', animation: 'slideUp 0.3s ease-out' }}>
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
               <CheckCircle2 size={40} color="#16a34a" />
@@ -244,9 +265,36 @@ export default function ToolProcessPage() {
               </button>
             </div>
           </div>
-        )}
+        ) : null}
 
       </div>
+      <section style={{ width: '100%', maxWidth: '900px', marginTop: '72px', display: 'grid', gap: '42px' }}>
+        <div>
+          <h2 style={{ fontSize: '1.65rem', marginBottom: '14px' }}>关于{tool.name}</h2>
+          <p style={{ color: 'var(--text-muted)', lineHeight: 1.85, fontSize: '1rem' }}>{seoContent.summary}</p>
+        </div>
+        <div>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '18px' }}>适合这些场景</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px' }}>
+            {seoContent.useCases.map((item) => <div key={item} style={{ padding: '18px', borderRadius: '14px', background: 'white', border: '1px solid var(--border)', lineHeight: 1.6 }}>{item}</div>)}
+          </div>
+        </div>
+        <div>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '18px' }}>常见问题</h2>
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {seoContent.faqs.map(([question, answer]) => <details key={question} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px 18px' }}><summary style={{ cursor: 'pointer', fontWeight: 650 }}>{question}</summary><p style={{ color: 'var(--text-muted)', lineHeight: 1.7, margin: '12px 0 0' }}>{answer}</p></details>)}
+          </div>
+        </div>
+        {relatedTools.length > 0 ? <div>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '18px' }}>相关工具</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>{relatedTools.map((related) => <Link key={related.id} href={`/tools/${related.id}`} style={{ padding: '11px 15px', borderRadius: '10px', background: 'white', border: '1px solid var(--border)', color: 'var(--text-main)', textDecoration: 'none' }}>{related.name}</Link>)}</div>
+        </div> : null}
+        <div style={{ padding: '30px', borderRadius: '20px', background: 'linear-gradient(135deg, #eef2ff, #ecfdf5)', border: '1px solid rgba(99,102,241,.15)', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '10px' }}>处理完成后，让 Office AI 继续工作</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>总结、翻译、分析数据，或直接生成 Word、Excel 和 PPT。</p>
+          <button onClick={() => router.push('/dashboard')} className="btn btn-primary">进入 Office AI</button>
+        </div>
+      </section>
     </div>
   );
 }

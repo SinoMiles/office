@@ -74,6 +74,29 @@ export async function POST(req) {
       finalPdfBytes = await pdf.save();
       downloadName = 'watermarked.pdf';
     }
+    else if (action === 'pdf-clean-metadata') {
+      const pdf = await PDFDocument.load(await files[0].arrayBuffer());
+      pdf.setTitle('');
+      pdf.setAuthor('');
+      pdf.setSubject('');
+      pdf.setKeywords([]);
+      pdf.setProducer('');
+      pdf.setCreator('');
+      finalPdfBytes = await pdf.save();
+      downloadName = 'clean_metadata.pdf';
+    }
+    else if (action === 'pdf-page-numbers') {
+      const pdf = await PDFDocument.load(await files[0].arrayBuffer());
+      const startPage = Number.parseInt(formData.get('startPage') || '1', 10);
+      if (!Number.isInteger(startPage) || startPage < 1) return NextResponse.json({ error: '起始页码必须是正整数' }, { status: 400 });
+      pdf.getPages().forEach((page, index) => {
+        const label = String(startPage + index);
+        const { width } = page.getSize();
+        page.drawText(label, { x: width / 2 - label.length * 3, y: 18, size: 10, color: rgb(0.25, 0.25, 0.25) });
+      });
+      finalPdfBytes = await pdf.save();
+      downloadName = 'numbered.pdf';
+    }
     else if (action === 'img-to-pdf') {
       const pdf = await PDFDocument.create();
       
