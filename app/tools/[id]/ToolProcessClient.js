@@ -212,7 +212,7 @@ export default function ToolProcessPage() {
                   {tool.option ? (
                     <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', fontSize: '0.9rem', fontWeight: 600 }}>
                       {tool.option.label}
-                      <input value={optionValue} onChange={(event) => setOptionValue(event.target.value)} placeholder={tool.option.placeholder} style={{ width: '100%', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '0.95rem', outline: 'none' }} />
+                      <input type={tool.option.type || 'text'} autoComplete={tool.option.type === 'password' ? 'new-password' : undefined} value={optionValue} onChange={(event) => setOptionValue(event.target.value)} placeholder={tool.option.placeholder} style={{ width: '100%', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '0.95rem', outline: 'none' }} />
                     </label>
                   ) : null}
                   
