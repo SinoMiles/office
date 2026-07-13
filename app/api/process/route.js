@@ -9,7 +9,7 @@ import BillingRecord from '@/models/BillingRecord';
 import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { chatError, chatLog } from '@/lib/aioncore/logger';
-import { buildConversationExtra, isExplicitFileGenerationRequest, OFFICEWEB_AGENT_CONTEXT } from '@/lib/aioncore/request-policy';
+import { buildConversationExtra, isExplicitFileGenerationRequest } from '@/lib/aioncore/request-policy';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -32,6 +32,7 @@ export async function POST(request) {
     await connectToDatabase();
     const formData = await request.formData();
     const prompt = String(formData.get('prompt') || '').trim();
+    const productLocale = request.headers.get('accept-language')?.split(',')[0]?.trim() || 'zh-CN';
     const parentTaskId = String(formData.get('taskId') || '').trim();
     const file = formData.get('file');
     if (!prompt) return NextResponse.json({ error: '请输入处理需求' }, { status: 400 });
@@ -86,7 +87,7 @@ export async function POST(request) {
     // Create a unique aionConversationId for the whole task chain, or inherit
     let aionConversationId = parentTask?.aionConversationId;
     if (!aionConversationId) {
-      const payload = { type: 'aionrs', extra: buildConversationExtra() };
+      const payload = { type: 'aionrs', extra: buildConversationExtra({ product_locale: productLocale }) };
       if (aionModelPayload) {
         payload.model = aionModelPayload;
       }
@@ -106,7 +107,7 @@ export async function POST(request) {
       const policyRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extra: { context: OFFICEWEB_AGENT_CONTEXT, context_file_name: 'OfficeWeb response policy' }, merge_extra: true }),
+        body: JSON.stringify({ extra: buildConversationExtra({ product_locale: productLocale }), merge_extra: true }),
       });
       chatLog('process', `conversation policy response ${policyRes.status}`, { conversation_id: aionConversationId });
     }
