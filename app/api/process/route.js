@@ -9,7 +9,7 @@ import BillingRecord from '@/models/BillingRecord';
 import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { chatError, chatLog } from '@/lib/aioncore/logger';
-import { buildConversationExtra, isExplicitFileGenerationRequest } from '@/lib/aioncore/request-policy';
+import { buildConversationExtra } from '@/lib/aioncore/request-policy';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -37,8 +37,6 @@ export async function POST(request) {
     const file = formData.get('file');
     if (!prompt) return NextResponse.json({ error: '请输入处理需求' }, { status: 400 });
     chatLog('process', 'request accepted', { parentTaskId: parentTaskId || undefined, hasFile: Boolean(file) });
-    const explicitFileGeneration = isExplicitFileGenerationRequest(prompt);
-
     const parentTask = parentTaskId
       ? await Task.findOne({ _id: parentTaskId, userId: user._id })
       : null;
@@ -187,7 +185,6 @@ export async function POST(request) {
       body: JSON.stringify({
         content: prompt,
         files: filename ? [filename] : [],
-        inject_skills: explicitFileGeneration ? ['officecli'] : [],
       })
     });
     chatLog('process', `message start response ${aiRes.status}`, { conversation_id: aionConversationId });
