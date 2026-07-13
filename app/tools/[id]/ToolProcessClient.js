@@ -78,11 +78,12 @@ export default function ToolProcessPage() {
       
       if (tool.type === 'pdf-util') {
         formData.append('action', tool.id);
-        if (tool.option) formData.append(tool.option.name, optionValue);
       }
+      if (tool.option) formData.append(tool.option.name, optionValue);
 
-      const endpoint = tool.type === 'convert' ? '/api/tools/convert' : tool.type === 'document-util' ? '/api/tools/document' : '/api/tools/pdf';
+      const endpoint = tool.type === 'convert' ? '/api/tools/convert' : tool.type === 'document-util' ? '/api/tools/document' : tool.type === 'image-convert' ? '/api/tools/images' : '/api/tools/pdf';
       if (tool.type === 'document-util') formData.append('action', tool.id);
+      if (tool.type === 'image-convert') formData.append('action', tool.id);
       const res = await fetch(endpoint, {
         method: 'POST',
         body: formData,
