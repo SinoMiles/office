@@ -146,12 +146,14 @@ export function useAioncoreChat() {
     };
   }, [applyRuntimeEvent, approvePermission, flushMessageQueue, openOfficePreview, recoverPendingPermissions]);
 
-  const loadConversation = useCallback((id, taskId, workspace = '') => {
+  const loadConversation = useCallback((id, taskId, workspace = '', options = {}) => {
     chatLog('conversation', `load ${id}`);
     conversationIdRef.current = id;
     taskIdRef.current = taskId || taskIdRef.current;
     workspaceRef.current = workspace || workspaceRef.current;
-    clientRef.current?.send('chat:history:load', { conversation_id: id });
+    if (options.loadHistory !== false) {
+      clientRef.current?.send('chat:history:load', { conversation_id: id });
+    }
     void recoverPendingPermissions(id);
     const pending = pendingOfficeFilesRef.current.splice(0);
     for (const event of pending) void openOfficePreview(event);

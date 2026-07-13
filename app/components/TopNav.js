@@ -1,5 +1,6 @@
 'use client';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PanelLeftClose } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export default function TopNav({ isLoggedIn }) {
     }
     return (
       <nav style={{ padding: '0 24px', position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(0,0,0,0.05)', height: '70px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ maxWidth: '1200px', margin: '0', display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button onClick={() => { window.location.href = '/'; }} style={{ fontSize: '1.25rem', fontWeight: 800, border: 'none', padding: 0, background: 'transparent', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', cursor: 'pointer' }} title="OfficeGPT 首页">
             <span style={{ color: 'var(--primary)', fontSize: '1.4rem' }}>✦</span> OfficeGPT
           </button>
@@ -58,14 +59,14 @@ export default function TopNav({ isLoggedIn }) {
         
         {/* Left: Logo */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <a href="/" style={{ fontSize: '1.35rem', fontWeight: 800, textDecoration: 'none', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', transition: 'opacity 0.2s' }} onMouseOver={e=>e.currentTarget.style.opacity='0.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+          <Link href="/" style={{ fontSize: '1.35rem', fontWeight: 800, textDecoration: 'none', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', transition: 'opacity 0.2s' }} onMouseOver={e=>e.currentTarget.style.opacity='0.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
             <span style={{ color: 'var(--primary)', fontSize: '1.5rem' }}>✦</span> OfficeGPT
-          </a>
+          </Link>
         </div>
 
         {/* Center: Menu */}
         <div style={{ display: 'flex', gap: '8px', fontSize: '0.95rem', fontWeight: 600 }}>
-          <a href="/tools" className="premium-nav-link" style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: pathname === '/tools' ? 'var(--primary)' : 'var(--text-main)', background: pathname === '/tools' ? 'var(--primary-light)' : 'transparent', transition: 'all 0.2s' }}>
+          <Link href="/tools" className="premium-nav-link" style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: pathname === '/tools' ? 'var(--primary)' : 'var(--text-main)', background: pathname === '/tools' ? 'var(--primary-light)' : 'transparent', transition: 'all 0.2s' }}>
             文档处理
             <span style={{ 
               position: 'absolute', 
@@ -84,18 +85,18 @@ export default function TopNav({ isLoggedIn }) {
             }}>
               FREE
             </span>
-          </a>
-          <a href="/#features" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>产品功能</a>
-          <a href="/#solutions" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>解决方案</a>
-          <a href="/#pricing" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>价格方案</a>
+          </Link>
+          <Link href="/#features" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>产品功能</Link>
+          <Link href="/#solutions" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>解决方案</Link>
+          <Link href="/#pricing" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>价格方案</Link>
         </div>
 
         {/* Right: Actions */}
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', alignItems: 'center' }}>
           {!isLoggedIn ? (
             <>
-              <a href="/login" style={{ textDecoration: 'none', color: 'var(--text-main)', fontWeight: 600, fontSize: '0.95rem', padding: '8px 16px', transition: 'color 0.2s' }} onMouseOver={e=>e.currentTarget.style.color='var(--primary)'} onMouseOut={e=>e.currentTarget.style.color='var(--text-main)'}>登录</a>
-              <a href="/register" style={{ textDecoration: 'none', background: 'var(--text-main)', color: 'white', fontWeight: 600, fontSize: '0.95rem', padding: '10px 24px', borderRadius: '24px', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} onMouseOver={e=>{e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 16px rgba(0,0,0,0.15)'}} onMouseOut={e=>{e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'}}>免费开始体验</a>
+              <Link href="/login" style={{ textDecoration: 'none', color: 'var(--text-main)', fontWeight: 600, fontSize: '0.95rem', padding: '8px 16px', transition: 'color 0.2s' }} onMouseOver={e=>e.currentTarget.style.color='var(--primary)'} onMouseOut={e=>e.currentTarget.style.color='var(--text-main)'}>登录</Link>
+              <Link href="/register" style={{ textDecoration: 'none', background: 'var(--text-main)', color: 'white', fontWeight: 600, fontSize: '0.95rem', padding: '10px 24px', borderRadius: '24px', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} onMouseOver={e=>{e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 16px rgba(0,0,0,0.15)'}} onMouseOut={e=>{e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'}}>免费开始体验</Link>
             </>
           ) : null}
         </div>

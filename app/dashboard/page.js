@@ -337,6 +337,9 @@ export default function UserDashboard() {
   };
 
   const loadHistoryTask = useCallback(async (task) => {
+    setActiveTaskId(task._id);
+    setActiveTab('workspace');
+    setMessages([{ role: 'ai', content: '', loading: true }]);
     const payload = await fetch(`/api/tasks/${task._id}/conversation`).then((res) => res.json()).catch(() => null);
     const conversation = payload?.tasks || [task];
     const persistedMessages = conversation.flatMap((turn) => [
@@ -354,10 +357,8 @@ export default function UserDashboard() {
       },
     ]);
     setMessages(payload?.messages?.length ? payload.messages : persistedMessages);
-    setActiveTaskId(task._id);
-    setActiveTab('workspace');
     window.localStorage.setItem('officeweb-active-task-id', task._id);
-    if (task.aionConversationId) loadConversation(task.aionConversationId, task._id);
+    if (task.aionConversationId) loadConversation(task.aionConversationId, task._id, '', { loadHistory: false });
     if (task.outputFile || task.previewFile) {
       const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
       setActiveArtifact({

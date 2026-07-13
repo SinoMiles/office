@@ -3,11 +3,11 @@ import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
-import { mapMessagesToUi, normalizeHistoryMessages } from '@/lib/aioncore/chat-reducer';
+import { mapMessagesToUi, normalizeHistoryMessages, sliceHistoryThroughPrompts } from '@/lib/aioncore/chat-reducer';
 
 const AIONCORE_URL = getAioncoreBaseUrl();
 
-async function loadAionHistory(conversationId) {
+async function loadAionHistory(conversationId, prompts) {
   if (!conversationId) return [];
   const pages = [];
   let before = '';
@@ -23,7 +23,8 @@ async function loadAionHistory(conversationId) {
     if (!page.has_more_before || !page.oldest_cursor || items.length === 0) break;
     before = page.oldest_cursor;
   }
-  return mapMessagesToUi(normalizeHistoryMessages(pages.flat()), { isProcessing: false });
+  const normalized = normalizeHistoryMessages(pages.flat());
+  return mapMessagesToUi(sliceHistoryThroughPrompts(normalized, prompts), { isProcessing: false });
 }
 
 export async function GET(_request, { params }) {
@@ -42,7 +43,7 @@ export async function GET(_request, { params }) {
   if (!turns.length) return NextResponse.json({ error: 'Task not found or permission denied' }, { status: 404 });
   let messages = [];
   try {
-    messages = await loadAionHistory(turns[turns.length - 1].aionConversationId);
+    messages = await loadAionHistory(turns[turns.length - 1].aionConversationId, turns.map((turn) => turn.prompt));
   } catch (error) {
     console.warn('[OfficeWeb:History] AionCore history unavailable:', error.message);
   }

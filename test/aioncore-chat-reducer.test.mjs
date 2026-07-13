@@ -6,6 +6,7 @@ import {
   mergeStreamMessages,
   normalizeHistoryMessages,
   reduceRuntime,
+  sliceHistoryThroughPrompts,
 } from '../lib/aioncore/chat-reducer.js';
 
 test('text stream chunks merge by message identity', () => {
@@ -99,4 +100,17 @@ test('AionCore HTTP history positions normalize into user and assistant roles', 
   ]);
   const ui = mapMessagesToUi(normalized, { isProcessing: false });
   assert.deepEqual(ui.map((message) => [message.role, message.content]), [['user', '问题'], ['ai', '回答']]);
+});
+
+test('history selection stops before the next turn in a shared AionCore conversation', () => {
+  const history = normalizeHistoryMessages([
+    { msg_id: 'u1', position: 'right', type: 'text', content: { content: '第一问' } },
+    { msg_id: 'a1', position: 'left', type: 'text', content: { content: '第一答' } },
+    { msg_id: 'u2', position: 'right', type: 'text', content: { content: '第二问' } },
+    { msg_id: 'a2', position: 'left', type: 'text', content: { content: '第二答' } },
+  ]);
+  const firstTurn = sliceHistoryThroughPrompts(history, ['第一问']);
+  assert.deepEqual(firstTurn.map((message) => message.msg_id), ['u1', 'a1']);
+  const secondTurn = sliceHistoryThroughPrompts(history, ['第一问', '第二问']);
+  assert.deepEqual(secondTurn.map((message) => message.msg_id), ['u1', 'a1', 'u2', 'a2']);
 });
