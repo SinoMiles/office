@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -45,6 +45,7 @@ export default function UserDashboard() {
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ isOpen: false, taskId: null });
   const menuRef = useRef(null);
   const lastPreviewVersionRef = useRef(null);
+  const historyRestoredRef = useRef(false);
 
   useEffect(() => {
     fetchData();
@@ -253,6 +254,9 @@ export default function UserDashboard() {
           recentTasks: prev.recentTasks.filter(t => t._id !== id)
         }));
         if (activeTaskId === id) setActiveTaskId(null);
+        if (window.localStorage.getItem('officeweb-active-task-id') === id) {
+          window.localStorage.removeItem('officeweb-active-task-id');
+        }
         setOpenMenuId(null);
       } else {
         throw new Error('Failed');
@@ -329,17 +333,31 @@ export default function UserDashboard() {
     setShowRightPanel(false);
     setSidebarCollapsed(false);
     setActiveArtifact(null);
+    window.localStorage.removeItem('officeweb-active-task-id');
   };
 
-  const loadHistoryTask = async (task) => {
+  const loadHistoryTask = useCallback(async (task) => {
     const payload = await fetch(`/api/tasks/${task._id}/conversation`).then((res) => res.json()).catch(() => null);
     const conversation = payload?.tasks || [task];
-    setMessages(conversation.flatMap((turn) => [
+    const persistedMessages = conversation.flatMap((turn) => [
       { role: 'user', content: turn.prompt, filename: turn.filename },
-      { role: 'ai', content: turn.aiTextResponse || (turn.status === 'cancelled' ? '任务已取消。' : '处理完成。'), error: turn.status === 'failed' },
-    ]));
+      {
+        role: 'ai',
+        content: turn.aiTextResponse || turn.runtime?.streamedText || (turn.status === 'cancelled'
+          ? '任务已取消。'
+          : turn.status === 'failed'
+            ? `处理失败：${turn.errorMessage || '未记录错误详情'}`
+            : turn.status === 'processing'
+              ? '任务仍在处理中，正在恢复实时状态…'
+              : '这条历史回复未能写入任务数据库。'),
+        error: turn.status === 'failed',
+      },
+    ]);
+    setMessages(payload?.messages?.length ? payload.messages : persistedMessages);
     setActiveTaskId(task._id);
     setActiveTab('workspace');
+    window.localStorage.setItem('officeweb-active-task-id', task._id);
+    if (task.aionConversationId) loadConversation(task.aionConversationId, task._id);
     if (task.outputFile || task.previewFile) {
       const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
       setActiveArtifact({
@@ -354,7 +372,17 @@ export default function UserDashboard() {
     } else {
       setActiveArtifact(null);
     }
-  };
+  }, [loadConversation]);
+
+  useEffect(() => {
+    if (loading || historyRestoredRef.current || !stats.recentTasks?.length) return;
+    historyRestoredRef.current = true;
+    const savedTaskId = window.localStorage.getItem('officeweb-active-task-id');
+    if (!savedTaskId) return;
+    const savedTask = stats.recentTasks.find((task) => task._id === savedTaskId);
+    if (savedTask) void loadHistoryTask(savedTask);
+    else window.localStorage.removeItem('officeweb-active-task-id');
+  }, [loadHistoryTask, loading, stats.recentTasks]);
 
   const handleCancel = async () => {
     if (!activeTaskId) return;
@@ -413,6 +441,7 @@ export default function UserDashboard() {
       const resData = await response.json();
       
       setActiveTaskId(resData.taskId);
+      window.localStorage.setItem('officeweb-active-task-id', resData.taskId);
       // Wait for React to apply activeTaskId before sending message,
       // or we can just pass the aionConversationId directly to sendMessage if we update the hook.
       // But loadConversation will be triggered by useEffect when activeTaskId changes.

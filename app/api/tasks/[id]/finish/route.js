@@ -8,7 +8,7 @@ export async function PUT(request, { params }) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: '请先登录' }, { status: 401 });
 
-    const { id } = params;
+    const { id } = await params;
     await connectToDatabase();
 
     const body = await request.json();
@@ -29,10 +29,14 @@ export async function PUT(request, { params }) {
       updatePayload.cost = body.cost;
     }
 
-    await Task.updateOne(
+    const result = await Task.updateOne(
       { _id: id, userId: user._id },
       { $set: updatePayload }
     );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: '任务不存在或无权访问' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

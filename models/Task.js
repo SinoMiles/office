@@ -25,10 +25,7 @@ const TaskSchema = new mongoose.Schema({
   tokensUsed: { type: Number, default: 0 },
   cost: { type: Number, default: 0 },
   errorMessage: { type: String },
-  expiresAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) } // 24 hours TTL
 }, { timestamps: true });
-
-TaskSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 delete mongoose.models.Task;
 export default mongoose.models.Task || mongoose.model('Task', TaskSchema);

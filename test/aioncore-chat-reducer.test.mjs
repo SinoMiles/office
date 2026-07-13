@@ -4,6 +4,7 @@ import {
   createRuntimeState,
   mapMessagesToUi,
   mergeStreamMessages,
+  normalizeHistoryMessages,
   reduceRuntime,
 } from '../lib/aioncore/chat-reducer.js';
 
@@ -88,4 +89,14 @@ test('separate thought messages remain visible instead of replacing each other',
   const ui = mapMessagesToUi(raw, { isProcessing: true });
   assert.equal(ui[0].thought.description, '先理解需求。\n再制定方案。');
   assert.equal(ui[0].thought.subject, '规划');
+});
+
+test('AionCore HTTP history positions normalize into user and assistant roles', () => {
+  const normalized = normalizeHistoryMessages([
+    { msg_id: 'user', position: 'right', type: 'text', content: { content: '问题' } },
+    { msg_id: 'hidden', position: 'left', type: 'text', hidden: true, content: { content: '内部内容' } },
+    { msg_id: 'assistant', position: 'left', type: 'text', content: { content: '回答' } },
+  ]);
+  const ui = mapMessagesToUi(normalized, { isProcessing: false });
+  assert.deepEqual(ui.map((message) => [message.role, message.content]), [['user', '问题'], ['ai', '回答']]);
 });

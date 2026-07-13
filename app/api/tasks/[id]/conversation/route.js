@@ -2,6 +2,29 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import Task from '@/models/Task';
+import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
+import { mapMessagesToUi, normalizeHistoryMessages } from '@/lib/aioncore/chat-reducer';
+
+const AIONCORE_URL = getAioncoreBaseUrl();
+
+async function loadAionHistory(conversationId) {
+  if (!conversationId) return [];
+  const pages = [];
+  let before = '';
+  for (let pageNumber = 0; pageNumber < 20; pageNumber += 1) {
+    const query = new URLSearchParams({ limit: '200', content_mode: 'full' });
+    if (before) query.set('before', before);
+    const response = await fetch(`${AIONCORE_URL}/api/conversations/${encodeURIComponent(conversationId)}/messages?${query}`);
+    if (!response.ok) throw new Error(`AionCore history request failed (${response.status})`);
+    const payload = await response.json();
+    const page = payload.data || payload;
+    const items = Array.isArray(page.items) ? page.items : [];
+    pages.unshift(items);
+    if (!page.has_more_before || !page.oldest_cursor || items.length === 0) break;
+    before = page.oldest_cursor;
+  }
+  return mapMessagesToUi(normalizeHistoryMessages(pages.flat()), { isProcessing: false });
+}
 
 export async function GET(_request, { params }) {
   const user = await getCurrentUser();
@@ -17,5 +40,11 @@ export async function GET(_request, { params }) {
       : null;
   }
   if (!turns.length) return NextResponse.json({ error: 'Task not found or permission denied' }, { status: 404 });
-  return NextResponse.json({ success: true, tasks: turns });
+  let messages = [];
+  try {
+    messages = await loadAionHistory(turns[turns.length - 1].aionConversationId);
+  } catch (error) {
+    console.warn('[OfficeWeb:History] AionCore history unavailable:', error.message);
+  }
+  return NextResponse.json({ success: true, tasks: turns, messages });
 }
