@@ -18,6 +18,7 @@ export default function ToolProcessPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultUrl, setResultUrl] = useState(null);
   const [resultFilename, setResultFilename] = useState('');
+  const [optionValue, setOptionValue] = useState('');
   
   const fileInputRef = useRef(null);
 
@@ -68,6 +69,7 @@ export default function ToolProcessPage() {
       
       if (tool.type === 'pdf-util') {
         formData.append('action', tool.id);
+        if (tool.option) formData.append(tool.option.name, optionValue);
       }
 
       const endpoint = tool.type === 'convert' ? '/api/tools/convert' : '/api/tools/pdf';
@@ -185,11 +187,17 @@ export default function ToolProcessPage() {
                       </div>
                     ))}
                   </div>
+                  {tool.option ? (
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', fontSize: '0.9rem', fontWeight: 600 }}>
+                      {tool.option.label}
+                      <input value={optionValue} onChange={(event) => setOptionValue(event.target.value)} placeholder={tool.option.placeholder} style={{ width: '100%', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '0.95rem', outline: 'none' }} />
+                    </label>
+                  ) : null}
                   
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <button 
                       onClick={(e) => { e.stopPropagation(); startProcessing(); }}
-                      disabled={isProcessing}
+                      disabled={isProcessing || Boolean(tool.option && !optionValue.trim())}
                       className="btn btn-primary"
                       style={{ fontSize: '1.1rem', padding: '16px 48px', width: '100%', maxWidth: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                     >

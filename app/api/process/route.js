@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.pptx']);
+const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.pptx', '.png', '.jpg', '.jpeg', '.webp']);
 const AIONCORE_URL = getAioncoreBaseUrl();
 
 function storageRoot() {

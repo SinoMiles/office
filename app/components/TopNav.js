@@ -1,7 +1,7 @@
 'use client';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { PanelLeftClose } from 'lucide-react';
 
 export default function TopNav({ isLoggedIn }) {
   const pathname = usePathname();
@@ -28,14 +28,23 @@ export default function TopNav({ isLoggedIn }) {
 
   // 大厅内的极简导航
   if (isDashboard) {
+    if (dashboardSidebarCollapsed) {
+      return (
+        <nav style={{ width: '72px', height: '70px', position: 'sticky', top: 0, zIndex: 50, background: '#f9f9f9', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'width 0.25s ease' }}>
+          <button onClick={() => setSidebarCollapsed(false)} title="展开左侧导航" aria-label="展开左侧导航" style={{ width: '42px', height: '42px', border: 'none', borderRadius: '12px', padding: 0, background: 'transparent', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.5rem', fontWeight: 800 }}>
+            ✦
+          </button>
+        </nav>
+      );
+    }
     return (
       <nav style={{ padding: '0 24px', position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(0,0,0,0.05)', height: '70px', display: 'flex', alignItems: 'center' }}>
         <div style={{ maxWidth: '1200px', margin: '0', display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-          <button onClick={() => { if (dashboardSidebarCollapsed) setSidebarCollapsed(false); else window.location.href = '/'; }} style={{ fontSize: '1.25rem', fontWeight: 800, border: 'none', padding: 0, background: 'transparent', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', cursor: 'pointer' }} title={dashboardSidebarCollapsed ? '展开左侧导航' : 'OfficeGPT 首页'}>
+          <button onClick={() => { window.location.href = '/'; }} style={{ fontSize: '1.25rem', fontWeight: 800, border: 'none', padding: 0, background: 'transparent', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', cursor: 'pointer' }} title="OfficeGPT 首页">
             <span style={{ color: 'var(--primary)', fontSize: '1.4rem' }}>✦</span> OfficeGPT
           </button>
-          <button onClick={() => setSidebarCollapsed(!dashboardSidebarCollapsed)} title={dashboardSidebarCollapsed ? '展开左侧导航' : '收起左侧导航'} aria-label={dashboardSidebarCollapsed ? '展开左侧导航' : '收起左侧导航'} style={{ width: '36px', height: '36px', border: 'none', background: 'transparent', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {dashboardSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+          <button onClick={() => setSidebarCollapsed(true)} title="收起左侧导航" aria-label="收起左侧导航" style={{ width: '36px', height: '36px', border: 'none', background: 'transparent', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <PanelLeftClose size={20} />
           </button>
         </div>
       </nav>

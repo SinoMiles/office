@@ -1,6 +1,20 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 
+function parsePageSelection(value, pageCount) {
+  const indices = new Set();
+  for (const part of String(value || '').split(',').map((item) => item.trim()).filter(Boolean)) {
+    const match = part.match(/^(\d+)(?:-(\d+))?$/);
+    if (!match) throw new Error('页码格式不正确，请使用例如 1-3,5');
+    const start = Number(match[1]);
+    const end = Number(match[2] || match[1]);
+    if (start < 1 || end < start || end > pageCount) throw new Error(`页码必须在 1-${pageCount} 之间`);
+    for (let page = start; page <= end; page += 1) indices.add(page - 1);
+  }
+  if (indices.size === 0) throw new Error('请输入要提取的页码');
+  return [...indices].sort((a, b) => a - b);
+}
+
 export async function POST(req) {
   try {
     const formData = await req.formData();
@@ -26,21 +40,17 @@ export async function POST(req) {
       downloadName = 'merged.pdf';
     } 
     else if (action === 'split-pdf') {
-      // 拆分：目前简化为提取前 5 页
       const file = files[0];
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await PDFDocument.load(arrayBuffer);
       const splitPdf = await PDFDocument.create();
       
-      const pageCount = pdf.getPageCount();
-      const extractCount = Math.min(pageCount, 5);
-      
-      const indices = Array.from({ length: extractCount }, (_, i) => i);
+      const indices = parsePageSelection(formData.get('pages'), pdf.getPageCount());
       const copiedPages = await splitPdf.copyPages(pdf, indices);
       copiedPages.forEach((page) => splitPdf.addPage(page));
       
       finalPdfBytes = await splitPdf.save();
-      downloadName = 'split_first_5_pages.pdf';
+      downloadName = 'extracted_pages.pdf';
     }
     else if (action === 'watermark') {
       const file = files[0];
@@ -48,9 +58,11 @@ export async function POST(req) {
       const pdf = await PDFDocument.load(arrayBuffer);
       const pages = pdf.getPages();
       
+      const watermark = String(formData.get('watermark') || '').trim();
+      if (!watermark) return NextResponse.json({ error: '请输入水印文字' }, { status: 400 });
       for (const page of pages) {
         const { width, height } = page.getSize();
-        page.drawText('OfficeGPT Confidential', {
+        page.drawText(watermark.slice(0, 80), {
           x: width / 6,
           y: height / 2,
           size: 40,
@@ -61,25 +73,6 @@ export async function POST(req) {
       }
       finalPdfBytes = await pdf.save();
       downloadName = 'watermarked.pdf';
-    }
-    else if (action === 'encrypt') {
-      const file = files[0];
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(arrayBuffer);
-      
-      // 设置固定密码 123 (仅供演示)
-      pdf.encrypt({
-        userPassword: '123',
-        ownerPassword: 'officegpt_admin',
-        permissions: {
-          printing: 'highResolution',
-          modifying: false,
-          copying: false,
-        },
-      });
-      
-      finalPdfBytes = await pdf.save();
-      downloadName = 'encrypted_pw_123.pdf';
     }
     else if (action === 'img-to-pdf') {
       const pdf = await PDFDocument.create();

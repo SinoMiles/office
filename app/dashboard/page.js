@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Download, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle } from 'lucide-react';
+import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
@@ -851,7 +851,7 @@ export default function UserDashboard() {
                 
                 {/* Upload Button */}
                 <div style={{ position: 'absolute', left: '12px', bottom: '12px' }}>
-                  <input type="file" id="file-upload" accept=".xlsx,.docx,.pptx" onChange={handleFileChange} style={{ display: 'none' }} />
+                  <input type="file" id="file-upload" accept=".pdf,.xlsx,.xls,.csv,.docx,.pptx,.png,.jpg,.jpeg,.webp" onChange={handleFileChange} style={{ display: 'none' }} />
                   <label htmlFor="file-upload" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: 'var(--background)', color: 'var(--text-muted)', transition: 'all 0.2s' }}>
                     <Paperclip size={18} />
                   </label>
@@ -868,7 +868,7 @@ export default function UserDashboard() {
                 </button>
               </div>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                支持 Excel、Word 和 PPT。你可以连续发送多条指令在同一个文档上叠加操作。
+                支持 PDF、Excel、Word、PPT 和常见图片。你可以连续发送多条指令在同一个文档上叠加操作。
               </div>
             </div>
           </div>
@@ -890,9 +890,9 @@ export default function UserDashboard() {
                     sandbox="allow-scripts allow-same-origin"
                     style={{ width: '100%', minHeight: '560px', flex: 1, border: '1px solid var(--border)', borderRadius: '8px', background: 'white' }}
                   />
-                  {activeArtifact.downloadUrl ? (
-                    <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <Download size={18} /> 下载 {activeArtifact.filename || 'Office 文件'}
+                  {activeArtifact.downloadUrl && !aionIsProcessing && !processLoading ? (
+                    <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      下载
                     </a>
                   ) : <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>正在生成，预览会随 OfficeCLI 的渲染实时更新…</div>}
                 </div>
