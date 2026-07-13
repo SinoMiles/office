@@ -44,7 +44,7 @@ export default function ToolboxPage() {
 
       <div style={{ maxWidth: '1200px', margin: '0 auto 120px auto', padding: '0 24px', position: 'relative', zIndex: 2 }}>
         {visibleCategories.map((category, idx) => (
-          <div key={idx} style={{ marginBottom: '64px', animation: `slideUp ${0.5 + idx * 0.1}s ease-out` }}>
+          <div id={`tool-category-${idx}`} key={category.title} style={{ marginBottom: '64px', animation: `slideUp ${0.5 + idx * 0.1}s ease-out`, scrollMarginTop: '96px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: category.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {category.icon}
