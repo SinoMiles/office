@@ -3,11 +3,18 @@
 import { toolCategories } from '@/lib/toolsData';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ArrowLeft, Box } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, ChevronDown } from 'lucide-react';
 
 export default function ToolLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
+  const activeCategory = toolCategories.find((category) => category.tools.some((tool) => pathname === `/tools/${tool.id}`))?.title;
+  const [openCategory, setOpenCategory] = useState(() => activeCategory || toolCategories[0]?.title);
+
+  const toggleCategory = (title) => {
+    setOpenCategory((current) => current === title ? null : title);
+  };
 
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)', background: 'var(--background)' }}>
@@ -51,10 +58,11 @@ export default function ToolLayout({ children }) {
         <div style={{ padding: '20px' }}>
           {toolCategories.map((category, idx) => (
             <div key={idx} style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', paddingLeft: '12px' }}>
-                {category.title}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <button onClick={() => toggleCategory(category.title)} aria-expanded={openCategory === category.title} style={{ width: '100%', border: 'none', background: 'transparent', fontSize: '0.8rem', fontWeight: 700, color: activeCategory === category.title ? 'var(--primary)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: openCategory === category.title ? '10px' : 0, padding: '8px 10px 8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', borderRadius: '8px' }}>
+                <span>{category.title}</span>
+                <ChevronDown size={16} style={{ transition: 'transform .2s ease', transform: openCategory === category.title ? 'rotate(0deg)' : 'rotate(-90deg)' }} />
+              </button>
+              <div style={{ display: openCategory === category.title ? 'flex' : 'none', flexDirection: 'column', gap: '4px' }}>
                 {category.tools.map(tool => {
                   const isActive = pathname === `/tools/${tool.id}`;
                   const targetUrl = `/tools/${tool.id}`;
@@ -80,6 +88,7 @@ export default function ToolLayout({ children }) {
                       className={isActive ? '' : 'sidebar-tool-link'}
                       onClick={(e) => {
                         if (tool.comingSoon) e.preventDefault();
+                        else setOpenCategory(category.title);
                       }}
                     >
                       <div style={{ 
