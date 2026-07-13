@@ -14,6 +14,7 @@ import { autoConfirmPermission, buildAutoConfirmation, listPendingPermissions } 
 export function useAioncoreChat() {
   const [messages, setMessages] = useState([]);
   const [runtime, setRuntime] = useState(createRuntimeState);
+  const runtimeRef = useRef(createRuntimeState());
   const [officeArtifact, setOfficeArtifact] = useState(null);
   const clientRef = useRef(null);
   const conversationIdRef = useRef(null);
@@ -79,6 +80,7 @@ export function useAioncoreChat() {
   const applyRuntimeEvent = useCallback((name, payload) => {
     setRuntime((previous) => {
       const next = reduceRuntime(previous, name, payload);
+      runtimeRef.current = next;
       chatLog('runtime', `${name}: ${previous.state}/${previous.isProcessing} -> ${next.state}/${next.isProcessing}`, payload);
       return next;
     });
@@ -187,13 +189,34 @@ export function useAioncoreChat() {
     ]);
   }, [applyRuntimeEvent]);
 
-  const cancelGeneration = useCallback((overrideConversationId = null) => {
+  const cancelGeneration = useCallback(async (overrideConversationId = null) => {
     const activeId = overrideConversationId || conversationIdRef.current;
-    if (activeId) {
-      chatLog('conversation', `cancel ${activeId}`);
-      clientRef.current?.send('chat:cancel', { conversation_id: activeId });
+    if (!activeId) throw new Error('当前没有可停止的会话');
+    let turnId = runtimeRef.current.activeTurnId;
+    if (!turnId) {
+      const stateResponse = await fetch(`/api/aioncore/api/conversations/${encodeURIComponent(activeId)}`);
+      const statePayload = await stateResponse.json().catch(() => ({}));
+      if (!stateResponse.ok) throw new Error(statePayload.error || '读取会话运行状态失败');
+      turnId = statePayload.data?.runtime?.turn_id || statePayload.runtime?.turn_id;
     }
-  }, []);
+    if (!turnId) throw new Error('当前会话已经结束，无需停止');
+    chatLog('conversation', `cancel ${activeId} turn ${turnId}`);
+    applyRuntimeEvent('local.cancel', { turn_id: turnId });
+    try {
+      const response = await fetch(`/api/aioncore/api/conversations/${encodeURIComponent(activeId)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ turn_id: turnId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      const errorText = typeof payload.error === 'string' ? payload.error : payload.error?.message;
+      if (!response.ok) throw new Error(errorText || payload.message || '停止生成失败');
+      return payload;
+    } catch (error) {
+      applyRuntimeEvent('local.cancel.failed', { error: error.message });
+      throw error;
+    }
+  }, [applyRuntimeEvent]);
 
   const uiMessages = useMemo(() => mapMessagesToUi(messages, runtime), [messages, runtime]);
 

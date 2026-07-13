@@ -11,7 +11,7 @@ export async function POST(_request, { params }) {
   const { id } = await params;
   const task = await Task.findOneAndUpdate(
     { _id: id, userId: user._id, status: { $in: ['processing', 'cancelling'] } },
-    { $set: { status: 'cancelling', 'runtime.state': 'cancelling', 'runtime.cancelRequested': true, 'runtime.updatedAt': new Date() } },
+    { $set: { status: 'cancelled', 'runtime.state': 'cancelled', 'runtime.cancelRequested': true, 'runtime.updatedAt': new Date() } },
     { new: true },
   );
   if (!task) return NextResponse.json({ error: '任务不存在或已结束' }, { status: 404 });

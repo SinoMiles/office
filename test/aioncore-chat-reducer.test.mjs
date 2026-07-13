@@ -51,6 +51,20 @@ test('turn.completed releases processing using the canonical AionUi event', () =
   assert.equal(completed.canSendMessage, true);
 });
 
+test('stream events retain the active turn required by AionCore cancellation', () => {
+  const running = reduceRuntime(createRuntimeState(), 'message.stream', { type: 'content', turn_id: 'turn-live' });
+  assert.equal(running.activeTurnId, 'turn-live');
+  assert.equal(running.isProcessing, true);
+  const cancelling = reduceRuntime(running, 'local.cancel', { turn_id: 'turn-live' });
+  assert.equal(cancelling.state, 'cancelling');
+  const retryable = reduceRuntime(cancelling, 'local.cancel.failed', { error: '网络异常' });
+  assert.equal(retryable.state, 'running');
+  assert.equal(retryable.isProcessing, true);
+  const finished = reduceRuntime(cancelling, 'message.stream', { type: 'cancelled', turn_id: 'turn-live' });
+  assert.equal(finished.activeTurnId, null);
+  assert.equal(finished.isProcessing, false);
+});
+
 test('AionUi thought and data payload shapes map to the existing UI shell', () => {
   const raw = [
     { msg_id: 'thought', type: 'thought', data: { subject: '分析', description: '正在判断' } },

@@ -46,6 +46,7 @@ export default function UserDashboard() {
   const menuRef = useRef(null);
   const lastPreviewVersionRef = useRef(null);
   const historyRestoredRef = useRef(false);
+  const cancellingRef = useRef(false);
 
   useEffect(() => {
     fetchData();
@@ -148,7 +149,7 @@ export default function UserDashboard() {
 
   useEffect(() => {
     // Sync completion status back to MongoDB when aioncore finishes generating
-    if (!aionIsProcessing && processLoading && activeTaskId && messages.length > 0) {
+    if (!aionIsProcessing && processLoading && !cancellingRef.current && activeTaskId && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.role === 'ai') {
         fetch(`/api/tasks/${activeTaskId}/finish`, {
@@ -387,17 +388,17 @@ export default function UserDashboard() {
 
   const handleCancel = async () => {
     if (!activeTaskId) return;
-    
-    // Tell AionCore to stop generating via WebSocket
-    cancelGeneration();
-
-    // Still notify backend to mark DB status as cancelled
-    const response = await fetch(`/api/tasks/${activeTaskId}/cancel`, { method: 'POST' });
-    if (response.ok) {
-      toast.success('正在停止任务…');
+    cancellingRef.current = true;
+    try {
+      await cancelGeneration();
+      const response = await fetch(`/api/tasks/${activeTaskId}/cancel`, { method: 'POST' });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '任务状态更新失败');
+      toast.success('任务已停止');
       setProcessLoading(false);
-    } else {
-      toast.error((await response.json().catch(() => ({}))).error || '停止失败');
+    } catch (error) {
+      toast.error(error.message || '停止失败');
+    } finally {
+      cancellingRef.current = false;
     }
   };
 
