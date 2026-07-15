@@ -17,11 +17,7 @@ export default function AdminUsersPage() {
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, email: '' });
   const [rechargeDialog, setRechargeDialog] = useState({ isOpen: false, userId: null, amountStr: '' });
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     try {
       const res = await fetch('/api/admin/users');
       const data = await res.json();
@@ -33,7 +29,12 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchUsers(), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const openModal = (user = null) => {
     if (user) {
@@ -172,7 +173,7 @@ export default function AdminUsersPage() {
                 <th>邮箱账号</th>
                 <th>角色</th>
                 <th>会员等级</th>
-                <th>当前余额 (Tokens)</th>
+                <th>当前余额（Credits）</th>
                 <th>注册时间</th>
                 <th style={{ textAlign: 'right', paddingRight: '24px' }}>操作</th>
               </tr>
@@ -273,7 +274,7 @@ export default function AdminUsersPage() {
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Tokens 余额</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Credits 余额</label>
                 <input type="number" className="input-base" value={formData.balance} onChange={e => setFormData({...formData, balance: parseInt(e.target.value) || 0})} />
               </div>
               
@@ -326,7 +327,7 @@ export default function AdminUsersPage() {
               后台手工充值/扣款
             </h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5 }}>
-              请输入充值数量 (Tokens)，支持输入负数进行扣款操作。
+              请输入 Credits 数量，支持输入负数进行人工余额调整。
             </p>
             <input 
               type="number" 

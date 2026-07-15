@@ -4,6 +4,7 @@ import User from '@/models/User';
 import bcrypt from 'bcryptjs';
 import { signToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
+import BillingRecord from '@/models/BillingRecord';
 
 export async function POST(req) {
   try {
@@ -22,9 +23,10 @@ export async function POST(req) {
     const user = await User.create({
       email,
       password: password,
-      balance: 10000, // 默认赠送 10000 Tokens
+      balance: 10000,
       role: 'user'
     });
+    await BillingRecord.create({ userId: user._id, type: 'charge', amount: 10000, balanceDelta: 10000, balanceBefore: 0, balanceAfter: 10000, description: '新用户注册赠送', idempotencyKey: `signup:${user._id}` });
 
     const token = signToken({ id: user._id, role: user.role });
     

@@ -57,7 +57,7 @@ export default async function AdminDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', padding: '16px', borderRadius: '20px', boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.5)' }}><DollarSign color="#d97706" size={28} /></div>
             <div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px', fontWeight: 500 }}>总消耗金额 (Tokens)</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px', fontWeight: 500 }}>总消耗（Credits）</div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{totalRevenue.toFixed(2)}</div>
             </div>
           </div>

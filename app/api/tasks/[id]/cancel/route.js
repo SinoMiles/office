@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import { cancelTaskRuntime } from '@/lib/task-runtime';
 import Task from '@/models/Task';
+import { releaseTaskReservation } from '@/lib/billing/service';
 
 export async function POST(_request, { params }) {
   const user = await getCurrentUser();
@@ -16,5 +17,6 @@ export async function POST(_request, { params }) {
   );
   if (!task) return NextResponse.json({ error: '任务不存在或已结束' }, { status: 404 });
   cancelTaskRuntime(id);
-  return NextResponse.json({ success: true, task });
+  const billing = await releaseTaskReservation({ taskId: task._id, userId: user._id, reason: '任务已取消，退回未结算预授权额度' });
+  return NextResponse.json({ success: true, task, billing });
 }

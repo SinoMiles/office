@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen } from 'lucide-react';
+import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
@@ -32,8 +33,14 @@ export default function UserDashboard() {
   const [followLatest, setFollowLatest] = useState(true);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState(null);
   const [previewError, setPreviewError] = useState('');
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
+  const [billingPagination, setBillingPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 1 });
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [rechargeAmountYuan, setRechargeAmountYuan] = useState(50);
+  const [wechatPayment, setWechatPayment] = useState(null);
+  const [wechatPaymentLoading, setWechatPaymentLoading] = useState(false);
   const router = useRouter();
 
   // AionCore hook
@@ -48,6 +55,8 @@ export default function UserDashboard() {
   const [activeTaskId, setActiveTaskId] = useState(null); // Tracks the current conversational thread context
   const messagesEndRef = useRef(null);
   const chatScrollRef = useRef(null);
+  const followLatestRef = useRef(true);
+  const previewPanelRef = useRef(null);
   
   const [openMenuId, setOpenMenuId] = useState(null);
   const [renamingTaskId, setRenamingTaskId] = useState(null);
@@ -85,17 +94,49 @@ export default function UserDashboard() {
     openArtifact(officeArtifact);
   }, [activeTaskId, openArtifact]);
 
+  const togglePreviewFullscreen = useCallback(async () => {
+    const panel = previewPanelRef.current;
+    if (!panel) return;
+
+    try {
+      if (document.fullscreenElement === panel) {
+        await document.exitFullscreen();
+      } else {
+        await panel.requestFullscreen();
+      }
+    } catch {
+      toast.error('浏览器无法进入全屏预览');
+    }
+  }, []);
+
+  const closePreviewPanel = useCallback(() => {
+    if (document.fullscreenElement === previewPanelRef.current) {
+      void document.exitFullscreen();
+    }
+    setShowRightPanel(false);
+    setSidebarCollapsed(false);
+  }, []);
+
   const closeArtifact = useCallback((artifactId) => {
     setPreviewTabs((current) => {
       const index = current.findIndex((item) => item.id === artifactId);
       const next = current.filter((item) => item.id !== artifactId);
       setActiveArtifact((active) => active?.id === artifactId ? (next[Math.min(index, next.length - 1)] || null) : active);
       if (!next.length) {
+        if (document.fullscreenElement === previewPanelRef.current) void document.exitFullscreen();
         setShowRightPanel(false);
         setSidebarCollapsed(false);
       }
       return next;
     });
+  }, []);
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setPreviewFullscreen(document.fullscreenElement === previewPanelRef.current);
+    };
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreenState);
   }, []);
 
   useEffect(() => {
@@ -229,10 +270,17 @@ export default function UserDashboard() {
 
   const handleChatScroll = useCallback((event) => {
     const element = event.currentTarget;
-    setFollowLatest(element.scrollHeight - element.scrollTop - element.clientHeight < 96);
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    const nextFollowLatest = followLatestRef.current
+      ? distanceFromBottom < 180
+      : distanceFromBottom < 32;
+    if (nextFollowLatest === followLatestRef.current) return;
+    followLatestRef.current = nextFollowLatest;
+    setFollowLatest(nextFollowLatest);
   }, []);
 
   const jumpToLatest = useCallback(() => {
+    followLatestRef.current = true;
     setFollowLatest(true);
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -268,7 +316,10 @@ export default function UserDashboard() {
       const billingJson = await billingRes.json();
       const statsJson = await statsRes.json();
 
-      if (billingJson.success) setData({ records: billingJson.records, balance: billingJson.balance });
+      if (billingJson.success) {
+        setData({ records: billingJson.records, balance: billingJson.balance });
+        if (billingJson.pagination) setBillingPagination(billingJson.pagination);
+      }
       if (statsJson.success) {
         setStats(statsJson.stats);
         if (statsJson.user) setUser(statsJson.user);
@@ -280,6 +331,54 @@ export default function UserDashboard() {
       setLoading(false);
     }
   };
+
+  const fetchBillingPage = async (page) => {
+    setBillingLoading(true);
+    try {
+      const response = await fetch(`/api/user/billing?page=${page}&pageSize=${billingPagination.pageSize}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '账单加载失败');
+      setData((current) => ({ ...current, records: payload.records, balance: payload.balance }));
+      setBillingPagination(payload.pagination);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  const handleWechatRecharge = async () => {
+    setWechatPaymentLoading(true);
+    try {
+      const response = await fetch('/api/user/billing/wechat/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amountYuan: rechargeAmountYuan }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '微信支付下单失败');
+      setWechatPayment({ id: payload.orderId, status: 'paying', ...payload });
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setWechatPaymentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!wechatPayment?.id || wechatPayment.status !== 'paying') return undefined;
+    const poll = window.setInterval(async () => {
+      const response = await fetch(`/api/user/billing/wechat/orders/${wechatPayment.id}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.order) return;
+      setWechatPayment((current) => current?.id === wechatPayment.id ? { ...current, ...payload.order } : current);
+      if (payload.order.status === 'paid') {
+        toast.success(`充值成功，已到账 ${payload.order.credits.toLocaleString()} Credits`);
+        void fetch('/api/user/billing?page=1&pageSize=20').then((billingResponse) => billingResponse.json()).then((billingPayload) => {
+          if (!billingPayload.success) return;
+          setData({ records: billingPayload.records, balance: billingPayload.balance });
+          setBillingPagination(billingPayload.pagination);
+        });
+      }
+    }, 2500);
+    return () => window.clearInterval(poll);
+  }, [wechatPayment?.id, wechatPayment?.status]);
 
   const handleRenameTask = async (e, id) => {
     e.stopPropagation();
@@ -375,7 +474,7 @@ export default function UserDashboard() {
       });
       const dataJson = await res.json();
       if (dataJson.success) {
-        toast.success(`兑换成功！增加 ${dataJson.amount} Tokens。`);
+        toast.success(`兑换成功！增加 ${dataJson.amount} Credits。`);
         setRedeemCode('');
         fetchData();
       } else {
@@ -864,7 +963,7 @@ export default function UserDashboard() {
                       )}
 
                       {/* Ordered AionCore timeline: thinking, tools and text keep their original positions. */}
-                      {msg.blocks?.length > 0 ? <AionMessageTimeline message={msg} onOpenFile={(fileInfo) => openWorkspaceFile({ path: fileInfo.path, name: fileInfo.name, previewType: /\.md$/i.test(fileInfo.name) ? 'markdown' : /\.(png|jpe?g|webp)$/i.test(fileInfo.name) ? 'image' : /\.pdf$/i.test(fileInfo.name) ? 'pdf' : 'text' })} /> : <>
+                      {msg.blocks?.length > 0 ? <AionMessageTimeline message={msg} /> : <>
                       {msg.thought && <Thinking thought={msg.thought} />}
                       {msg.progress && <TaskProgress progress={msg.progress} />}
                       {msg.loading && !msg.progress && !msg.thought && !msg.content ? (
@@ -1013,7 +1112,7 @@ export default function UserDashboard() {
 
         {/* Right Panel: real OfficeCLI preview */}
         {showRightPanel && (
-          <div style={{ flex: 1, minWidth: 0, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
+          <div ref={previewPanelRef} style={{ flex: 1, minWidth: 0, width: previewFullscreen ? '100vw' : undefined, height: previewFullscreen ? '100vh' : undefined, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
             <div style={{ minHeight: '58px', padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}><button type="button" onClick={() => setRightPanelMode('preview')} style={{ padding: '7px 9px', border: 0, borderRadius: '7px', background: rightPanelMode === 'preview' ? 'var(--primary-light)' : 'transparent', color: rightPanelMode === 'preview' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem' }}>预览</button><button type="button" onClick={() => setRightPanelMode('workspace')} style={{ padding: '7px 9px', border: 0, borderRadius: '7px', background: rightPanelMode === 'workspace' ? 'var(--primary-light)' : 'transparent', color: rightPanelMode === 'workspace' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem' }}>文件</button></div>
               <div style={{ display: 'flex', gap: '6px', minWidth: 0, overflowX: 'auto', flex: 1, scrollbarWidth: 'none' }}>
@@ -1025,7 +1124,8 @@ export default function UserDashboard() {
                   </button>
                 ))}
               </div>
-              <button onClick={() => { setShowRightPanel(false); setSidebarCollapsed(false); }} style={{ width: '34px', height: '34px', display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }} title="关闭预览并展开左侧导航"><X size={20} /></button>
+              <button type="button" onClick={() => void togglePreviewFullscreen()} style={{ width: '34px', height: '34px', display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }} title={previewFullscreen ? '退出全屏预览' : '全屏预览'} aria-label={previewFullscreen ? '退出全屏预览' : '全屏预览'}>{previewFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}</button>
+              <button type="button" onClick={closePreviewPanel} style={{ width: '34px', height: '34px', display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }} title="关闭预览并展开左侧导航" aria-label="关闭预览"><X size={20} /></button>
             </div>
             <div style={{ padding: rightPanelMode === 'workspace' ? 0 : '20px', overflow: 'hidden', flex: 1 }}>
               {rightPanelMode === 'workspace' ? <WorkspaceBrowser taskId={activeTaskId} onOpen={openWorkspaceFile} /> : activeArtifact && (
@@ -1101,7 +1201,7 @@ export default function UserDashboard() {
               <div className="glass-card" style={{ padding: '24px', background: 'white', display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '50%' }}><Activity color="#d97706" size={24} /></div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>累计消耗 Tokens</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>累计消耗 Credits</div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{stats.totalConsumed}</div>
                 </div>
               </div>
@@ -1124,43 +1224,50 @@ export default function UserDashboard() {
             </div>
             <div className="glass-card" style={{ padding: '32px', background: 'white', marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}><CreditCard size={18} /> 当前可用 Tokens 余额</div>
+                <div style={{ color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}><CreditCard size={18} /> 当前可用 Credits</div>
                 <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)' }}>{data.balance.toLocaleString()}</div>
               </div>
-              <button className="btn btn-outline">充值卡密兑换</button>
+              <button type="button" className="btn btn-primary" onClick={() => setActiveDrawer('upgrade')}>微信支付充值</button>
             </div>
 
             <div className="glass-card" style={{ background: 'white', padding: '0', overflow: 'hidden' }}>
-              <h2 style={{ fontSize: '1.2rem', padding: '24px', borderBottom: '1px solid var(--border)' }}>近期账单流水</h2>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><div><h2 style={{ fontSize: '1.2rem', marginBottom: '4px' }}>账单明细</h2><span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>共 {billingPagination.total.toLocaleString()} 条流水</span></div><button type="button" className="btn btn-outline" disabled={billingLoading} onClick={() => void fetchBillingPage(billingPagination.page)}>{billingLoading ? '加载中…' : '刷新'}</button></div>
+              <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', minWidth: '1080px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ padding: '16px', fontWeight: 600 }}>时间</th>
                     <th style={{ padding: '16px', fontWeight: 600 }}>类型</th>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>详情</th>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>额度变动</th>
+                    <th style={{ padding: '16px', fontWeight: 600 }}>任务与模型</th>
+                    <th style={{ padding: '16px', fontWeight: 600 }}>Token 用量</th>
+                    <th style={{ padding: '16px', fontWeight: 600 }}>结算金额</th>
+                    <th style={{ padding: '16px', fontWeight: 600 }}>余额</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.records.length === 0 && (
-                    <tr><td colSpan="4" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>暂无账单记录</td></tr>
+                    <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>暂无账单记录</td></tr>
                   )}
-                  {data.records.map(r => (
+                  {data.records.map((r) => {
+                    const usage = r.metadata?.usage;
+                    const pricing = r.metadata?.pricingSnapshot;
+                    const balanceDelta = r.balanceDelta ?? (['charge', 'refund'].includes(r.type) ? r.amount : -r.amount);
+                    return (
                     <tr key={r._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '16px' }}>{new Date(r.createdAt).toLocaleString()}</td>
+                      <td style={{ padding: '16px', whiteSpace: 'nowrap', verticalAlign: 'top' }}><div>{new Date(r.createdAt).toLocaleDateString()}</div><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '4px' }}>{new Date(r.createdAt).toLocaleTimeString()}</div></td>
                       <td style={{ padding: '16px' }}>
-                        <span style={{ padding: '4px 8px', background: r.type === 'charge' ? '#d1fae5' : '#fee2e2', color: r.type === 'charge' ? '#059669' : '#ef4444', borderRadius: '4px', fontSize: '0.8rem' }}>
-                          {r.type === 'charge' ? '充值' : '消费'}
+                        <span style={{ padding: '4px 8px', background: ['charge', 'refund'].includes(r.type) ? '#d1fae5' : r.type === 'reserve' ? '#e0e7ff' : '#fee2e2', color: ['charge', 'refund'].includes(r.type) ? '#059669' : r.type === 'reserve' ? '#4f46e5' : '#ef4444', borderRadius: '4px', fontSize: '0.8rem' }}>
+                          {{ charge: '充值', reserve: '预授权', consume: '消费', refund: '退回', adjustment: '调整' }[r.type] || r.type}
                         </span>
                       </td>
-                      <td style={{ padding: '16px', color: 'var(--text-muted)' }}>{r.description}</td>
-                      <td style={{ padding: '16px', fontWeight: 'bold', color: r.type === 'charge' ? '#059669' : '#ef4444' }}>
-                        {r.type === 'charge' ? '+' : '-'}{r.amount.toLocaleString()}
-                      </td>
+                      <td style={{ padding: '16px', maxWidth: '300px', verticalAlign: 'top' }}><div style={{ fontWeight: 600, marginBottom: '5px' }}>{r.description || '账户余额变动'}</div>{r.relatedTaskId ? <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.relatedTaskId.prompt}>{r.relatedTaskId.filename || r.relatedTaskId.prompt || `任务 ${r.relatedTaskId._id}`}</div> : null}<div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '5px' }}>{pricing?.model || r.metadata?.model || (r.metadata?.transactionId ? `微信订单 ${r.metadata.outTradeNo}` : '')}</div></td>
+                      <td style={{ padding: '16px', verticalAlign: 'top' }}>{usage ? <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '4px 12px', fontSize: '0.78rem' }}><span style={{ color: 'var(--text-muted)' }}>输入</span><b>{usage.inputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>输出</span><b>{usage.outputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>缓存</span><b>{usage.cachedInputTokens?.toLocaleString() || 0}</b></div> : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                      <td style={{ padding: '16px', verticalAlign: 'top' }}><div style={{ fontWeight: 700 }}>{r.amount.toLocaleString()} Credits</div>{pricing ? <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', lineHeight: 1.5, marginTop: '5px' }}>输入 {pricing.inputCreditsPer1K}/1K · 输出 {pricing.outputCreditsPer1K}/1K<br/>折扣倍率 {pricing.discountRate}</div> : null}</td>
+                      <td style={{ padding: '16px', verticalAlign: 'top' }}><div style={{ fontWeight: 'bold', color: balanceDelta >= 0 ? '#059669' : '#ef4444' }}>{balanceDelta > 0 ? '+' : ''}{balanceDelta.toLocaleString()}</div>{Number.isFinite(r.balanceAfter) ? <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '5px' }}>{r.balanceBefore?.toLocaleString()} → {r.balanceAfter.toLocaleString()}</div> : null}</td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
-              </table>
+              </table></div>
+              <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>第 {billingPagination.page} / {billingPagination.totalPages} 页</span><div style={{ display: 'flex', gap: '8px' }}><button type="button" className="btn btn-outline" disabled={billingLoading || billingPagination.page <= 1} onClick={() => void fetchBillingPage(billingPagination.page - 1)}>上一页</button><button type="button" className="btn btn-outline" disabled={billingLoading || billingPagination.page >= billingPagination.totalPages} onClick={() => void fetchBillingPage(billingPagination.page + 1)}>下一页</button></div></div>
             </div>
           </div>
         )}
@@ -1203,11 +1310,22 @@ export default function UserDashboard() {
               {activeDrawer === 'upgrade' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   <div style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.1) 100%)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
-                    <div style={{ color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>当前可用 Tokens 余额</div>
+                    <div style={{ color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>当前可用 Credits</div>
                     <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)' }}>{data.balance.toLocaleString()}</div>
                   </div>
                   
                   <div>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--text-main)' }}>微信支付充值</h3>
+                    {!wechatPayment || !['paying', 'paid'].includes(wechatPayment.status) ? <div style={{ display: 'grid', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>{[10, 50, 100, 500].map((amount) => <button key={amount} type="button" onClick={() => setRechargeAmountYuan(amount)} style={{ padding: '10px', border: `1px solid ${rechargeAmountYuan === amount ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '9px', background: rechargeAmountYuan === amount ? 'var(--primary-light)' : 'white', color: rechargeAmountYuan === amount ? 'var(--primary)' : 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>¥{amount}</button>)}</div>
+                      <label style={{ display: 'grid', gap: '7px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>自定义金额（人民币）<input type="number" min="1" max="10000" step="1" value={rechargeAmountYuan} onChange={(event) => setRechargeAmountYuan(Number(event.target.value))} style={{ padding: '13px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: '1rem' }} /></label>
+                      <button type="button" onClick={handleWechatRecharge} disabled={wechatPaymentLoading} className="btn btn-primary" style={{ justifyContent: 'center', padding: '13px' }}>{wechatPaymentLoading ? <><Loader2 size={16} className="spin-anim" /> 正在创建订单…</> : '微信扫码支付'}</button>
+                    </div> : <div style={{ textAlign: 'center', padding: '18px', border: '1px solid var(--border)', borderRadius: '14px', background: '#f8fafc' }}>
+                      {wechatPayment.status === 'paid' ? <><Check size={42} color="#059669" /><h4 style={{ marginTop: '8px', color: '#059669' }}>充值成功</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)' }}>{wechatPayment.credits?.toLocaleString()} Credits 已到账</p><button type="button" className="btn btn-outline" style={{ marginTop: '14px' }} onClick={() => setWechatPayment(null)}>继续充值</button></> : <><Image src={wechatPayment.qrCodeDataUrl} alt="微信支付二维码" width={240} height={240} unoptimized style={{ width: '240px', height: '240px', borderRadius: '10px' }} /><h4 style={{ marginTop: '10px' }}>微信扫码支付 ¥{wechatPayment.amountYuan}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>支付完成后将自动到账，无需手动刷新</p><button type="button" className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => setWechatPayment(null)}>取消本次支付</button></>}
+                    </div>}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
                     <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--text-main)' }}>卡密充值兑换</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <input 
@@ -1230,7 +1348,7 @@ export default function UserDashboard() {
                   
                   <div style={{ marginTop: '24px', padding: '16px', background: '#f8fafc', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                     <p style={{ marginBottom: '8px', fontWeight: 600, color: 'var(--text-main)' }}>充值说明：</p>
-                    <p>1. Tokens 用于支付每次调用 AI 核心模型处理文档的计算成本。</p>
+                    <p>1. Credits 根据模型实际返回的输入、输出和缓存 Token 用量结算。</p>
                     <p>2. 卡密一经兑换即刻生效，不设有效期。</p>
                     <p>3. 如需大客户专属私有化模型接入方案，请联系官方支持团队。</p>
                   </div>

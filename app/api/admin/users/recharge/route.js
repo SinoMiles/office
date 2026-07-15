@@ -18,21 +18,23 @@ export async function POST(req) {
 
     await connectToDatabase();
     
-    // Create billing record
-    const record = new BillingRecord({
-      userId,
-      type: amount > 0 ? 'charge' : 'consume',
-      amount: Math.abs(amount),
-      description: description || 'Admin manual recharge'
-    });
-    await record.save();
-
-    // Update user balance
-    const user = await User.findByIdAndUpdate(
-      userId, 
-      { $inc: { balance: amount } }, 
+    const numericAmount = Number(amount);
+    const user = await User.findOneAndUpdate(
+      { _id: userId, ...(numericAmount < 0 ? { balance: { $gte: Math.abs(numericAmount) } } : {}) },
+      { $inc: { balance: numericAmount } },
       { new: true }
     );
+    if (!user) return NextResponse.json({ error: '用户不存在或可用余额不足' }, { status: 400 });
+    await BillingRecord.create({
+      userId,
+      type: numericAmount > 0 ? 'charge' : 'adjustment',
+      amount: Math.abs(numericAmount),
+      balanceDelta: numericAmount,
+      description: description || '后台人工余额调整',
+      balanceBefore: user.balance - numericAmount,
+      balanceAfter: user.balance,
+      metadata: { operatorId: String(admin._id) },
+    });
 
     return NextResponse.json({ success: true, balance: user.balance });
   } catch (error) {

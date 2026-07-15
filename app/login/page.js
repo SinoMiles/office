@@ -101,7 +101,7 @@ export default function LoginPage() {
 
         <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.9rem' }}>
           <span style={{ color: 'var(--text-muted)' }}>还没有账号？</span>{' '}
-          <a href="/register" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>免费注册获赠 10,000 Tokens</a>
+          <a href="/register" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>免费注册获赠 10,000 Credits</a>
         </div>
       </div>
     </div>

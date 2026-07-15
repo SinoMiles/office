@@ -3,9 +3,11 @@ import bcrypt from 'bcryptjs';
 
 const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
+  wechatOpenId: { type: String, sparse: true, index: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   balance: { type: Number, default: 0 },
+  billingVersion: { type: Number, default: 1 },
   membershipLevel: { type: String, enum: ['FREE', 'PRO', 'ENTERPRISE'], default: 'FREE' },
 }, { timestamps: true });
 

@@ -183,7 +183,7 @@ export default function LandingPage() {
               <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>适合尝鲜用户，立刻体验 AI 办公的魅力。</p>
               
               <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 48px 0', display: 'flex', flexDirection: 'column', gap: '20px', fontSize: '1.05rem' }}>
-                <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>注册即送 10,000 Tokens</span></li>
+                <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>注册即送 10,000 Credits</span></li>
                 <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>基础数据分析指令支持</span></li>
                 <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>支持最大 10MB 的文档</span></li>
                 <li style={{ display: 'flex', gap: '16px', alignItems: 'center', color: 'var(--text-muted)' }}><Shield size={24} /> <span>无专属技术支持</span></li>
@@ -198,11 +198,11 @@ export default function LandingPage() {
               
               <div style={{ background: 'white', padding: '56px 40px', borderRadius: '24px', height: '100%' }}>
                 <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 700 }}>专业版 (Pro)</h3>
-                <div style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-0.02em', color: 'var(--primary)', marginTop: '20px' }}>按 Token 计费</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-0.02em', color: 'var(--primary)', marginTop: '20px' }}>按真实用量计费</div>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>面向专业职场人，随时充值，解锁全部高级功能。</p>
                 
                 <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 48px 0', display: 'flex', flexDirection: 'column', gap: '20px', fontSize: '1.05rem' }}>
-                  <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span style={{ fontWeight: 600 }}>约 ¥0.02 / 1000 Tokens</span></li>
+                  <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span style={{ fontWeight: 600 }}>输入、输出 Token 分项透明结算</span></li>
                   <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>无限轮次的多文件联合对话</span></li>
                   <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>解锁 Deepseek V3 推理极速版</span></li>
                   <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>7x24 小时专属客户成功团队</span></li>

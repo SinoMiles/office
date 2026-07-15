@@ -35,6 +35,22 @@ const TaskSchema = new mongoose.Schema({
   },
   tokensUsed: { type: Number, default: 0 },
   cost: { type: Number, default: 0 },
+  billing: {
+    state: { type: String, enum: ['unreserved', 'reserving', 'reserved', 'settling', 'settled', 'releasing', 'released', 'failed'], default: 'unreserved' },
+    reservationCredits: { type: Number, default: 0 },
+    chargedCredits: { type: Number, default: 0 },
+    refundedCredits: { type: Number, default: 0 },
+    usage: {
+      inputTokens: { type: Number, default: 0 },
+      outputTokens: { type: Number, default: 0 },
+      cachedInputTokens: { type: Number, default: 0 },
+      totalTokens: { type: Number, default: 0 },
+    },
+    pricingSnapshot: { type: mongoose.Schema.Types.Mixed },
+    reservationKey: { type: String },
+    settlementKey: { type: String },
+    settledAt: { type: Date },
+  },
   errorMessage: { type: String },
 }, { timestamps: true });
 

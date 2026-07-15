@@ -50,7 +50,7 @@ export default function RegisterPage() {
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
             <span style={{ color: 'var(--primary)' }}>✦</span> OfficeGPT
           </div>
-          <p style={{ color: 'var(--text-muted)' }}>注册新账号，免费获赠 10,000 Tokens</p>
+          <p style={{ color: 'var(--text-muted)' }}>注册新账号，免费获赠 10,000 Credits</p>
         </div>
 
         {error && <div style={{ padding: '12px', background: '#fee2e2', color: '#ef4444', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '0.9rem' }}>{error}</div>}

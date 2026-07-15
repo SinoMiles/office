@@ -6,6 +6,7 @@ import {
   mergeStreamMessages,
   normalizeHistoryMessages,
   reduceRuntime,
+  sanitizeAssistantText,
   sliceHistoryThroughPrompts,
 } from '../lib/aioncore/chat-reducer.js';
 
@@ -129,6 +130,13 @@ test('plans, notices and canceled tools remain visible and terminal', () => {
   const [assistant] = mapMessagesToUi(messages, { isProcessing: false });
   assert.deepEqual(assistant.blocks.map((block) => block.type), ['plan', 'status', 'tools', 'tip']);
   assert.equal(assistant.blocks[2].steps[0].status, 'canceled');
+});
+
+test('server workspace paths never reach user-visible assistant text', () => {
+  const input = 'PPT 已成功生成！文件路径：\n\n📁 `/Users/miles/Documents/office/2026/07/15/aionrs-temp-1107ea11/年度述职报告.pptx`';
+  assert.equal(sanitizeAssistantText(input), 'PPT 已成功生成！');
+  const inline = '文件已保存到 /tmp/aionrs-temp-123/report.xlsx，请下载。';
+  assert.equal(sanitizeAssistantText(inline), '文件已保存到 report.xlsx，请下载。');
 });
 
 test('AionCore HTTP history positions normalize into user and assistant roles', () => {

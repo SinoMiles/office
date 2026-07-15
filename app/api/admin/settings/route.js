@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import SystemSetting from '@/models/SystemSetting';
+import { normalizeBillingSettings } from '@/lib/billing/pricing';
 
 export async function GET() {
   try {
@@ -13,7 +14,11 @@ export async function GET() {
     await connectToDatabase();
     const settings = await SystemSetting.find();
     
-    return NextResponse.json({ success: true, settings });
+    const wechatPayRequired = ['WECHAT_PAY_APP_ID', 'WECHAT_PAY_MCH_ID', 'WECHAT_PAY_CERT_SERIAL_NO', 'WECHAT_PAY_API_V3_KEY', 'WECHAT_PAY_NOTIFY_URL'];
+    const missingWechatPay = wechatPayRequired.filter((name) => !process.env[name]);
+    if (!process.env.WECHAT_PAY_PRIVATE_KEY && !process.env.WECHAT_PAY_PRIVATE_KEY_FILE) missingWechatPay.push('WECHAT_PAY_PRIVATE_KEY/FILE');
+    if (!process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY && !process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE) missingWechatPay.push('WECHAT_PAY_PLATFORM_PUBLIC_KEY/FILE');
+    return NextResponse.json({ success: true, settings, wechatPay: { configured: missingWechatPay.length === 0, missing: missingWechatPay, notifyUrl: process.env.WECHAT_PAY_NOTIFY_URL || '' } });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -30,16 +35,17 @@ export async function POST(req) {
     await connectToDatabase();
     
     for (const update of updates) {
+      const normalizedValue = update.key === 'billing' ? normalizeBillingSettings(update.value) : update.value;
       await SystemSetting.findOneAndUpdate(
         { key: update.key },
-        { value: update.value },
+        { value: normalizedValue },
         { upsert: true }
       );
 
       // Sync LLM config to AionCore providers
       if (update.key === 'llm') {
         try {
-          const llmValue = update.value || {};
+          const llmValue = normalizedValue || {};
           const apiKey = llmValue.apiKey || '';
           const baseUrl = llmValue.baseUrl || 'https://api.deepseek.com';
 

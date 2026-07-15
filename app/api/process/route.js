@@ -1,15 +1,14 @@
 import path from 'node:path';
-import fs from 'node:fs/promises';
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { connectToDatabase } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import SystemSetting from '@/models/SystemSetting';
-import BillingRecord from '@/models/BillingRecord';
 import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { chatError, chatLog } from '@/lib/aioncore/logger';
 import { buildConversationExtra } from '@/lib/aioncore/request-policy';
+import { releaseTaskReservation, reserveTaskCredits } from '@/lib/billing/service';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -18,12 +17,9 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.pptx', '.png', '.jpg', '.jpeg', '.webp']);
 const AIONCORE_URL = getAioncoreBaseUrl();
 
-function storageRoot() {
-  return path.resolve(process.env.STORAGE_DIR || path.join(process.cwd(), 'storage'));
-}
-
 export async function POST(request) {
   let task;
+  let billingUserId;
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: '请先登录' }, { status: 401 });
@@ -46,18 +42,7 @@ export async function POST(request) {
 
     const settings = await SystemSetting.find({ key: { $in: ['llm', 'billing'] } }).lean();
     const billing = settings.find((item) => item.key === 'billing')?.value || {};
-    
-    // For local AionCore inference, we could bypass billing, but we follow SaaS rules
-    const rate = Number(billing.inputTokenRate || 0.002);
-    // Rough estimate just for reservation
-    const estimatedInputTokens = prompt.length + 4_000;
-    const reservedCost = ((estimatedInputTokens + 8192) / 1000) * rate;
-    const reservedUser = await user.constructor.findOneAndUpdate(
-      { _id: user._id, balance: { $gte: reservedCost } },
-      { $inc: { balance: -reservedCost } },
-      { new: true },
-    );
-    if (!reservedUser) throw new Error('余额不足，无法为本次任务预留额度');
+    billingUserId = user._id;
 
     // Fetch AionCore providers to find the matching provider ID
     let aionModelPayload = null;
@@ -119,6 +104,14 @@ export async function POST(request) {
       runtime: { state: 'running', updatedAt: new Date() },
     });
     chatLog('process', `task created ${task._id}`, { conversation_id: aionConversationId });
+
+    const reservedBilling = await reserveTaskCredits({
+      taskId: task._id,
+      userId: user._id,
+      model: aionModelPayload?.model || 'deepseek-v4-flash',
+      membershipLevel: user.membershipLevel,
+      billingSettings: billing,
+    });
 
     let filename = parentTask?.filename || '';
     let aionFilePath = '';
@@ -202,11 +195,17 @@ export async function POST(request) {
       taskId: String(task._id),
       aionConversationId,
       aionWorkspace,
-      reservedCost,
+      reservedCredits: reservedBilling.reservationCredits,
     });
 
   } catch (error) {
     chatError('process', 'task initiation failed', error);
+    if (task?._id && billingUserId) {
+      await releaseTaskReservation({ taskId: task._id, userId: billingUserId, reason: '任务启动失败，退回预授权额度' }).catch((releaseError) => {
+        chatError('billing', 'failed to release reservation after startup error', releaseError);
+      });
+      await Task.updateOne({ _id: task._id }, { $set: { status: 'failed', 'runtime.state': 'failed', errorMessage: error.message } }).catch(() => undefined);
+    }
     return NextResponse.json({ error: error.message || '内部处理错误' }, { status: 500 });
   }
 }
