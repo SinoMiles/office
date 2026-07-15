@@ -119,6 +119,18 @@ test('thinking, tools and text retain their original timeline order', () => {
   assert.equal(assistant.content, '开始生成第一页。\n\n第1步：封面页');
 });
 
+test('plans, notices and canceled tools remain visible and terminal', () => {
+  const messages = [
+    { msg_id: 'plan-1', type: 'plan', content: { entries: [{ content: '生成封面', status: 'completed' }] } },
+    { msg_id: 'status-1', type: 'agent_status', content: { status: 'connected', message: '工作区已连接' } },
+    { msg_id: 'tool-1', type: 'tool_call', content: { call_id: 'call-1', name: 'ExecCommand', status: 'canceled' } },
+    { msg_id: 'tip-1', type: 'tips', content: { type: 'warning', content: '部分内容未生成' } },
+  ];
+  const [assistant] = mapMessagesToUi(messages, { isProcessing: false });
+  assert.deepEqual(assistant.blocks.map((block) => block.type), ['plan', 'status', 'tools', 'tip']);
+  assert.equal(assistant.blocks[2].steps[0].status, 'canceled');
+});
+
 test('AionCore HTTP history positions normalize into user and assistant roles', () => {
   const normalized = normalizeHistoryMessages([
     { msg_id: 'user', position: 'right', type: 'text', content: { content: '问题' } },

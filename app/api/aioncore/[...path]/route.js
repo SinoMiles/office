@@ -7,8 +7,12 @@ export const dynamic = 'force-dynamic';
 async function proxy(request, context) {
   if (!(await getCurrentUser())) return Response.json({ error: '请先登录' }, { status: 401 });
   const { path } = await context.params;
+  const relativePath = path.join('/');
+  if (relativePath.startsWith('api/fs/')) {
+    return Response.json({ error: '文件系统操作必须通过任务工作区接口' }, { status: 403 });
+  }
   const sourceUrl = new URL(request.url);
-  const target = `${getAioncoreBaseUrl()}/${path.join('/')}${sourceUrl.search}`;
+  const target = `${getAioncoreBaseUrl()}/${relativePath}${sourceUrl.search}`;
   const headers = new Headers(request.headers);
   headers.delete('host');
   headers.delete('cookie');
@@ -24,4 +28,3 @@ export const POST = proxy;
 export const PUT = proxy;
 export const PATCH = proxy;
 export const DELETE = proxy;
-

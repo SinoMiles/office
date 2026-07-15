@@ -6,11 +6,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle } from 'lucide-react';
+import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
 import AionMessageTimeline from '@/app/components/AionMessageTimeline';
+import WorkspaceBrowser from '@/app/components/WorkspaceBrowser';
+import GenericFilePreview from '@/app/components/GenericFilePreview';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
 import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
 
@@ -26,6 +28,10 @@ export default function UserDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeArtifact, setActiveArtifact] = useState(null);
   const [previewTabs, setPreviewTabs] = useState([]);
+  const [rightPanelMode, setRightPanelMode] = useState('preview');
+  const [followLatest, setFollowLatest] = useState(true);
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState(null);
+  const [previewError, setPreviewError] = useState('');
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
   const router = useRouter();
@@ -41,6 +47,7 @@ export default function UserDashboard() {
   const isGenerating = processLoading || aionIsProcessing;
   const [activeTaskId, setActiveTaskId] = useState(null); // Tracks the current conversational thread context
   const messagesEndRef = useRef(null);
+  const chatScrollRef = useRef(null);
   
   const [openMenuId, setOpenMenuId] = useState(null);
   const [renamingTaskId, setRenamingTaskId] = useState(null);
@@ -56,9 +63,27 @@ export default function UserDashboard() {
       ? current.map((item) => item.id === artifact.id ? { ...item, ...artifact } : item)
       : [...current, artifact]);
     setActiveArtifact(artifact);
+    setPreviewError('');
+    setRightPanelMode('preview');
     setShowRightPanel(true);
     setSidebarCollapsed(true);
   }, []);
+
+  const openWorkspaceFile = useCallback((workspaceFile) => {
+    const encodedPath = encodeURIComponent(workspaceFile.path);
+    const officeArtifact = workspaceFile.artifactId ? {
+      id: `${activeTaskId}:${workspaceFile.artifactId}`, taskId: activeTaskId, artifactId: workspaceFile.artifactId,
+      filename: workspaceFile.name, fileType: workspaceFile.previewType, status: workspaceFile.status || 'ready', live: true,
+      previewUrl: `/api/tasks/${activeTaskId}/office-preview/proxy/${workspaceFile.artifactId}/`,
+      downloadUrl: `/api/tasks/${activeTaskId}/download?artifactId=${encodeURIComponent(workspaceFile.artifactId)}`,
+    } : {
+      id: `${activeTaskId}:workspace:${workspaceFile.path}`, taskId: activeTaskId, filename: workspaceFile.name,
+      fileType: workspaceFile.previewType, previewType: workspaceFile.previewType, status: 'ready', generic: true,
+      previewUrl: `/api/tasks/${activeTaskId}/workspace/file?path=${encodedPath}`,
+      downloadUrl: `/api/tasks/${activeTaskId}/workspace/file?path=${encodedPath}&download=1`,
+    };
+    openArtifact(officeArtifact);
+  }, [activeTaskId, openArtifact]);
 
   const closeArtifact = useCallback((artifactId) => {
     setPreviewTabs((current) => {
@@ -197,10 +222,26 @@ export default function UserDashboard() {
 
   useEffect(() => {
     // Auto scroll to bottom of chat
-    if (messagesEndRef.current) {
+    if (followLatest && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, followLatest]);
+
+  const handleChatScroll = useCallback((event) => {
+    const element = event.currentTarget;
+    setFollowLatest(element.scrollHeight - element.scrollTop - element.clientHeight < 96);
+  }, []);
+
+  const jumpToLatest = useCallback(() => {
+    setFollowLatest(true);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  const copyMessage = useCallback(async (content, index) => {
+    await navigator.clipboard.writeText(content || '');
+    setCopiedMessageIndex(index);
+    window.setTimeout(() => setCopiedMessageIndex((current) => current === index ? null : current), 1500);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -758,10 +799,10 @@ export default function UserDashboard() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}>
             
             {/* Left Column (Chat Area + Input) */}
-            <div style={{ flex: showRightPanel ? '0 0 42%' : 1, minWidth: showRightPanel ? '360px' : 0, display: 'flex', flexDirection: 'column', height: '100%', transition: 'flex-basis 0.25s ease' }}>
+            <div style={{ flex: showRightPanel ? '0 0 42%' : 1, minWidth: showRightPanel ? '360px' : 0, display: 'flex', flexDirection: 'column', height: '100%', transition: 'flex-basis 0.25s ease', position: 'relative' }}>
             
             {/* Chat Area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {messages.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '0 20px' }}>
                   <Sparkles size={48} color="var(--primary)" style={{ marginBottom: '24px', opacity: 0.8 }} />
@@ -823,7 +864,7 @@ export default function UserDashboard() {
                       )}
 
                       {/* Ordered AionCore timeline: thinking, tools and text keep their original positions. */}
-                      {msg.blocks?.length > 0 ? <AionMessageTimeline message={msg} /> : <>
+                      {msg.blocks?.length > 0 ? <AionMessageTimeline message={msg} onOpenFile={(fileInfo) => openWorkspaceFile({ path: fileInfo.path, name: fileInfo.name, previewType: /\.md$/i.test(fileInfo.name) ? 'markdown' : /\.(png|jpe?g|webp)$/i.test(fileInfo.name) ? 'image' : /\.pdf$/i.test(fileInfo.name) ? 'pdf' : 'text' })} /> : <>
                       {msg.thought && <Thinking thought={msg.thought} />}
                       {msg.progress && <TaskProgress progress={msg.progress} />}
                       {msg.loading && !msg.progress && !msg.thought && !msg.content ? (
@@ -910,15 +951,23 @@ export default function UserDashboard() {
                           ))}
                         </div>
                       )}
+                      {msg.role === 'ai' && !msg.loading && msg.content && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                          <button type="button" onClick={() => void copyMessage(msg.content, i)} title="复制回复" style={{ width: '28px', height: '28px', display: 'grid', placeItems: 'center', border: 0, borderRadius: '7px', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>{copiedMessageIndex === i ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}</button>
+                          {msg.createdAt ? <span>{new Date(msg.createdAt).toLocaleString('zh-CN')}</span> : null}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
               )}
               <div ref={messagesEndRef} />
             </div>
+            {!followLatest && <button type="button" onClick={jumpToLatest} title="回到最新消息" style={{ position: 'absolute', right: '22px', bottom: '148px', zIndex: 3, width: '38px', height: '38px', display: 'grid', placeItems: 'center', border: '1px solid var(--border)', borderRadius: '50%', background: 'white', boxShadow: 'var(--shadow-md)', cursor: 'pointer', color: 'var(--text-main)' }}><ArrowDown size={18} /></button>}
 
             {/* Input Area */}
             <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              {activeTaskId && !showRightPanel && <button type="button" onClick={() => { setShowRightPanel(true); setSidebarCollapsed(true); setRightPanelMode('workspace'); }} style={{ float: 'right', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: '9px', background: 'white', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}><FolderOpen size={15} /> 文件工作区</button>}
               
               {/* Active File Preview */}
               {file && (
@@ -966,8 +1015,9 @@ export default function UserDashboard() {
         {showRightPanel && (
           <div style={{ flex: 1, minWidth: 0, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
             <div style={{ minHeight: '58px', padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}><button type="button" onClick={() => setRightPanelMode('preview')} style={{ padding: '7px 9px', border: 0, borderRadius: '7px', background: rightPanelMode === 'preview' ? 'var(--primary-light)' : 'transparent', color: rightPanelMode === 'preview' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem' }}>预览</button><button type="button" onClick={() => setRightPanelMode('workspace')} style={{ padding: '7px 9px', border: 0, borderRadius: '7px', background: rightPanelMode === 'workspace' ? 'var(--primary-light)' : 'transparent', color: rightPanelMode === 'workspace' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem' }}>文件</button></div>
               <div style={{ display: 'flex', gap: '6px', minWidth: 0, overflowX: 'auto', flex: 1, scrollbarWidth: 'none' }}>
-                {previewTabs.map((artifact) => (
+                {rightPanelMode === 'preview' && previewTabs.map((artifact) => (
                   <button key={artifact.id} onClick={() => setActiveArtifact(artifact)} title={artifact.filename} style={{ maxWidth: '220px', minWidth: '120px', padding: '8px 8px 8px 11px', display: 'flex', alignItems: 'center', gap: '7px', border: '1px solid', borderColor: activeArtifact?.id === artifact.id ? 'var(--primary)' : 'var(--border)', borderRadius: '9px', background: activeArtifact?.id === artifact.id ? 'var(--primary-light)' : 'var(--background)', cursor: 'pointer', color: 'var(--text-main)' }}>
                     <FileText size={15} style={{ flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left', fontSize: '0.82rem' }}>{artifact.filename}</span>
@@ -977,16 +1027,18 @@ export default function UserDashboard() {
               </div>
               <button onClick={() => { setShowRightPanel(false); setSidebarCollapsed(false); }} style={{ width: '34px', height: '34px', display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }} title="关闭预览并展开左侧导航"><X size={20} /></button>
             </div>
-            <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-              {activeArtifact && (
+            <div style={{ padding: rightPanelMode === 'workspace' ? 0 : '20px', overflow: 'hidden', flex: 1 }}>
+              {rightPanelMode === 'workspace' ? <WorkspaceBrowser taskId={activeTaskId} onOpen={openWorkspaceFile} /> : activeArtifact && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-                  <iframe
+                  {activeArtifact.generic ? <GenericFilePreview key={activeArtifact.previewUrl} artifact={activeArtifact} /> : <iframe
                     key={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}:${activeArtifact.previewVersion || 0}`}
                     src={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}?v=${activeArtifact.previewVersion || 0}`}
                     title="Office document preview"
                     sandbox="allow-scripts allow-same-origin"
+                    onError={() => setPreviewError('实时预览加载失败')}
                     style={{ width: '100%', minHeight: '560px', flex: 1, border: '1px solid var(--border)', borderRadius: '8px', background: 'white' }}
-                  />
+                  />}
+                  {previewError && <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1px solid #fecaca', borderRadius: '9px', background: '#fff7f7', color: '#b91c1c', fontSize: '0.82rem' }}><span>{previewError}</span><button type="button" onClick={() => { setPreviewError(''); setActiveArtifact((current) => ({ ...current, previewUrl: `${current.previewUrl.split('?')[0]}?retry=${Date.now()}` })); }} style={{ padding: '6px 10px', border: '1px solid #fecaca', borderRadius: '7px', background: 'white', color: '#b91c1c', cursor: 'pointer' }}>重试</button></div>}
                   {activeArtifact.downloadUrl && !(activeArtifact.status === 'generating' && isGenerating) ? (
                     <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       下载

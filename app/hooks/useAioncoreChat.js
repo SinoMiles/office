@@ -23,6 +23,7 @@ export function useAioncoreChat() {
   const taskIdRef = useRef(null);
   const workspaceRef = useRef('');
   const pendingOfficeFilesRef = useRef([]);
+  const officeOpenTimersRef = useRef(new Map());
   const confirmationsInFlightRef = useRef(new Set());
 
   const approvePermission = useCallback((payload) => {
@@ -53,7 +54,7 @@ export function useAioncoreChat() {
     }
   }, [approvePermission]);
 
-  const openOfficePreview = useCallback(async (event) => {
+  const startOfficePreview = useCallback(async (event) => {
     const taskId = taskIdRef.current;
     const workspace = workspaceRef.current || event.workspace;
     if (!taskId || !workspace) {
@@ -77,6 +78,16 @@ export function useAioncoreChat() {
     }
   }, []);
 
+  const openOfficePreview = useCallback((event) => {
+    const normalizedPath = String(event.file_path || '').replaceAll('\\', '/').replace(/^\/private\/(tmp|var)(?=\/)/, '/$1');
+    if (!normalizedPath || officeOpenTimersRef.current.has(normalizedPath)) return;
+    const timer = window.setTimeout(() => {
+      officeOpenTimersRef.current.delete(normalizedPath);
+      void startOfficePreview({ ...event, file_path: normalizedPath });
+    }, 900);
+    officeOpenTimersRef.current.set(normalizedPath, timer);
+  }, [startOfficePreview]);
+
   const applyRuntimeEvent = useCallback((name, payload) => {
     setRuntime((previous) => {
       const next = reduceRuntime(previous, name, payload);
@@ -96,6 +107,7 @@ export function useAioncoreChat() {
 
   useEffect(() => {
     const client = createAioncoreRealtimeClient();
+    const officeOpenTimers = officeOpenTimersRef.current;
     clientRef.current = client;
     const subscriptions = [
       client.on('realtime.connected', () => applyRuntimeEvent('realtime.connected', {})),
@@ -143,6 +155,8 @@ export function useAioncoreChat() {
     return () => {
       for (const unsubscribe of subscriptions) unsubscribe();
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      for (const timer of officeOpenTimers.values()) window.clearTimeout(timer);
+      officeOpenTimers.clear();
       client.close();
       clientRef.current = null;
     };

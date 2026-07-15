@@ -167,6 +167,8 @@ export async function POST(request) {
         aionWorkspace = conversationPayload.data?.extra?.workspace || conversationPayload.data?.workspace || '';
       }
       if (aionWorkspace) {
+        task.workspace = aionWorkspace;
+        await task.save();
         const watchRes = await fetch(`${AIONCORE_URL}/api/fs/office-watch/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
