@@ -10,6 +10,7 @@ import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, 
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
+import AionMessageTimeline from '@/app/components/AionMessageTimeline';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
 import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
 
@@ -821,7 +822,8 @@ export default function UserDashboard() {
                         </div>
                       )}
 
-                      {/* Text Content */}
+                      {/* Ordered AionCore timeline: thinking, tools and text keep their original positions. */}
+                      {msg.blocks?.length > 0 ? <AionMessageTimeline message={msg} /> : <>
                       {msg.thought && <Thinking thought={msg.thought} />}
                       {msg.progress && <TaskProgress progress={msg.progress} />}
                       {msg.loading && !msg.progress && !msg.thought && !msg.content ? (
@@ -887,6 +889,7 @@ export default function UserDashboard() {
                           )}
                       </div>
                       )}
+                      </>}
                       {msg.role === 'ai' && msg.artifacts?.length > 0 && (
                         <div style={{ display: 'grid', gap: '10px', marginTop: '14px' }}>
                           {msg.artifacts.map((artifact) => (

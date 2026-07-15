@@ -106,6 +106,19 @@ test('separate thought messages remain visible instead of replacing each other',
   assert.equal(ui[0].thought.subject, '规划');
 });
 
+test('thinking, tools and text retain their original timeline order', () => {
+  const messages = [
+    { msg_id: 'think-1', type: 'thinking', data: { content: '先规划', status: 'done' } },
+    { msg_id: 'text-1', type: 'text', content: { content: '开始生成第一页。' } },
+    { msg_id: 'tool-1', type: 'acp_tool_call', data: { update: { tool_call_id: 'call-1', title: 'ExecCommand', status: 'completed' } } },
+    { msg_id: 'text-2', type: 'text', content: { content: '第1步：封面页' } },
+  ];
+  const [assistant] = mapMessagesToUi(messages, { isProcessing: false });
+  assert.deepEqual(assistant.blocks.map((block) => block.type), ['thinking', 'text', 'tools', 'text']);
+  assert.equal(assistant.blocks[2].steps[0].title, 'ExecCommand');
+  assert.equal(assistant.content, '开始生成第一页。\n\n第1步：封面页');
+});
+
 test('AionCore HTTP history positions normalize into user and assistant roles', () => {
   const normalized = normalizeHistoryMessages([
     { msg_id: 'user', position: 'right', type: 'text', content: { content: '问题' } },
