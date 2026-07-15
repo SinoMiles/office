@@ -12,7 +12,13 @@ export async function GET(_request, { params }) {
   const task = await Task.findOne({ _id: id, userId: user._id }).lean();
   if (!task?.previewFile) return NextResponse.json({ error: '预览不存在' }, { status: 404 });
   try {
-    const html = await fs.readFile(task.previewFile, 'utf8');
+    const html = (await fs.readFile(task.previewFile, 'utf8')).replace('</head>', `<style>
+      * { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.48) transparent; }
+      *::-webkit-scrollbar { width: 10px; height: 10px; }
+      *::-webkit-scrollbar-track { background: transparent; }
+      *::-webkit-scrollbar-thumb { min-height: 42px; border: 3px solid transparent; border-radius: 999px; background: linear-gradient(180deg, rgba(148,163,184,.72), rgba(100,116,139,.58)) padding-box; }
+      *::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(100,116,139,.8), rgba(71,85,105,.72)) padding-box; }
+    </style></head>`);
     return new Response(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
@@ -24,4 +30,3 @@ export async function GET(_request, { params }) {
     return NextResponse.json({ error: '预览已过期' }, { status: 410 });
   }
 }
-

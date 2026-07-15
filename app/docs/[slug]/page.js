@@ -1,4 +1,4 @@
-import { getDocBySlug } from '@/lib/docsData';
+import { getAllDocs, getDocBySlug } from '@/lib/docsData';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,7 +11,8 @@ export async function generateMetadata({ params }) {
   
   if (!doc) {
     return {
-      title: '文档未找到 | OfficeGPT'
+      title: '文档未找到 | OfficeGPT',
+      robots: { index: false, follow: false },
     }
   }
 
@@ -19,10 +20,16 @@ export async function generateMetadata({ params }) {
     title: `${doc.title} - 帮助文档 | OfficeGPT`,
     description: `阅读关于 ${doc.title} 的详细介绍。OfficeGPT 官方帮助中心为您提供最权威的解答。`,
     keywords: [doc.title, 'OfficeGPT 教程', '帮助文档'],
+    alternates: { canonical: `/docs/${doc.slug}` },
     openGraph: {
       title: `${doc.title} - 帮助文档 | OfficeGPT`,
+      url: `/docs/${doc.slug}`,
     }
   }
+}
+
+export function generateStaticParams() {
+  return getAllDocs().map((doc) => ({ slug: doc.slug }));
 }
 
 export default async function DocPage({ params }) {

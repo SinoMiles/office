@@ -1,11 +1,13 @@
+import { getSiteUrl } from '@/lib/seo';
+
 export default function robots() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.officegpt.example.com';
+  const baseUrl = getSiteUrl();
 
   return {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/dashboard/', '/api/'],
+      disallow: ['/dashboard/', '/admin/', '/api/'],
     },
     sitemap: `${baseUrl}/sitemap.xml`,
   }

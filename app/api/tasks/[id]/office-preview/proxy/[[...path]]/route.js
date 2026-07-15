@@ -1,6 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
-import { getWatchPort } from '@/lib/office/watch-manager';
+import { getWatchPort, startWatch } from '@/lib/office/watch-manager';
 import Task from '@/models/Task';
 
 export const runtime = 'nodejs';
@@ -10,7 +10,14 @@ function rewritePreviewHtml(html, prefix) {
   return html
     .replaceAll("new EventSource('/events')", `new EventSource('${prefix}/events')`)
     .replaceAll("fetch('/')", `fetch('${prefix}/')`)
-    .replaceAll("fetch('/api/", `fetch('${prefix}/api/`);
+    .replaceAll("fetch('/api/", `fetch('${prefix}/api/`)
+    .replace('</head>', `<style>
+      * { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.48) transparent; }
+      *::-webkit-scrollbar { width: 10px; height: 10px; }
+      *::-webkit-scrollbar-track { background: transparent; }
+      *::-webkit-scrollbar-thumb { min-height: 42px; border: 3px solid transparent; border-radius: 999px; background: linear-gradient(180deg, rgba(148,163,184,.72), rgba(100,116,139,.58)) padding-box; }
+      *::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(100,116,139,.8), rgba(71,85,105,.72)) padding-box; }
+    </style></head>`);
 }
 
 async function proxy(request, { params }) {
@@ -18,9 +25,17 @@ async function proxy(request, { params }) {
   if (!user) return Response.json({ error: '请先登录' }, { status: 401 });
   const { id, path = [] } = await params;
   await connectToDatabase();
-  if (!(await Task.exists({ _id: id, userId: user._id }))) return Response.json({ error: '任务不存在' }, { status: 404 });
-  const port = getWatchPort(id);
-  if (!port) return Response.json({ error: '实时预览服务未运行' }, { status: 410 });
+  const task = await Task.findOne({ _id: id, userId: user._id }).select('outputFile').lean();
+  if (!task) return Response.json({ error: '任务不存在' }, { status: 404 });
+  let port = getWatchPort(id);
+  if (!port && task.outputFile) {
+    try {
+      port = await startWatch(id, task.outputFile);
+    } catch (error) {
+      return Response.json({ error: error.message || '实时预览恢复失败' }, { status: 502 });
+    }
+  }
+  if (!port) return Response.json({ error: '预览不存在' }, { status: 404 });
 
   const source = new URL(request.url);
   const target = `http://127.0.0.1:${port}/${path.join('/')}${source.search}`;
@@ -40,4 +55,3 @@ async function proxy(request, { params }) {
 
 export const GET = proxy;
 export const HEAD = proxy;
-

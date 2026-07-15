@@ -110,9 +110,17 @@ export default function UserDashboard() {
           progress: runtimeProgress ? { subject: runtimeProgress.title || '正在处理任务', startedAt: new Date(task.createdAt).getTime(), steps: [runtimeProgress] } : undefined,
         },
       ]);
-      if (task.previewFile && task.runtime?.progress?.type === 'preview') {
+      if ((task.outputFile || task.previewFile) && task.runtime?.progress?.type === 'preview') {
         const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
-        setActiveArtifact({ previewUrl: `/api/tasks/${task._id}/preview`, previewVersion: version });
+        setActiveArtifact({
+          filename: task.outputFilename,
+          previewUrl: task.outputFile
+            ? `/api/tasks/${task._id}/office-preview/proxy/`
+            : `/api/tasks/${task._id}/preview`,
+          downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined,
+          live: Boolean(task.outputFile),
+          previewVersion: version,
+        });
         lastPreviewVersionRef.current = version;
         setShowRightPanel(true);
         setSidebarCollapsed(true);
@@ -364,8 +372,11 @@ export default function UserDashboard() {
       const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
       setActiveArtifact({
         filename: task.outputFilename,
-        previewUrl: `/api/tasks/${task._id}/preview`,
+        previewUrl: task.outputFile
+          ? `/api/tasks/${task._id}/office-preview/proxy/`
+          : `/api/tasks/${task._id}/preview`,
         downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined,
+        live: Boolean(task.outputFile),
         previewVersion: version,
       });
       lastPreviewVersionRef.current = version;

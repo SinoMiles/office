@@ -6,8 +6,10 @@ const inter = Inter({ subsets: ['latin'] })
 
 import TopNav from './components/TopNav'
 import { Toaster } from 'react-hot-toast'
+import { getSiteUrl } from '@/lib/seo'
 
 export const metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: 'OfficeGPT - 全能 AI 智能办公套件与文档处理大厅',
   description: '全球首个专为 AI 智能体设计的 Office 套件，让 AI 帮你做 Excel、PPT 和 Word。基于大语言模型驱动，提供自然语言交互的办公自动化解决方案。',
   keywords: ['OfficeGPT', 'AI智能办公套件', 'AI文档处理', 'Excel助手', '自动生成PPT', 'Word智能排版', '办公自动化 SaaS', '数据处理', '深圳市星尚硕教育科技有限公司'],
@@ -18,12 +20,14 @@ export const metadata = {
     index: true,
     follow: true,
   },
+  alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
     locale: 'zh_CN',
     title: 'OfficeGPT - 全能 AI 智能办公套件',
     description: '打破软件操作壁垒，将您的自然语言直接转化为精准的文档计算结果。',
     siteName: 'OfficeGPT',
+    url: '/',
   },
   twitter: {
     card: 'summary_large_image',
@@ -45,24 +49,24 @@ export default async function RootLayout({ children }) {
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": "SoftwareApplication",
-              "name": "OfficeGPT",
-              "applicationCategory": "BusinessApplication",
-              "operatingSystem": "Web",
-              "offers": {
-                "@type": "Offer",
-                "price": "0",
-                "priceCurrency": "CNY"
-              },
-              "publisher": {
-                "@type": "Organization",
-                "name": "深圳市星尚硕教育科技有限公司"
-              },
-              "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": "4.9",
-                "ratingCount": "893"
-              }
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": `${getSiteUrl()}/#organization`,
+                  "name": "深圳市星尚硕教育科技有限公司",
+                  "url": getSiteUrl()
+                },
+                {
+                  "@type": "SoftwareApplication",
+                  "@id": `${getSiteUrl()}/#application`,
+                  "name": "OfficeGPT",
+                  "url": getSiteUrl(),
+                  "applicationCategory": "BusinessApplication",
+                  "operatingSystem": "Web",
+                  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                  "publisher": { "@id": `${getSiteUrl()}/#organization` }
+                }
+              ]
             })
           }}
         />

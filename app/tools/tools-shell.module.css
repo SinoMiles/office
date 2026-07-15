@@ -77,10 +77,8 @@
   padding: 10px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: none;
   overscroll-behavior: contain;
 }
-.categoryNav::-webkit-scrollbar { display: none; }
 
 .category + .category { margin-top: 3px; }
 .categoryButton {
