@@ -452,6 +452,49 @@ h1, h2, h3, h4 {
   background: #f8fafc;
 }
 
+/* Chat documents use a compact editorial rhythm instead of inheriting page-level headings. */
+.chat-markdown {
+  min-width: 0;
+  color: #253044;
+  font-size: 15px;
+  line-height: 1.72;
+  overflow-wrap: anywhere;
+}
+.chat-markdown > :first-child { margin-top: 0; }
+.chat-markdown > :last-child { margin-bottom: 0; }
+.chat-markdown p { margin: 0 0 12px; }
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4 {
+  color: #172033;
+  letter-spacing: -0.018em;
+  line-height: 1.35;
+}
+.chat-markdown h1 { margin: 24px 0 14px; font-size: 1.42rem; font-weight: 750; }
+.chat-markdown h2 { margin: 22px 0 12px; font-size: 1.18rem; font-weight: 700; }
+.chat-markdown h3 { margin: 18px 0 9px; font-size: 1rem; font-weight: 680; }
+.chat-markdown h4 { margin: 16px 0 8px; font-size: .94rem; font-weight: 650; }
+.chat-markdown strong { color: #172033; font-weight: 680; }
+.chat-markdown ul,
+.chat-markdown ol { margin: 7px 0 14px; padding-left: 1.35rem; }
+.chat-markdown li { margin: 3px 0; padding-left: 2px; }
+.chat-markdown li::marker { color: #94a3b8; }
+.chat-markdown hr { height: 1px; margin: 20px 0; border: 0; background: #e2e8f0; }
+.chat-markdown blockquote { margin: 14px 0; padding: 9px 14px; border-left: 3px solid #cbd5e1; border-radius: 0 8px 8px 0; background: #f8fafc; color: #64748b; }
+.chat-markdown a { color: #2563eb; text-decoration: none; }
+.chat-markdown a:hover { text-decoration: underline; }
+.chat-markdown code:not([class*='language-']) { padding: 2px 5px; border: 1px solid #e2e8f0; border-radius: 5px; background: #f8fafc; color: #be123c; font-size: .88em; }
+.chat-markdown-code { margin: 14px 0; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.chat-markdown-code-label { padding: 6px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b; font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+.chat-markdown-table-wrap { width: 100%; margin: 14px 0 18px; overflow-x: auto; border: 1px solid #dfe5ee; border-radius: 10px; background: #fff; }
+.chat-markdown table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: .9rem; line-height: 1.55; }
+.chat-markdown th { padding: 9px 12px; border-bottom: 1px solid #dfe5ee; background: #f8fafc; color: #475569; font-weight: 650; text-align: left; white-space: nowrap; }
+.chat-markdown td { padding: 9px 12px; border-bottom: 1px solid #edf1f6; vertical-align: top; }
+.chat-markdown tr:last-child td { border-bottom: 0; }
+.chat-markdown tbody tr:hover { background: #fbfdff; }
+.chat-markdown-error { color: #dc2626; }
+
 .premium-stat-card {
   position: relative;
   overflow: hidden;

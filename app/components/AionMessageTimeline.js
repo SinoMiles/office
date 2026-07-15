@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { AlertCircle, Brain, CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardList, Info, Loader2, Terminal, XCircle } from 'lucide-react';
+import ChatMarkdown from '@/app/components/ChatMarkdown';
 
 function stringifyDetail(value) {
   if (!value) return '';
@@ -75,11 +74,7 @@ function NoticeBlock({ block }) {
 
 function TextBlock({ content, error }) {
   if (!content) return null;
-  return (
-    <div className="markdown-body" style={{ lineHeight: 1.6, color: error ? '#ef4444' : 'var(--text-main)' }}>
-      {error ? <div style={{ whiteSpace: 'pre-wrap' }}>{content}</div> : <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>}
-    </div>
-  );
+  return <ChatMarkdown error={error}>{content}</ChatMarkdown>;
 }
 
 function FileTextIcon() { return <span aria-hidden="true">📄</span>; }
