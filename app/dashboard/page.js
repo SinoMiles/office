@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
+import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
 
 export default function UserDashboard() {
   const [data, setData] = useState({ records: [], balance: 0 });
@@ -23,6 +24,7 @@ export default function UserDashboard() {
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeArtifact, setActiveArtifact] = useState(null);
+  const [previewTabs, setPreviewTabs] = useState([]);
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
   const router = useRouter();
@@ -44,9 +46,31 @@ export default function UserDashboard() {
   const [renameValue, setRenameValue] = useState('');
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ isOpen: false, taskId: null });
   const menuRef = useRef(null);
-  const lastPreviewVersionRef = useRef(null);
   const historyRestoredRef = useRef(false);
   const cancellingRef = useRef(false);
+
+  const openArtifact = useCallback((artifact) => {
+    if (!artifact) return;
+    setPreviewTabs((current) => current.some((item) => item.id === artifact.id)
+      ? current.map((item) => item.id === artifact.id ? { ...item, ...artifact } : item)
+      : [...current, artifact]);
+    setActiveArtifact(artifact);
+    setShowRightPanel(true);
+    setSidebarCollapsed(true);
+  }, []);
+
+  const closeArtifact = useCallback((artifactId) => {
+    setPreviewTabs((current) => {
+      const index = current.findIndex((item) => item.id === artifactId);
+      const next = current.filter((item) => item.id !== artifactId);
+      setActiveArtifact((active) => active?.id === artifactId ? (next[Math.min(index, next.length - 1)] || null) : active);
+      if (!next.length) {
+        setShowRightPanel(false);
+        setSidebarCollapsed(false);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -110,24 +134,11 @@ export default function UserDashboard() {
           progress: runtimeProgress ? { subject: runtimeProgress.title || '正在处理任务', startedAt: new Date(task.createdAt).getTime(), steps: [runtimeProgress] } : undefined,
         },
       ]);
-      if ((task.outputFile || task.previewFile) && task.runtime?.progress?.type === 'preview') {
-        const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
-        setActiveArtifact({
-          filename: task.outputFilename,
-          previewUrl: task.outputFile
-            ? `/api/tasks/${task._id}/office-preview/proxy/`
-            : `/api/tasks/${task._id}/preview`,
-          downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined,
-          live: Boolean(task.outputFile),
-          previewVersion: version,
-        });
-        lastPreviewVersionRef.current = version;
-        setShowRightPanel(true);
-        setSidebarCollapsed(true);
-      }
+      const artifacts = taskArtifactViews(task);
+      if (artifacts.length && task.runtime?.progress?.type === 'preview') openArtifact(artifacts.at(-1));
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, []);
+  }, [openArtifact]);
 
   useEffect(() => {
     // We no longer poll MongoDB for real-time generation updates since AionCore streams via WS.
@@ -138,7 +149,7 @@ export default function UserDashboard() {
          setMessages(prev => {
             const next = [...prev];
             if (next.length > 0 && next[next.length - 1].role === 'ai') {
-               next[next.length - 1] = { ...next[next.length - 1], ...lastAionMsg, loading: aionIsProcessing };
+               next[next.length - 1] = { ...next[next.length - 1], ...lastAionMsg, artifacts: next[next.length - 1].artifacts, loading: aionIsProcessing };
             } else {
                next.push({ ...lastAionMsg, loading: aionIsProcessing });
             }
@@ -150,10 +161,23 @@ export default function UserDashboard() {
 
   useEffect(() => {
     if (!officeArtifact) return;
-    setActiveArtifact(officeArtifact);
-    setShowRightPanel(true);
-    setSidebarCollapsed(true);
-  }, [officeArtifact]);
+    const artifact = officeArtifact.id ? officeArtifact : {
+      ...officeArtifact,
+      id: `${officeArtifact.taskId || activeTaskId}:${officeArtifact.artifactId || officeArtifact.filename}`,
+    };
+    setMessages((current) => {
+      const next = [...current];
+      const index = next.findLastIndex((message) => message.role === 'ai');
+      if (index >= 0) {
+        const artifacts = next[index].artifacts || [];
+        next[index] = { ...next[index], artifacts: artifacts.some((item) => item.id === artifact.id)
+          ? artifacts.map((item) => item.id === artifact.id ? { ...item, ...artifact } : item)
+          : [...artifacts, artifact] };
+      }
+      return next;
+    });
+    openArtifact(artifact);
+  }, [officeArtifact, activeTaskId, openArtifact]);
 
   useEffect(() => {
     // Sync completion status back to MongoDB when aioncore finishes generating
@@ -342,6 +366,7 @@ export default function UserDashboard() {
     setShowRightPanel(false);
     setSidebarCollapsed(false);
     setActiveArtifact(null);
+    setPreviewTabs([]);
     window.localStorage.removeItem('officeweb-active-task-id');
   };
 
@@ -365,26 +390,14 @@ export default function UserDashboard() {
         error: turn.status === 'failed',
       },
     ]);
-    setMessages(payload?.messages?.length ? payload.messages : persistedMessages);
+    const historyMessages = payload?.messages?.length ? payload.messages : persistedMessages;
+    setMessages(attachArtifactsToMessages(historyMessages, conversation));
     window.localStorage.setItem('officeweb-active-task-id', task._id);
     if (task.aionConversationId) loadConversation(task.aionConversationId, task._id, '', { loadHistory: false });
-    if (task.outputFile || task.previewFile) {
-      const version = new Date(task.runtime?.updatedAt || task.updatedAt).getTime();
-      setActiveArtifact({
-        filename: task.outputFilename,
-        previewUrl: task.outputFile
-          ? `/api/tasks/${task._id}/office-preview/proxy/`
-          : `/api/tasks/${task._id}/preview`,
-        downloadUrl: task.outputFile ? `/api/tasks/${task._id}/download` : undefined,
-        live: Boolean(task.outputFile),
-        previewVersion: version,
-      });
-      lastPreviewVersionRef.current = version;
-      setShowRightPanel(true);
-      setSidebarCollapsed(true);
-    } else {
-      setActiveArtifact(null);
-    }
+    setPreviewTabs([]);
+    setActiveArtifact(null);
+    setShowRightPanel(false);
+    setSidebarCollapsed(false);
   }, [loadConversation]);
 
   useEffect(() => {
@@ -874,6 +887,26 @@ export default function UserDashboard() {
                           )}
                       </div>
                       )}
+                      {msg.role === 'ai' && msg.artifacts?.length > 0 && (
+                        <div style={{ display: 'grid', gap: '10px', marginTop: '14px' }}>
+                          {msg.artifacts.map((artifact) => (
+                            <button
+                              key={artifact.id}
+                              onClick={() => openArtifact(artifact)}
+                              style={{ width: '100%', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid var(--border)', borderRadius: '12px', background: activeArtifact?.id === artifact.id ? 'var(--primary-light)' : 'white', cursor: 'pointer', textAlign: 'left', transition: 'border-color .2s, background .2s, transform .2s' }}
+                            >
+                              <span style={{ width: '36px', height: '36px', display: 'grid', placeItems: 'center', borderRadius: '9px', background: artifact.fileType?.startsWith('ppt') ? '#fff1e8' : artifact.fileType?.startsWith('xls') ? '#eaf8ef' : '#edf4ff', flexShrink: 0 }}>
+                                {artifact.fileType?.startsWith('ppt') ? <Presentation size={19} color="#ea580c" /> : artifact.fileType?.startsWith('xls') ? <FileSpreadsheet size={19} color="#16a34a" /> : <FileText size={19} color="#2563eb" />}
+                              </span>
+                              <span style={{ minWidth: 0, flex: 1 }}>
+                                <span style={{ display: 'block', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{artifact.filename}</span>
+                                <span style={{ display: 'block', marginTop: '3px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>{artifact.status === 'generating' && isGenerating ? '生成中 · 点击查看实时预览' : '点击打开预览'}</span>
+                              </span>
+                              <span style={{ color: 'var(--primary)', fontSize: '0.82rem', fontWeight: 600 }}>预览</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -929,9 +962,17 @@ export default function UserDashboard() {
         {/* Right Panel: real OfficeCLI preview */}
         {showRightPanel && (
           <div style={{ flex: 1, minWidth: 0, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
-            <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.2rem', margin: 0 }}>Office 真实预览</h3>
-              <button onClick={() => { setShowRightPanel(false); setSidebarCollapsed(false); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} title="关闭预览并展开左侧导航"><X size={20} /></button>
+            <div style={{ minHeight: '58px', padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '6px', minWidth: 0, overflowX: 'auto', flex: 1, scrollbarWidth: 'none' }}>
+                {previewTabs.map((artifact) => (
+                  <button key={artifact.id} onClick={() => setActiveArtifact(artifact)} title={artifact.filename} style={{ maxWidth: '220px', minWidth: '120px', padding: '8px 8px 8px 11px', display: 'flex', alignItems: 'center', gap: '7px', border: '1px solid', borderColor: activeArtifact?.id === artifact.id ? 'var(--primary)' : 'var(--border)', borderRadius: '9px', background: activeArtifact?.id === artifact.id ? 'var(--primary-light)' : 'var(--background)', cursor: 'pointer', color: 'var(--text-main)' }}>
+                    <FileText size={15} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left', fontSize: '0.82rem' }}>{artifact.filename}</span>
+                    <span role="button" aria-label={`关闭 ${artifact.filename}`} onClick={(event) => { event.stopPropagation(); closeArtifact(artifact.id); }} style={{ display: 'grid', placeItems: 'center', borderRadius: '5px', flexShrink: 0 }}><X size={14} /></span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => { setShowRightPanel(false); setSidebarCollapsed(false); }} style={{ width: '34px', height: '34px', display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }} title="关闭预览并展开左侧导航"><X size={20} /></button>
             </div>
             <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
               {activeArtifact && (
@@ -943,7 +984,7 @@ export default function UserDashboard() {
                     sandbox="allow-scripts allow-same-origin"
                     style={{ width: '100%', minHeight: '560px', flex: 1, border: '1px solid var(--border)', borderRadius: '8px', background: 'white' }}
                   />
-                  {activeArtifact.downloadUrl && !aionIsProcessing && !processLoading ? (
+                  {activeArtifact.downloadUrl && !(activeArtifact.status === 'generating' && isGenerating) ? (
                     <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       下载
                     </a>

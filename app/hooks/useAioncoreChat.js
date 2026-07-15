@@ -70,7 +70,7 @@ export function useAioncoreChat() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || '启动 Office 实时预览失败');
-      setOfficeArtifact({ ...payload, live: true, previewVersion: Date.now() });
+      setOfficeArtifact({ ...payload, id: `${payload.taskId}:${payload.artifactId}`, live: true, previewVersion: Date.now() });
       chatLog('preview', `live preview ready for ${payload.filename}`, event);
     } catch (error) {
       chatWarn('preview', error.message, event);

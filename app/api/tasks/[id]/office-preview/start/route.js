@@ -22,7 +22,24 @@ export async function POST(request, { params }) {
   const task = await Task.findOne({ _id: id, userId: user._id });
   if (!task) return NextResponse.json({ error: '任务不存在' }, { status: 404 });
 
-  await startWatch(id, resolvedFile);
+  let artifact = task.artifacts?.find((item) => item.filePath === resolvedFile);
+  if (!artifact) {
+    task.artifacts.push({
+      filePath: resolvedFile,
+      filename: path.basename(resolvedFile),
+      fileType: path.extname(resolvedFile).slice(1).toLowerCase(),
+      workspace: resolvedWorkspace,
+      status: 'generating',
+    });
+    artifact = task.artifacts[task.artifacts.length - 1];
+  } else {
+    artifact.filename = path.basename(resolvedFile);
+    artifact.workspace = resolvedWorkspace;
+    artifact.status = 'generating';
+    artifact.updatedAt = new Date();
+  }
+  const artifactId = String(artifact._id);
+  await startWatch(`${id}:${artifactId}`, resolvedFile);
   task.outputFile = resolvedFile;
   task.outputFilename = path.basename(resolvedFile);
   task.runtime.progress = { type: 'preview', title: `正在生成 ${task.outputFilename}`, filePath: resolvedFile };
@@ -31,9 +48,12 @@ export async function POST(request, { params }) {
 
   return NextResponse.json({
     success: true,
+    taskId: id,
+    artifactId,
     filename: task.outputFilename,
-    previewUrl: `/api/tasks/${id}/office-preview/proxy/`,
-    downloadUrl: `/api/tasks/${id}/download`,
+    fileType: artifact.fileType,
+    status: artifact.status,
+    previewUrl: `/api/tasks/${id}/office-preview/proxy/${artifactId}/`,
+    downloadUrl: `/api/tasks/${id}/download?artifactId=${encodeURIComponent(artifactId)}`,
   });
 }
-

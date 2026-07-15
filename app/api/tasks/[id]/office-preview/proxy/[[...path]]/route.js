@@ -25,12 +25,17 @@ async function proxy(request, { params }) {
   if (!user) return Response.json({ error: '请先登录' }, { status: 401 });
   const { id, path = [] } = await params;
   await connectToDatabase();
-  const task = await Task.findOne({ _id: id, userId: user._id }).select('outputFile').lean();
+  const task = await Task.findOne({ _id: id, userId: user._id }).select('outputFile artifacts').lean();
   if (!task) return Response.json({ error: '任务不存在' }, { status: 404 });
-  let port = getWatchPort(id);
-  if (!port && task.outputFile) {
+  const candidateId = path[0];
+  const artifact = candidateId ? task.artifacts?.find((item) => String(item._id) === candidateId) : null;
+  const upstreamPath = artifact ? path.slice(1) : path;
+  const filePath = artifact?.filePath || task.outputFile;
+  const watchKey = artifact ? `${id}:${candidateId}` : id;
+  let port = getWatchPort(watchKey);
+  if (!port && filePath) {
     try {
-      port = await startWatch(id, task.outputFile);
+      port = await startWatch(watchKey, filePath);
     } catch (error) {
       return Response.json({ error: error.message || '实时预览恢复失败' }, { status: 502 });
     }
@@ -38,14 +43,14 @@ async function proxy(request, { params }) {
   if (!port) return Response.json({ error: '预览不存在' }, { status: 404 });
 
   const source = new URL(request.url);
-  const target = `http://127.0.0.1:${port}/${path.join('/')}${source.search}`;
+  const target = `http://127.0.0.1:${port}/${upstreamPath.join('/')}${source.search}`;
   const response = await fetch(target, { headers: { accept: request.headers.get('accept') || '*/*' }, cache: 'no-store' });
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'private, no-store');
   headers.delete('content-security-policy');
 
   if (response.headers.get('content-type')?.includes('text/html')) {
-    const prefix = `/api/tasks/${id}/office-preview/proxy`;
+    const prefix = `/api/tasks/${id}/office-preview/proxy${artifact ? `/${candidateId}` : ''}`;
     const html = rewritePreviewHtml(await response.text(), prefix);
     headers.delete('content-length');
     return new Response(html, { status: response.status, headers });

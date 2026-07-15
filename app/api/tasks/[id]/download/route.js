@@ -11,16 +11,19 @@ const CONTENT_TYPES = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await connectToDatabase();
   const { id } = await params;
   const task = await Task.findOne({ _id: id, userId: user._id }).lean();
-  if (!task?.outputFile) return NextResponse.json({ error: '文件不存在' }, { status: 404 });
+  const artifactId = new URL(request.url).searchParams.get('artifactId');
+  const artifact = artifactId ? task?.artifacts?.find((item) => String(item._id) === artifactId) : null;
+  const filePath = artifact?.filePath || task?.outputFile;
+  if (!filePath) return NextResponse.json({ error: '文件不存在' }, { status: 404 });
   try {
-    const buffer = await fs.readFile(task.outputFile);
-    const filename = task.outputFilename || path.basename(task.outputFile);
+    const buffer = await fs.readFile(filePath);
+    const filename = artifact?.filename || task.outputFilename || path.basename(filePath);
     return new Response(buffer, {
       headers: {
         'Content-Type': CONTENT_TYPES[path.extname(filename).toLowerCase()] || 'application/octet-stream',
@@ -32,4 +35,3 @@ export async function GET(_request, { params }) {
     return NextResponse.json({ error: '文件已过期' }, { status: 410 });
   }
 }
-
