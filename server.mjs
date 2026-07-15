@@ -4,6 +4,7 @@ import next from 'next';
 import { WebSocket, WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { getAioncoreBaseUrl } from './lib/aioncore/config.js';
+import { startAioncore, stopAioncore } from './lib/aioncore/launcher.js';
 import { chatError, chatLog, chatWarn } from './lib/aioncore/logger.js';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -69,6 +70,7 @@ function settleUsage(userId, settlement, attempt = 0) {
   });
 }
 
+await startAioncore();
 await app.prepare();
 const server = createServer((request, response) => handle(request, response));
 const handleNextUpgrade = app.getUpgradeHandler();
@@ -119,3 +121,17 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 server.listen(port, hostname, () => console.log(`OfficeWeb ready at http://${hostname}:${port}`));
+
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`OfficeWeb received ${signal}, shutting down`);
+  proxyServer.clients.forEach((client) => client.close(1001, 'Server shutting down'));
+  await new Promise((resolve) => server.close(resolve));
+  await stopAioncore();
+  process.exit(0);
+}
+
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.once('SIGTERM', () => void shutdown('SIGTERM'));

@@ -21,6 +21,9 @@
 /build
 /storage
 /uploads
+/.runtime/
+/bin/aioncore
+/bin/aioncore.exe
 
 # misc
 .DS_Store
