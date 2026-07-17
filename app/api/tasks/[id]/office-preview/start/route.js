@@ -39,7 +39,15 @@ export async function POST(request, { params }) {
     artifact.updatedAt = new Date();
   }
   const artifactId = String(artifact._id);
-  await startWatch(`${id}:${artifactId}`, resolvedFile);
+  try {
+    await startWatch(`${id}:${artifactId}`, resolvedFile);
+  } catch (error) {
+    console.error('[OfficeGPT:Preview] document preview engine failed to start:', error);
+    artifact.status = 'failed';
+    artifact.updatedAt = new Date();
+    await task.save();
+    return NextResponse.json({ error: 'OfficeGPT 文档预览服务暂时不可用，文件仍可下载' }, { status: 503 });
+  }
   task.outputFile = resolvedFile;
   task.outputFilename = path.basename(resolvedFile);
   task.runtime.progress = { type: 'preview', title: `正在生成 ${task.outputFilename}`, filePath: resolvedFile };

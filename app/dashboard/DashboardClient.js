@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
+import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, FileType2, ImageIcon, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
@@ -95,6 +95,8 @@ export default function DashboardClient() {
   const isGenerating = processLoading || aionIsProcessing;
   const [activeTaskId, setActiveTaskId] = useState(null); // Tracks the current conversational thread context
   const messagesEndRef = useRef(null);
+  const artifactRefs = useRef(new Map());
+  const promptInputRef = useRef(null);
   const chatScrollRef = useRef(null);
   const followLatestRef = useRef(true);
   const previewPanelRef = useRef(null);
@@ -106,6 +108,29 @@ export default function DashboardClient() {
   const menuRef = useRef(null);
   const historyRestoredRef = useRef(false);
   const cancellingRef = useRef(false);
+
+  const resizePromptInput = useCallback((element) => {
+    if (!element) return;
+    element.style.height = '40px';
+    const nextHeight = Math.min(200, Math.max(40, element.scrollHeight));
+    element.style.height = `${nextHeight}px`;
+    element.style.overflowY = element.scrollHeight > 200 ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    resizePromptInput(promptInputRef.current);
+  }, [prompt, resizePromptInput]);
+
+  const fileTimeline = messages.flatMap((message, messageIndex) =>
+    (message.artifacts || []).map((artifact) => ({ artifact, messageIndex }))
+  );
+
+  const jumpToArtifactRow = useCallback((artifactId) => {
+    const element = artifactRefs.current.get(artifactId);
+    if (!element) return;
+    setFollowLatest(false);
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
 
   const openArtifact = useCallback((artifact) => {
     if (!artifact) return;
@@ -296,6 +321,17 @@ export default function DashboardClient() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: lastMsg.content })
+        }).then(async (response) => {
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || 'Failed to sync finish state');
+          if (!payload.artifacts?.length) return;
+          setMessages((current) => {
+            const next = [...current];
+            const index = next.findLastIndex((message) => message.role === 'ai');
+            if (index >= 0) next[index] = { ...next[index], artifacts: payload.artifacts };
+            return next;
+          });
+          openArtifact(payload.artifacts.at(-1));
         }).catch(e => console.error('Failed to sync finish state', e));
         setProcessLoading(false);
       }
@@ -947,7 +983,7 @@ export default function DashboardClient() {
             <div style={{ flex: showRightPanel ? '0 0 42%' : 1, minWidth: showRightPanel ? '360px' : 0, display: 'flex', flexDirection: 'column', height: '100%', transition: 'flex-basis 0.25s ease', position: 'relative' }}>
             
             {/* Chat Area */}
-            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, overflowY: 'auto', padding: fileTimeline.length && !showRightPanel ? '24px 72px 24px 24px' : '24px', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding-right .2s ease' }}>
               {messages.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '0 20px' }}>
                   <Sparkles size={48} color="var(--primary)" style={{ marginBottom: '24px', opacity: 0.8 }} />
@@ -984,7 +1020,7 @@ export default function DashboardClient() {
                 </div>
               ) : (
                 messages.map((msg, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '16px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+                  <div key={i} style={{ display: 'flex', gap: '16px', maxWidth: '800px', margin: '0 auto', width: '100%', padding: '12px', borderRadius: '16px' }}>
                     {msg.role === 'ai' ? (
                       <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Sparkles size={20} color="var(--primary)" />
@@ -1081,6 +1117,7 @@ export default function DashboardClient() {
                           {msg.artifacts.map((artifact) => (
                             <button
                               key={artifact.id}
+                              ref={(element) => { if (element) artifactRefs.current.set(artifact.id, element); else artifactRefs.current.delete(artifact.id); }}
                               onClick={() => openArtifact(artifact)}
                               style={{ width: '100%', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid var(--border)', borderRadius: '12px', background: activeArtifact?.id === artifact.id ? 'var(--primary-light)' : 'white', cursor: 'pointer', textAlign: 'left', transition: 'border-color .2s, background .2s, transform .2s' }}
                             >
@@ -1108,6 +1145,23 @@ export default function DashboardClient() {
               )}
               <div ref={messagesEndRef} />
             </div>
+            {fileTimeline.length > 0 && !showRightPanel && (
+              <aside aria-label="会话文件时间线" style={{ position: 'absolute', zIndex: 4, top: '50%', right: 'max(12px, calc(50% - 454px))', width: '40px', maxHeight: '52%', padding: '8px 5px', overflowY: 'auto', transform: 'translateY(-50%)' }}>
+                <div style={{ position: 'relative', display: 'grid', justifyItems: 'center', gap: '12px', padding: '3px 0' }}>
+                  <span aria-hidden="true" style={{ position: 'absolute', top: '16px', bottom: '16px', left: '50%', width: '2px', transform: 'translateX(-50%)', borderRadius: '2px', background: 'var(--border)' }} />
+                  {fileTimeline.map(({ artifact, messageIndex }, timelineIndex) => (
+                    <button key={`${artifact.id}:${messageIndex}`} type="button" onClick={() => jumpToArtifactRow(artifact.id)} aria-label="跳转到文件" style={{ position: 'relative', zIndex: 1, width: '30px', height: '30px', padding: 0, display: 'grid', placeItems: 'center', border: 0, borderRadius: '50%', background: 'white', cursor: 'pointer', boxShadow: '0 1px 5px rgba(15,23,42,.12)' }}>
+                      {artifact.fileType?.startsWith('ppt') ? <Presentation size={16} color="#ea580c" />
+                        : artifact.fileType?.startsWith('xls') || artifact.fileType === 'excel' ? <FileSpreadsheet size={16} color="#16a34a" />
+                        : ['doc', 'docx', 'word'].includes(artifact.fileType) ? <FileType2 size={16} color="#2563eb" />
+                        : artifact.fileType === 'pdf' ? <FileText size={16} color="#dc2626" />
+                        : artifact.fileType === 'image' ? <ImageIcon size={16} color="#7c3aed" />
+                        : <FileJson size={16} color={timelineIndex === fileTimeline.length - 1 ? 'var(--primary)' : '#64748b'} />}
+                    </button>
+                  ))}
+                </div>
+              </aside>
+            )}
             {!followLatest && <button type="button" onClick={jumpToLatest} title="回到最新消息" style={{ position: 'absolute', right: '22px', bottom: '148px', zIndex: 3, width: '38px', height: '38px', display: 'grid', placeItems: 'center', border: '1px solid var(--border)', borderRadius: '50%', background: 'white', boxShadow: 'var(--shadow-md)', cursor: 'pointer', color: 'var(--text-main)' }}><ArrowDown size={18} /></button>}
 
             {/* Input Area */}
@@ -1123,32 +1177,34 @@ export default function DashboardClient() {
                 </div>
               )}
 
-              <div style={{ position: 'relative', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', transition: 'all 0.3s' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', transition: 'all 0.3s', overflow: 'hidden' }}>
                 <textarea 
+                  ref={promptInputRef}
+                  rows={1}
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onChange={(e) => { setPrompt(e.target.value); resizePromptInput(e.currentTarget); }}
                   onKeyDown={handleKeyDown}
                   placeholder={activeTaskId ? "在此文件基础上，继续补充处理需求..." : "上传 Excel、Word 或 PPT 文档并描述您的需求..."}
-                  style={{ width: '100%', minHeight: '60px', maxHeight: '200px', padding: '16px 48px 16px 48px', border: 'none', borderRadius: 'var(--radius-lg)', resize: 'none', outline: 'none', fontSize: '1rem', lineHeight: '1.5', background: 'transparent' }}
+                  style={{ display: 'block', width: '100%', height: '40px', minHeight: '40px', maxHeight: '200px', padding: '6px 16px 2px', overflowY: 'hidden', border: 'none', resize: 'none', outline: 'none', fontSize: '1rem', lineHeight: '26px', background: 'transparent' }}
                 />
-                
-                {/* Upload Button */}
-                <div style={{ position: 'absolute', left: '12px', bottom: '12px' }}>
+
+                <div style={{ minHeight: '44px', padding: '4px 12px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {/* Upload Button */}
                   <input type="file" id="file-upload" accept=".pdf,.xlsx,.xls,.csv,.docx,.pptx,.png,.jpg,.jpeg,.webp" onChange={handleFileChange} style={{ display: 'none' }} />
                   <label htmlFor="file-upload" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: 'var(--background)', color: 'var(--text-muted)', transition: 'all 0.2s' }}>
                     <Paperclip size={18} />
                   </label>
-                </div>
 
-                {/* Send / Stop Button */}
-                <button 
-                  onClick={isGenerating ? handleCancel : handleProcess}
-                  disabled={!isGenerating && !prompt.trim()}
-                  title={isGenerating ? '停止生成' : '发送'}
-                  style={{ position: 'absolute', right: '12px', bottom: '12px', minWidth: isGenerating ? '88px' : '32px', height: '32px', padding: isGenerating ? '0 11px' : 0, borderRadius: isGenerating ? '8px' : '50%', background: isGenerating ? '#ef4444' : prompt.trim() ? 'var(--primary)' : 'var(--background)', color: isGenerating || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: isGenerating || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isGenerating ? '6px' : 0, transition: 'all 0.2s', fontWeight: 600, fontSize: '0.8rem' }}
-                >
-                  {isGenerating ? <><StopCircle size={16} /> 停止生成</> : <Send size={16} style={{ marginLeft: '2px' }} />}
-                </button>
+                  {/* Send / Stop Button */}
+                  <button
+                    onClick={isGenerating ? handleCancel : handleProcess}
+                    disabled={!isGenerating && !prompt.trim()}
+                    title={isGenerating ? '停止生成' : '发送'}
+                    style={{ minWidth: isGenerating ? '88px' : '32px', height: '32px', padding: isGenerating ? '0 11px' : 0, borderRadius: isGenerating ? '8px' : '50%', background: isGenerating ? '#ef4444' : prompt.trim() ? 'var(--primary)' : 'var(--background)', color: isGenerating || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: isGenerating || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isGenerating ? '6px' : 0, transition: 'all 0.2s', fontWeight: 600, fontSize: '0.8rem' }}
+                  >
+                    {isGenerating ? <><StopCircle size={16} /> 停止生成</> : <Send size={16} style={{ marginLeft: '2px' }} />}
+                  </button>
+                </div>
               </div>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
                 支持 PDF、Excel、Word、PPT 和常见图片。你可以连续发送多条指令在同一个文档上叠加操作。
@@ -1156,7 +1212,7 @@ export default function DashboardClient() {
             </div>
           </div>
 
-        {/* Right Panel: real OfficeCLI preview */}
+        {/* Right Panel: OfficeGPT document preview */}
         {showRightPanel && (
           <div ref={previewPanelRef} style={{ flex: 1, minWidth: 0, width: previewFullscreen ? '100vw' : undefined, height: previewFullscreen ? '100vh' : undefined, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
             <div style={{ minHeight: '58px', padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1189,7 +1245,7 @@ export default function DashboardClient() {
                     <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       下载
                     </a>
-                  ) : <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>正在生成，预览会随 OfficeCLI 的渲染实时更新…</div>}
+                  ) : <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>正在生成，预览会随 OfficeGPT 文档引擎实时更新…</div>}
                 </div>
               )}
             </div>

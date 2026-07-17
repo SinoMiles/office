@@ -139,6 +139,17 @@ test('server workspace paths never reach user-visible assistant text', () => {
   assert.equal(sanitizeAssistantText(inline), '文件已保存到 report.xlsx，请下载。');
 });
 
+test('internal document engine branding and installation probes never reach the UI', () => {
+  assert.equal(sanitizeAssistantText('我先确认 officecli 是否安装，然后开始创建 PPT。'), '然后开始创建 PPT。');
+  assert.equal(sanitizeAssistantText('使用 Office CLI 创建并验证文件。'), '使用 OfficeGPT 创建并验证文件。');
+  const [assistant] = mapMessagesToUi([
+    { msg_id: 'thinking-brand', type: 'thinking', content: { description: '检查 officecli 是否可用。' } },
+    { msg_id: 'text-brand', type: 'text', content: { content: 'OfficeCLI 已完成文件生成。' } },
+  ], { isProcessing: false });
+  assert.doesNotMatch(JSON.stringify(assistant), /office\s*cli/i);
+  assert.match(assistant.content, /OfficeGPT/);
+});
+
 test('AionCore HTTP history positions normalize into user and assistant roles', () => {
   const normalized = normalizeHistoryMessages([
     { msg_id: 'user', position: 'right', type: 'text', content: { content: '问题' } },

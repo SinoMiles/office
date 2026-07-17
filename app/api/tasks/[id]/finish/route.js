@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import Task from '@/models/Task';
+import { reconcileTaskArtifacts } from '@/lib/workspace/artifact-reconcile';
+import { taskArtifactViews } from '@/lib/office/artifacts';
 
 export async function PUT(request, { params }) {
   try {
@@ -21,13 +23,14 @@ export async function PUT(request, { params }) {
     task.runtime.state = 'completed';
     task.runtime.updatedAt = new Date();
     if (body.text) task.runtime.streamedText = body.text;
+    await reconcileTaskArtifacts(task);
     for (const artifact of task.artifacts || []) {
       artifact.status = 'ready';
       artifact.updatedAt = new Date();
     }
     await task.save();
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, artifacts: taskArtifactViews(task) });
   } catch (error) {
     console.error('Failed to finish task:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

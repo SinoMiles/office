@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { mapMessagesToUi, normalizeHistoryMessages, sliceHistoryThroughPrompts } from '@/lib/aioncore/chat-reducer';
+import { reconcileTaskArtifacts } from '@/lib/workspace/artifact-reconcile';
 
 const AIONCORE_URL = getAioncoreBaseUrl();
 
@@ -41,6 +42,21 @@ export async function GET(_request, { params }) {
       : null;
   }
   if (!turns.length) return NextResponse.json({ error: 'Task not found or permission denied' }, { status: 404 });
+  // Recover files created without a realtime Office watcher event. This is
+  // idempotent and also repairs tasks generated before reconciliation existed.
+  for (let index = 0; index < turns.length; index += 1) {
+    if (!turns[index].workspace) continue;
+    try {
+      const task = await Task.findOne({ _id: turns[index]._id, userId: user._id });
+      if (!task) continue;
+      const previousCount = task.artifacts?.length || 0;
+      await reconcileTaskArtifacts(task);
+      if ((task.artifacts?.length || 0) !== previousCount) await task.save();
+      turns[index] = task.toObject();
+    } catch (error) {
+      console.warn('[OfficeWeb:Artifacts] workspace reconciliation failed:', error.message);
+    }
+  }
   let messages = [];
   try {
     messages = await loadAionHistory(turns[turns.length - 1].aionConversationId, turns.map((turn) => turn.prompt));

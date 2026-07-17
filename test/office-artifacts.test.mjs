@@ -17,6 +17,16 @@ test('creates one preview identity per artifact', () => {
   assert.match(views[0].downloadUrl, /artifactId=ppt-1/);
 });
 
+test('non-Office artifacts use the generic workspace preview', () => {
+  const [view] = taskArtifactViews({
+    _id: 'task-md',
+    artifacts: [{ _id: 'md-1', filename: '大纲.md', filePath: '/work/大纲.md', fileType: 'markdown', status: 'ready' }],
+  });
+  assert.equal(view.generic, true);
+  assert.equal(view.previewType, 'markdown');
+  assert.match(view.previewUrl, /workspace\/file\?path=/);
+});
+
 test('keeps legacy outputFile compatible', () => {
   const [view] = taskArtifactViews({ _id: 'old-task', outputFile: '/work/old.docx', outputFilename: 'old.docx' });
   assert.equal(view.id, 'old-task:legacy');
