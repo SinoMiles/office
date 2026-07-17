@@ -11,6 +11,8 @@ services:
       - .:/app
       - /app/node_modules
       - /app/.next
+      # 保留镜像构建阶段准备好的 AionCore，避免源码挂载覆盖它。
+      - aioncore_runtime:/app/.runtime
       - ./uploads:/app/uploads
       - ./storage:/app/storage
     environment:
@@ -20,6 +22,8 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-v4-flash}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-sino_miles@foxmail.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - STORAGE_DIR=/app/storage
     command: npm run dev -- -H 0.0.0.0
     depends_on:
@@ -43,3 +47,4 @@ services:
 
 volumes:
   mongo_data:
+  aioncore_runtime:

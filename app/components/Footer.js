@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Link from 'next/link';
 
 export default function Footer() {
   return (
@@ -15,22 +16,26 @@ export default function Footer() {
         <div>
           <h4 style={{ color: 'white', marginBottom: '24px', fontSize: '1.1rem' }}>产品与服务</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.95rem' }}>
-            <a href="/#solutions" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>核心工作流</a>
-            <a href="/#pricing" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>按量计费方案</a>
-            <a href="/docs" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>帮助文档中心</a>
+            <Link href="/#solutions" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>核心工作流</Link>
+            <Link href="/#pricing" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>按量计费方案</Link>
+            <Link href="/docs" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>帮助文档中心</Link>
           </div>
         </div>
         <div>
           <h4 style={{ color: 'white', marginBottom: '24px', fontSize: '1.1rem' }}>法律与支持</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.95rem' }}>
-            <a href="/about" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>关于我们</a>
-            <a href="/privacy" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>隐私政策</a>
-            <a href="/terms" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>服务条款</a>
+            <Link href="/about" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>关于我们</Link>
+            <Link href="/privacy" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>隐私政策</Link>
+            <Link href="/terms" style={{ textDecoration: 'none', color: 'inherit', transition: 'color 0.2s' }}>服务条款</Link>
           </div>
         </div>
       </div>
-      <div className="container" style={{ borderTop: '1px solid #1e293b', paddingTop: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '16px', fontSize: '0.9rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="container" style={{ borderTop: '1px solid #1e293b', paddingTop: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '18px', fontSize: '0.9rem', maxWidth: '1200px', margin: '0 auto' }}>
         <div>© 2026 深圳市星尚硕教育科技有限公司 保留所有权利.</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.85rem' }}>
+          <Link href="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>服务条款</Link>
+          <Link href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>隐私政策</Link>
+        </div>
       </div>
     </footer>
   );

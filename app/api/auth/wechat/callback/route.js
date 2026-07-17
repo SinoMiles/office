@@ -10,6 +10,7 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
+    const embedded = searchParams.get('embed') === '1';
     
     if (!code) {
       return NextResponse.json({ error: 'Missing code' }, { status: 400 });
@@ -50,13 +51,18 @@ export async function GET(req) {
     }
 
     const token = signToken({ id: user._id, role: user.role });
-    const redirectUrl = new URL('/dashboard', req.url);
-    const response = NextResponse.redirect(redirectUrl.toString());
+    const response = embedded
+      ? new NextResponse(`<!doctype html><html><head><meta charset="utf-8"></head><body><script>window.top.location.replace('/dashboard');</script></body></html>`, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+        })
+      : NextResponse.redirect(new URL('/dashboard', req.url).toString());
     
     response.cookies.set({
       name: 'auth_token',
       value: token,
       httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 60 * 60 * 24 * 7
     });

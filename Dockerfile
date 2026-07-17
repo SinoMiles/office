@@ -13,6 +13,12 @@ COPY package*.json ./
 # 安装依赖
 RUN npm ci
 
+# 与 AionUi 的发布流程保持一致：在镜像构建阶段准备当前平台的
+# AionCore 二进制、校验信息和 managed resources。
+COPY scripts ./scripts
+COPY lib/aioncore/runtime.mjs ./lib/aioncore/runtime.mjs
+RUN npm run prepare:aioncore
+
 # 暴露端口
 EXPOSE 3000
 

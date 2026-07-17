@@ -42,7 +42,7 @@ export default async function RootLayout({ children }) {
   const isLoggedIn = !!token;
 
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" data-scroll-behavior="smooth">
       <head>
         <script
           type="application/ld+json"

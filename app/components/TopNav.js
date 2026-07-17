@@ -40,14 +40,14 @@ export default function TopNav({ isLoggedIn }) {
     }
     return (
       <nav style={{ padding: '0 24px', position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(0,0,0,0.05)', height: '70px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <button onClick={() => { window.location.href = '/'; }} style={{ fontSize: '1.25rem', fontWeight: 800, border: 'none', padding: 0, background: 'transparent', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', cursor: 'pointer' }} title="OfficeGPT 首页">
             <span style={{ color: 'var(--primary)', fontSize: '1.4rem' }}>✦</span> OfficeGPT
           </button>
-          <button onClick={() => setSidebarCollapsed(true)} title="收起左侧导航" aria-label="收起左侧导航" style={{ width: '36px', height: '36px', border: 'none', background: 'transparent', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <PanelLeftClose size={20} />
-          </button>
         </div>
+        <button onClick={() => setSidebarCollapsed(true)} title="收起左侧导航" aria-label="收起左侧导航" style={{ width: '36px', height: '36px', position: 'absolute', left: '228px', border: 'none', background: 'rgba(255, 255, 255, 0.92)', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+          <PanelLeftClose size={20} />
+        </button>
       </nav>
     );
   }

@@ -1,42 +1,18 @@
-'use client';
-import { ArrowLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import LegalDocument from '@/app/components/LegalDocument';
+
+const sections = [
+  { title: '1. 条款的接受与适用', content: ['欢迎使用 OfficeGPT。本条款是您与深圳市星尚硕教育科技有限公司之间关于访问和使用 OfficeGPT 网站、应用程序、API 及相关服务的协议。', '注册、登录或实际使用本服务，即表示您已阅读并同意本条款及隐私政策。若您代表组织使用本服务，应确保已获得该组织的有效授权。'] },
+  { title: '2. 账户与安全', content: ['您应提供真实、准确的注册信息，并妥善保管密码、微信登录凭据及其他账户信息。通过您账户进行的操作原则上视为由您本人完成。', '发现账户被未经授权使用时，请及时修改密码并联系平台。不得转让、出租、出售账户或以其他方式规避平台的账户与权限管理。'] },
+  { title: '3. 服务内容与 AI 输出', content: ['本服务提供 AI 对话、文档生成、编辑、转换、预览及办公自动化能力。具体功能、支持格式和可用模型可能随版本调整。', '人工智能生成结果可能存在错误、遗漏或不适用于特定场景。您应在使用、发布或据此作出决定前进行人工审核；对于法律、医疗、财务等专业事项，应咨询具备资质的专业人士。'] },
+  { title: '4. 用户内容与授权', content: ['您保留对上传文件、提示词和生成内容依法享有的权利，并保证您有权处理这些内容。', '为完成您发起的任务，您授予平台在服务期间处理、转换、暂存和向您选择的模型服务商传输相关内容的必要许可。除提供服务、保障安全或履行法律义务外，平台不会擅自使用您的内容。'] },
+  { title: '5. 使用规范', content: ['不得使用本服务从事违法犯罪、侵犯他人权益、传播恶意程序、绕过安全机制、干扰服务运行或未经授权访问系统与数据的活动。', '若发现违规使用或安全风险，平台可以采取限制功能、暂停任务、冻结账户或终止服务等必要措施，并依法保存或提供相关记录。'] },
+  { title: '6. 计费、Credits 与退款', content: ['部分功能按照 Credits、模型用量或页面公示的方案计费。实际扣费可能受到模型、输入输出长度、缓存命中和会员等级等因素影响。', '充值前请确认金额和用途。除法律另有规定、重复扣款或平台原因导致服务无法交付外，已消耗的 Credits 通常不支持退款。支付由相应支付机构处理，并同时适用其规则。'] },
+  { title: '7. 知识产权', content: ['OfficeGPT 的软件、界面、商标、文档及平台自有内容受法律保护。未经许可，不得复制、反向工程、出售或制作具有混淆性的衍生服务，但开源组件的使用依其各自许可证执行。'] },
+  { title: '8. 服务变更与责任限制', content: ['平台会尽力保障服务稳定和数据安全，但互联网、第三方模型及支付服务可能出现中断或延迟。平台将在合理范围内修复问题并提供必要通知。', '在法律允许的范围内，平台不对因您未审核 AI 输出、违规使用、第三方服务故障或不可抗力造成的间接损失承担责任。依法不能排除的责任不受本条限制。'] },
+  { title: '9. 终止与争议处理', content: ['您可以停止使用服务并申请注销账户。终止后，依法应保留的交易、安全和审计记录可能在法定期限内继续保存。', '本条款适用中华人民共和国法律。发生争议时，双方应先友好协商；协商不成的，依法向有管辖权的人民法院提起诉讼。'] },
+  { title: '10. 条款更新与联系我们', content: ['因法律、功能或业务变化需要更新条款时，平台会通过页面公告等合理方式提示。重大变更将在生效前给予合理通知。', '对本条款有疑问，可通过平台公布的客服渠道联系我们。'] },
+];
 
 export default function TermsOfService() {
-  const router = useRouter();
-  
-  return (
-    <main style={{ minHeight: '100vh', padding: '60px 24px', background: 'var(--background)' }}>
-      <div className="container" style={{ maxWidth: '800px', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: 'var(--shadow-md)' }}>
-        <button onClick={() => router.back()} className="btn btn-outline" style={{ marginBottom: '32px', padding: '8px 16px', borderRadius: '12px' }}>
-          <ArrowLeft size={16} /> 返回
-        </button>
-        
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '24px' }}>服务条款</h1>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>最后更新时间：2026年7月</p>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', lineHeight: 1.8, color: 'var(--text-main)' }}>
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>1. 接受条款</h2>
-            <p>欢迎使用 OfficeGPT（以下简称“本服务”）。通过访问或使用本服务，即表示您已阅读、理解并同意接受本服务条款的所有内容。如果您不同意这些条款的任何部分，请立即停止使用本服务。</p>
-          </section>
-          
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>2. 服务描述</h2>
-            <p>本服务提供基于人工智能的文档处理与自动化工具。服务按“现状”和“现有”基础提供，我们保留在不事先通知的情况下修改、暂停或终止任何服务功能的权利。</p>
-          </section>
-          
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>3. 用户行为准则</h2>
-            <p>您承诺不在使用本服务时进行任何违法、侵权或破坏性的行为。您不得利用本服务处理包含违法内容、淫秽色情或侵犯他人知识产权的文档。我们保留随时封禁违规账户的权利，而无需退还任何费用。</p>
-          </section>
-          
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>4. 费用与退款</h2>
-            <p>我们采用按量计费 (Token-based) 的收费模式。所有充值款项均为最终消费，除非法律强制要求，否则我们不提供退款服务。请您在充值前谨慎评估自己的使用需求。</p>
-          </section>
-        </div>
-      </div>
-    </main>
-  );
+  return <LegalDocument title="服务条款" intro="请在使用 OfficeGPT 前仔细阅读以下条款。" sections={sections} />;
 }

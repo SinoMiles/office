@@ -1,3 +1,5 @@
+import DashboardClient from './DashboardClient';
+
 export const metadata = {
   title: '工作台 | OfficeGPT',
   robots: {
@@ -7,5 +9,9 @@ export const metadata = {
 }
 
 export default function DashboardLayout({ children }) {
-  return children;
+  return (
+    <DashboardClient>
+      {children}
+    </DashboardClient>
+  );
 }

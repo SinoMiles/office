@@ -27,6 +27,14 @@ npm run dev
 
 缓存位于 `.runtime/aioncore/<version>/<platform>-<arch>/`，不会提交到 Git。生产镜像应在构建阶段执行准备命令。也可以设置 `AIONCORE_BIN=/absolute/path/to/aioncore` 使用服务器预装版本，或设置 `AIONCORE_MANAGED=0` 与 `AIONCORE_URL` 连接外部进程。
 
+## Initial administrator
+
+新数据库会在首次连接时自动创建管理员。默认邮箱为 `sino_miles@foxmail.com`，可通过 `ADMIN_EMAIL` 覆盖。建议在部署环境设置 `ADMIN_PASSWORD`；如果留空，服务会生成高强度临时密码并仅在首次启动日志中输出一次：
+
+```bash
+docker compose logs web | grep "Generated one-time administrator password"
+```
+
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

@@ -1,42 +1,18 @@
-'use client';
-import { ArrowLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import LegalDocument from '@/app/components/LegalDocument';
+
+const sections = [
+  { title: '1. 我们收集的信息', content: ['账户信息：包括邮箱、加密后的密码、微信 OpenID（选择微信登录时）、账户角色和会员状态。', '服务内容：包括您主动提交的提示词、上传文件、工作区文件、对话记录及生成结果。', '使用与交易信息：包括任务状态、模型用量、Credits 余额与变动、充值订单及必要的支付状态。平台不保存您的微信支付密码或银行卡完整信息。', '技术与安全信息：包括请求时间、错误日志、设备和浏览器的基础信息，以及用于防止滥用和排查故障的记录。'] },
+  { title: '2. 信息的使用目的', content: ['我们使用相关信息来创建和保护账户、执行文档处理任务、展示历史记录、计算用量、完成支付结算、提供客服支持，以及检测欺诈、滥用和系统故障。', '未经另行明确同意，我们不会将您的私人文件或对话用于训练面向其他用户的通用模型。'] },
+  { title: '3. AI 模型与第三方服务', content: ['为完成您选择的任务，相关提示词和必要文件可能发送给您配置或平台提供的模型服务商。第三方将依据其服务条款和隐私规则处理这些数据。', '微信登录和微信支付分别由微信开放平台及微信支付提供。扫码或付款时，微信会按照其规则处理设备、账户和交易信息。我们仅接收完成登录或确认支付所需的信息。'] },
+  { title: '4. Cookie 与登录状态', content: ['我们使用 HttpOnly Cookie 保存登录状态，以维持会话并防止客户端脚本直接读取凭据。浏览器可能同时保存界面偏好等必要信息。', '您可以清除 Cookie 或退出登录；清除后可能需要重新验证身份。'] },
+  { title: '5. 存储期限与删除', content: ['账户和任务数据在提供服务所需期限内保存。临时文件、日志和失败任务会根据运行、安全和备份策略定期清理；交易记录可能依据法律和财务要求保存更长时间。', '您可以删除任务和工作区文件，或通过客服渠道申请注销账户。收到请求并完成身份验证后，我们将在合理期限内处理，但法律要求保留或安全调查所需的数据除外。'] },
+  { title: '6. 数据安全', content: ['我们通过访问控制、密码哈希、传输加密、隔离运行目录、日志审计和最小权限等措施降低数据风险。', '任何系统都无法保证绝对安全。若发生可能影响您权益的数据安全事件，我们将依法采取补救措施并进行通知。'] },
+  { title: '7. 信息共享与披露', content: ['除完成您请求的服务、使用必要的基础设施与支付服务、取得您的授权，或履行法律义务外，我们不会出售您的个人信息，也不会无关地向第三方披露您的文件内容。', '服务供应商只能在受约束的范围内处理数据，并应采取与其处理活动相适应的安全措施。'] },
+  { title: '8. 您的权利', content: ['在适用法律范围内，您可以查询、更正或删除个人信息，撤回可撤回的授权，申请注销账户，或要求说明个人信息处理规则。', '为保护账户安全，我们可能需要在响应请求前验证您的身份。某些请求可能因法律义务、交易争议或安全需要而受到合理限制。'] },
+  { title: '9. 未成年人保护', content: ['若您是未成年人，应在监护人阅读并同意本政策后使用服务。我们不会主动面向不具备相应民事行为能力的未成年人收集非必要信息。'] },
+  { title: '10. 政策更新与联系我们', content: ['我们可能因功能、法律或数据处理方式变化更新本政策。重大变化会通过页面公告等合理方式提示。', '如需行使数据权利或咨询隐私问题，可通过平台公布的客服渠道联系我们。'] },
+];
 
 export default function PrivacyPolicy() {
-  const router = useRouter();
-  
-  return (
-    <main style={{ minHeight: '100vh', padding: '60px 24px', background: 'var(--background)' }}>
-      <div className="container" style={{ maxWidth: '800px', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: 'var(--shadow-md)' }}>
-        <button onClick={() => router.back()} className="btn btn-outline" style={{ marginBottom: '32px', padding: '8px 16px', borderRadius: '12px' }}>
-          <ArrowLeft size={16} /> 返回
-        </button>
-        
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '24px' }}>隐私政策</h1>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>最后更新时间：2026年7月</p>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', lineHeight: 1.8, color: 'var(--text-main)' }}>
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>1. 信息收集</h2>
-            <p>我们仅收集为您提供服务所必需的最少信息，包括但不限于您的注册邮箱以及您主动上传用于处理的文档。所有的文档在通过底层沙盒引擎处理完成后，均不会被用于任何商业用途或模型训练。</p>
-          </section>
-          
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>2. 数据安全</h2>
-            <p>我们采用业界标准的高级加密技术来保护您的数据安全。您的文件在传输过程中受到 TLS 加密保护，在存储状态下（如您选择持久化保存）使用 AES-256 加密。执行脚本的环境位于完全隔离的沙箱内。</p>
-          </section>
-          
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>3. 信息共享</h2>
-            <p>我们郑重承诺，绝不出售、出租或以任何形式向第三方泄露您的个人信息和文档内容。除遵守相关法律法规或响应合法强制性要求外，您的数据仅对您个人可见。</p>
-          </section>
-          
-          <section>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>4. 您的权利</h2>
-            <p>您随时有权访问、修改或要求删除您的个人数据和历史记录。如果您希望注销账户并清除所有足迹，可以通过联系支持邮箱提出请求，我们会在验证后立即执行。</p>
-          </section>
-        </div>
-      </div>
-    </main>
-  );
+  return <LegalDocument title="隐私政策" intro="本政策说明 OfficeGPT 如何收集、使用、保存和保护您的信息。" sections={sections} />;
 }
