@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '../i18n/I18nProvider';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -17,7 +19,7 @@ export default function RegisterPage() {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('两次密码输入不一致');
+      setError(t('auth.passwordMismatch'));
       setLoading(false);
       return;
     }
@@ -37,7 +39,7 @@ export default function RegisterPage() {
         setError(data.error);
       }
     } catch (err) {
-      setError('网络错误');
+      setError(t('auth.networkError'));
     } finally {
       setLoading(false);
     }
@@ -50,14 +52,14 @@ export default function RegisterPage() {
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
             <span style={{ color: 'var(--primary)' }}>✦</span> OfficeGPT
           </div>
-          <p style={{ color: 'var(--text-muted)' }}>注册新账号，免费获赠 10,000 Credits</p>
+          <p style={{ color: 'var(--text-muted)' }}>{t('auth.registerIntro')}</p>
         </div>
 
         {error && <div style={{ padding: '12px', background: '#fee2e2', color: '#ef4444', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '0.9rem' }}>{error}</div>}
 
         <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>邮箱</label>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>{t('auth.email')}</label>
             <input 
               type="email" 
               className="input-base" 
@@ -68,35 +70,35 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>密码</label>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>{t('auth.password')}</label>
             <input 
               type="password" 
               className="input-base" 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               required 
-              placeholder="设置一个安全的密码"
+              placeholder={t('auth.passwordPlaceholder')}
             />
           </div>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>确认密码</label>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>{t('auth.confirmPassword')}</label>
             <input 
               type="password" 
               className="input-base" 
               value={confirmPassword} 
               onChange={e => setConfirmPassword(e.target.value)} 
               required 
-              placeholder="再次输入密码"
+              placeholder={t('auth.confirmPlaceholder')}
             />
           </div>
           <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', marginTop: '8px' }} disabled={loading}>
-            {loading ? '注册中...' : '免费注册'}
+            {loading ? t('auth.registering') : t('auth.register')}
           </button>
         </form>
         
         <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.9rem' }}>
-          <span style={{ color: 'var(--text-muted)' }}>已有账号？</span>{' '}
-          <a href="/login" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>去登录</a>
+          <span style={{ color: 'var(--text-muted)' }}>{t('auth.hasAccount')}</span>{' '}
+          <a href="/login" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>{t('auth.goLogin')}</a>
         </div>
       </div>
     </div>

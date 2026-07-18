@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useI18n } from '../i18n/I18nProvider';
 
 const faqs = [
   {
@@ -24,12 +25,14 @@ const faqs = [
 
 export default function FAQ() {
   const [openIndex, setOpenIndex] = useState(0);
+  const { t } = useI18n();
+  const localizedFaqs = t('faq.items').map(([question, answer]) => ({ question, answer }));
 
   // Generate JSON-LD for AI search engines
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    "mainEntity": faqs.map(faq => ({
+    "mainEntity": localizedFaqs.map(faq => ({
       "@type": "Question",
       "name": faq.question,
       "acceptedAnswer": {
@@ -49,14 +52,14 @@ export default function FAQ() {
       
       <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h2 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '16px' }}>常见问题解答</h2>
+          <h2 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '16px' }}>{t('faq.title')}</h2>
           <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>
-            了解更多关于 OfficeGPT 的核心优势与安全机制
+            {t('faq.subtitle')}
           </p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {faqs.map((faq, index) => {
+          {localizedFaqs.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
               <div 

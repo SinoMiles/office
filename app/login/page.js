@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
+import { useI18n } from '../i18n/I18nProvider';
 
 const QR_REFRESH_MS = 4 * 60 * 1000;
 
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [qrVersion, setQrVersion] = useState(0);
   const router = useRouter();
+  const { t } = useI18n();
 
   useEffect(() => {
     const refresh = () => setQrVersion(Date.now());
@@ -55,10 +57,10 @@ export default function LoginPage() {
         if (nextPath.startsWith('/admin') && data.user.role !== 'admin') nextPath = '/dashboard';
         router.push(nextPath);
       } else {
-        setError(data.error || '登录失败，请稍后重试');
+        setError(data.error || t('auth.loginFailed'));
       }
     } catch {
-      setError('网络错误，请检查服务是否正常运行');
+      setError(t('auth.networkError'));
     } finally {
       setLoading(false);
     }
@@ -70,35 +72,35 @@ export default function LoginPage() {
         <div className={styles.formPanel}>
           <div className={styles.brand}>
             <div className={styles.logo}><span>✦</span> OfficeGPT</div>
-            <p>欢迎回来，请登录您的账户</p>
+            <p>{t('auth.welcome')}</p>
           </div>
 
           {error && <div className={styles.error} role="alert">{error}</div>}
 
           <form onSubmit={handleLogin} className={styles.form}>
             <label>
-              <span>邮箱</span>
+              <span>{t('auth.email')}</span>
               <input type="email" className="input-base" value={email} onChange={(event) => setEmail(event.target.value)} required placeholder="name@example.com" autoComplete="email" />
             </label>
             <label>
-              <span>密码</span>
+              <span>{t('auth.password')}</span>
               <input type="password" className="input-base" value={password} onChange={(event) => setPassword(event.target.value)} required placeholder="••••••••" autoComplete="current-password" />
             </label>
             <button type="submit" className={`btn btn-primary ${styles.loginButton}`} disabled={loading}>
-              {loading ? '登录中…' : '登 录'}
+              {loading ? t('auth.signingIn') : t('auth.login')}
             </button>
           </form>
 
-          <p className={styles.register}>还没有账号？ <a href="/register">免费注册获赠 10,000 Credits</a></p>
+          <p className={styles.register}>{t('auth.noAccount')} <a href="/register">{t('auth.registerBonus')}</a></p>
         </div>
 
         <aside className={styles.wechatPanel}>
-          <div className={styles.wechatTitle}><WechatIcon /><span>微信扫码登录</span></div>
-          <p className={styles.wechatHint}>打开微信扫一扫，无需输入密码</p>
+          <div className={styles.wechatTitle}><WechatIcon /><span>{t('auth.wechat')}</span></div>
+          <p className={styles.wechatHint}>{t('auth.wechatHint')}</p>
           <div className={styles.qrFrame}>
             <iframe key={qrVersion} src={`/api/auth/wechat?embed=1${qrVersion ? `&t=${qrVersion}` : ''}`} title="微信登录二维码" scrolling="no" />
           </div>
-          <p className={styles.wechatLegal}>扫码即表示同意<a href="/terms">服务条款</a>与<a href="/privacy">隐私政策</a></p>
+          <p className={styles.wechatLegal}>{t('auth.scanAgreement')} <a href="/terms">{t('footer.terms')}</a> &amp; <a href="/privacy">{t('footer.privacy')}</a></p>
         </aside>
       </section>
     </main>

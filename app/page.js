@@ -4,9 +4,13 @@ import { ArrowRight, Zap, Shield, Sparkles, BarChart3, Clock, CheckCircle2, Mess
 import { useRouter } from 'next/navigation';
 import Footer from './components/Footer';
 import FAQ from './components/FAQ';
+import { useI18n } from './i18n/I18nProvider';
+import { homeCopy } from './i18n/homeCopy';
 
 export default function LandingPage() {
   const router = useRouter();
+  const { locale } = useI18n();
+  const copy = homeCopy[locale] || homeCopy['zh-CN'];
 
   return (
     <main style={{ overflowX: 'hidden' }}>
@@ -52,16 +56,16 @@ export default function LandingPage() {
           <div style={{ textAlign: 'left' }}>
             
             <h1 style={{ fontSize: 'clamp(3rem, 5vw, 5rem)', fontWeight: 800, lineHeight: 1.1, marginBottom: '24px', letterSpacing: '-0.04em', animation: 'slideUp 0.6s ease-out' }}>
-              与你的数据 <br />
+              {copy.hero[0]} <br />
               <span style={{ position: 'relative', display: 'inline-block' }}>
-                <span className="text-gradient">直接对话</span>
+                <span className="text-gradient">{copy.hero[1]}</span>
                 {/* Sparkle decorative element */}
                 <div style={{ position: 'absolute', top: '-10px', right: '-30px', color: '#fbbf24', animation: 'pulse 2s infinite' }}><Sparkles size={32} /></div>
               </span>
             </h1>
             
             <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '48px', maxWidth: '600px', lineHeight: 1.6, animation: 'slideUp 0.7s ease-out', fontWeight: 400 }}>
-              OfficeGPT 彻底颠覆传统办公软件的交互方式。无需记忆任何函数公式，告别繁琐的下拉菜单。只需输入自然语言，AI 将在数秒内为你完成一切复杂运算与排版。
+              {copy.hero[2]}
             </p>
             
             <div style={{ display: 'flex', gap: '20px', animation: 'slideUp 0.8s ease-out' }}>
@@ -70,7 +74,7 @@ export default function LandingPage() {
                 className="btn btn-primary" 
                 style={{ padding: '18px 40px', fontSize: '1.1rem', borderRadius: 'var(--radius-full)', boxShadow: '0 8px 30px rgba(16, 185, 129, 0.3)', textDecoration: 'none' }}
               >
-                免费体验 <ArrowRight size={20} />
+                {copy.hero[3]} <ArrowRight size={20} />
               </a>
             </div>
           </div>
@@ -127,9 +131,9 @@ export default function LandingPage() {
       <section id="solutions" style={{ padding: '120px 24px', background: 'white', position: 'relative', overflow: 'hidden' }}>
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '80px', position: 'relative', zIndex: 2 }}>
-            <div style={{ display: 'inline-block', color: 'var(--primary)', fontWeight: 700, marginBottom: '16px', padding: '8px 16px', background: 'var(--primary-light)', borderRadius: '20px', fontSize: '0.9rem' }}>工作流革命</div>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>像聊天一样，搞定繁琐数据</h2>
-            <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto' }}>打破软件操作壁垒，将您的意图直接转化为精准的计算结果。</p>
+            <div style={{ display: 'inline-block', color: 'var(--primary)', fontWeight: 700, marginBottom: '16px', padding: '8px 16px', background: 'var(--primary-light)', borderRadius: '20px', fontSize: '0.9rem' }}>{copy.workflow[0]}</div>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>{copy.workflow[1]}</h2>
+            <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto' }}>{copy.workflow[2]}</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px', position: 'relative', maxWidth: '1100px', margin: '0 auto', zIndex: 2 }}>
@@ -139,8 +143,8 @@ export default function LandingPage() {
               <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, var(--primary) 0%, #10b981 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)', marginBottom: '24px', transform: 'rotate(-5deg)' }}>
                 <Database size={32} />
               </div>
-              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>1. 丢入任何杂乱数据</h3>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>一键上传您的 Excel、Word 或 PPT 文件。底层沙箱环境瞬间接管数据结构，确保绝对的隐私安全与极速解析。</p>
+              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>{copy.steps[0][0]}</h3>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>{copy.steps[0][1]}</p>
             </div>
 
             {/* Step 2 */}
@@ -148,8 +152,8 @@ export default function LandingPage() {
               <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(59,130,246,0.4)', marginBottom: '24px', transform: 'rotate(5deg)' }}>
                 <Bot size={32} />
               </div>
-              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>2. 输入自然语言指令</h3>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>告诉 AI：“把 C 列的电话号码去重，如果 D 列是空值则填充为未知，最后生成根据城市汇总的柱状图。”</p>
+              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>{copy.steps[1][0]}</h3>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>{copy.steps[1][1]}</p>
             </div>
 
             {/* Step 3 */}
@@ -157,8 +161,8 @@ export default function LandingPage() {
               <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(139,92,246,0.4)', marginBottom: '24px', transform: 'rotate(-5deg)' }}>
                 <Workflow size={32} />
               </div>
-              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>3. 秒级实时渲染反馈</h3>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>基于自研的底层驱动引擎，所有复杂的宏与公式被瞬间执行，修改后的成品文档将实时展现在你眼前。</p>
+              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>{copy.steps[2][0]}</h3>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>{copy.steps[2][1]}</p>
             </div>
           </div>
         </div>
@@ -170,45 +174,39 @@ export default function LandingPage() {
       <section id="pricing" style={{ padding: '120px 24px', background: 'white' }}>
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>按量计费，童叟无欺</h2>
-            <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto' }}>拒绝强制包月，用多少算多少，极大降低您的试错成本。</p>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>{copy.pricing[0]}</h2>
+            <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto' }}>{copy.pricing[1]}</p>
           </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '40px', maxWidth: '1000px', margin: '0 auto' }}>
             
             {/* Free Tier */}
             <div className="pricing-card" style={{ padding: '56px 40px', border: '1px solid var(--border)', borderRadius: '32px' }}>
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 700 }}>免费体验版</h3>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 700 }}>{copy.pricing[2]}</h3>
               <div style={{ fontSize: '3.5rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-0.04em' }}>¥ 0</div>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>适合尝鲜用户，立刻体验 AI 办公的魅力。</p>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>{copy.pricing[3]}</p>
               
               <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 48px 0', display: 'flex', flexDirection: 'column', gap: '20px', fontSize: '1.05rem' }}>
-                <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>注册即送 10,000 Credits</span></li>
-                <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>基础数据分析指令支持</span></li>
-                <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>支持最大 10MB 的文档</span></li>
-                <li style={{ display: 'flex', gap: '16px', alignItems: 'center', color: 'var(--text-muted)' }}><Shield size={24} /> <span>无专属技术支持</span></li>
+                {copy.free.map((item, index) => <li key={item} style={{ display: 'flex', gap: '16px', alignItems: 'center', color: index === 3 ? 'var(--text-muted)' : undefined }}>{index === 3 ? <Shield size={24} /> : <CheckCircle2 size={24} color="var(--primary)" />} <span>{item}</span></li>)}
               </ul>
               
-              <a href="/api/auth/entry" className="btn btn-outline" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '16px', textDecoration: 'none' }}>免费注册</a>
+              <a href="/api/auth/entry" className="btn btn-outline" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '16px', textDecoration: 'none' }}>{copy.pricing[4]}</a>
             </div>
 
             {/* Pro Tier (Animated Border) */}
             <div className="animated-border">
-              <div style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%)', background: 'var(--primary)', color: 'white', padding: '6px 20px', borderRadius: 'var(--radius-full)', fontSize: '0.9rem', fontWeight: 'bold', zIndex: 10, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)' }}>最受欢迎</div>
+              <div style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%)', background: 'var(--primary)', color: 'white', padding: '6px 20px', borderRadius: 'var(--radius-full)', fontSize: '0.9rem', fontWeight: 'bold', zIndex: 10, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)' }}>{copy.pricing[5]}</div>
               
               <div style={{ background: 'white', padding: '56px 40px', borderRadius: '24px', height: '100%' }}>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 700 }}>专业版 (Pro)</h3>
-                <div style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-0.02em', color: 'var(--primary)', marginTop: '20px' }}>按真实用量计费</div>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>面向专业职场人，随时充值，解锁全部高级功能。</p>
+                <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 700 }}>{copy.pricing[6]}</h3>
+                <div style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-0.02em', color: 'var(--primary)', marginTop: '20px' }}>{copy.pricing[7]}</div>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>{copy.pricing[8]}</p>
                 
                 <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 48px 0', display: 'flex', flexDirection: 'column', gap: '20px', fontSize: '1.05rem' }}>
-                  <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span style={{ fontWeight: 600 }}>输入、输出 Token 分项透明结算</span></li>
-                  <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>无限轮次的多文件联合对话</span></li>
-                  <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>解锁 Deepseek V3 推理极速版</span></li>
-                  <li style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>7x24 小时专属客户成功团队</span></li>
+                  {copy.pro.map((item) => <li key={item} style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>{item}</span></li>)}
                 </ul>
                 
-                <button className="btn btn-primary" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '16px', boxShadow: '0 8px 24px rgba(16,185,129,0.3)' }} onClick={() => router.push('/login')}>立即充值使用</button>
+                <button className="btn btn-primary" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '16px', boxShadow: '0 8px 24px rgba(16,185,129,0.3)' }} onClick={() => router.push('/login')}>{copy.pricing[9]}</button>
               </div>
             </div>
             

@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
-import { previewType, resolveWorkspaceEntry, taskWorkspace } from '@/lib/workspace/path-policy';
+import { isUserVisibleDocument, previewType, resolveWorkspaceEntry, taskWorkspace } from '@/lib/workspace/path-policy';
 import Task from '@/models/Task';
 
 export const runtime = 'nodejs';
@@ -23,6 +23,7 @@ async function walk(root) {
       const relativePath = path.join(relativeDir, entry.name);
       if (entry.isDirectory()) queue.push(relativePath);
       else if (entry.isFile()) {
+        if (!isUserVisibleDocument(entry.name)) continue;
         const stat = await fs.stat(path.join(root, relativePath)).catch(() => null);
         result.push({ path: relativePath.split(path.sep).join('/'), name: entry.name, size: stat?.size || 0, updatedAt: stat?.mtime?.toISOString(), previewType: previewType(entry.name) });
       }

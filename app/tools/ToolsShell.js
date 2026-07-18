@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { ChevronDown, Grid2X2, Sparkles } from 'lucide-react';
 import { toolCategories } from '@/lib/toolsData';
 import styles from './tools-shell.module.css';
+import { useI18n } from '@/app/i18n/I18nProvider';
+import { localizedToolName } from '@/app/i18n/toolNames';
 
 function categoryForPath(pathname) {
   return toolCategories.find((category) =>
@@ -15,27 +17,28 @@ function categoryForPath(pathname) {
 
 export default function ToolsShell({ children }) {
   const pathname = usePathname();
+  const { locale, t } = useI18n();
   const activeCategory = categoryForPath(pathname);
   const [openCategory, setOpenCategory] = useState(() => activeCategory || toolCategories[0]?.title);
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar} aria-label="文档工具导航">
+      <aside className={styles.sidebar} aria-label={t('tools.nav')}>
         <div className={styles.brandRow}>
           <Link href="/tools" className={styles.brandLink}>
             <span className={styles.brandIcon}><Sparkles size={18} /></span>
             <span>
-              <strong>文档工具</strong>
-              <small>免费在线处理</small>
+              <strong>{t('tools.shellTitle')}</strong>
+              <small>{t('tools.freeOnline')}</small>
             </span>
           </Link>
-          <Link href="/tools" className={styles.allTools} aria-label="返回全部工具">
+          <Link href="/tools" className={styles.allTools} aria-label={t('tools.backAll')}>
             <Grid2X2 size={17} />
           </Link>
         </div>
 
         <nav className={styles.categoryNav}>
-          {toolCategories.map((category) => {
+          {toolCategories.map((category, categoryIndex) => {
             const isOpen = openCategory === category.title;
             const isCurrent = activeCategory === category.title;
             return (
@@ -48,7 +51,7 @@ export default function ToolsShell({ children }) {
                 >
                   <span className={styles.categoryIdentity}>
                     <span className={styles.categoryIcon} style={{ background: category.color }}>{category.icon}</span>
-                    <span>{category.title}</span>
+                    <span>{t('tools.categories')[categoryIndex]}</span>
                   </span>
                   <ChevronDown className={styles.chevron} data-open={isOpen} size={16} />
                 </button>
@@ -70,7 +73,7 @@ export default function ToolsShell({ children }) {
                             }}
                           >
                             <span className={styles.toolIcon}>{tool.icon}</span>
-                            <span className={styles.toolName}>{tool.name}</span>
+                            <span className={styles.toolName}>{localizedToolName(tool, locale)}</span>
                           </Link>
                         );
                       })}
@@ -84,7 +87,7 @@ export default function ToolsShell({ children }) {
 
         <Link href="/dashboard" className={styles.aiLink}>
           <span className={styles.aiIcon}><Sparkles size={17} /></span>
-          <span><strong>Office AI</strong><small>复杂任务交给 AI</small></span>
+          <span><strong>Office AI</strong><small>{t('tools.aiComplex')}</small></span>
         </Link>
       </aside>
       <main className={styles.content}>{children}</main>

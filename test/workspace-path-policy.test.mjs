@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeWorkspacePath, previewType, resolveWorkspaceEntry } from '../lib/workspace/path-policy.js';
+import { isUserVisibleDocument, normalizeWorkspacePath, previewType, resolveWorkspaceEntry } from '../lib/workspace/path-policy.js';
 
 test('workspace paths reject traversal and unrelated absolute paths', () => {
   assert.throws(() => resolveWorkspaceEntry('/tmp/work', '../secret'), /PATH_OUTSIDE_WORKSPACE/);
   assert.throws(() => resolveWorkspaceEntry('/tmp/work', '/etc/passwd'), /PATH_OUTSIDE_WORKSPACE/);
   assert.equal(resolveWorkspaceEntry('/tmp/work', 'slides/report.pptx').candidate, '/tmp/work/slides/report.pptx');
+});
+
+test('only user-facing Office, PDF, and Markdown files appear as artifacts', () => {
+  for (const filename of ['report.docx', 'data.xlsx', 'slides.pptx', 'brief.pdf', 'notes.md']) assert.equal(isUserVisibleDocument(filename), true);
+  for (const filename of ['build.sh', 'helper.py', 'state.json', 'debug.log']) assert.equal(isUserVisibleDocument(filename), false);
 });
 
 test('macOS private temporary paths normalize to one identity', () => {

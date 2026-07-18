@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown, Loader2, XCircle } from 'lucide-react';
+import { useI18n } from '@/app/i18n/I18nProvider';
+import { dashboardExtra } from '@/app/i18n/dashboardCopy';
 
-function elapsed(startedAt, now) {
+function elapsed(startedAt, now, copy) {
   const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
-  return seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+  return seconds < 60 ? `${seconds} ${copy.second}` : `${Math.floor(seconds / 60)} ${copy.minute} ${seconds % 60} ${copy.second}`;
 }
 
 export default function TaskProgress({ progress }) {
+  const { locale } = useI18n(); const copy = dashboardExtra(locale);
   const [ticks, setTicks] = useState(0);
   const [manuallyCollapsed, setManuallyCollapsed] = useState(false);
   const done = Boolean(progress?.done);
@@ -33,8 +36,8 @@ export default function TaskProgress({ progress }) {
         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '9px', padding: '11px 13px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', color: '#1e3a5f' }}
       >
         <Icon size={16} className={done ? '' : 'spin-anim'} color={done ? '#16a34a' : 'var(--primary)'} />
-        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{progress.subject || '正在处理任务'}</span>
-        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{done ? `已完成 · ${elapsed(progress.startedAt, now)}` : elapsed(progress.startedAt, now)}</span>
+        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{progress.subject || copy.processing}</span>
+        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{done ? `${copy.completed} · ${elapsed(progress.startedAt, now, copy)}` : elapsed(progress.startedAt, now, copy)}</span>
         <ChevronDown size={16} style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0)', transition: 'transform .2s' }} />
       </button>
       {!collapsed && (

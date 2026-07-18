@@ -20,6 +20,8 @@ export function useAioncoreChat() {
   const conversationIdRef = useRef(null);
   const frameRef = useRef(null);
   const queueRef = useRef([]);
+  const queuedSignaturesRef = useRef(new Map());
+  const flushingRef = useRef(false);
   const taskIdRef = useRef(null);
   const workspaceRef = useRef('');
   const pendingOfficeFilesRef = useRef([]);
@@ -98,16 +100,27 @@ export function useAioncoreChat() {
   }, []);
 
   const flushMessageQueue = useCallback(() => {
+    if (flushingRef.current) return;
+    flushingRef.current = true;
     frameRef.current = null;
     const queued = queueRef.current.splice(0);
-    if (!queued.length) return;
-    chatLog('messages', `merging ${queued.length} stream event(s)`);
-    setMessages((previous) => queued.reduce(mergeStreamMessages, previous));
+    try {
+      if (!queued.length) return;
+      chatLog('messages', `merging ${queued.length} stream event(s)`);
+      setMessages((previous) => {
+        const next = queued.reduce(mergeStreamMessages, previous);
+        return next === previous ? previous : next;
+      });
+    } finally {
+      flushingRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
     const client = createAioncoreRealtimeClient();
     const officeOpenTimers = officeOpenTimersRef.current;
+    const messageQueue = queueRef.current;
+    const queuedSignatures = queuedSignaturesRef.current;
     clientRef.current = client;
     const subscriptions = [
       client.on('realtime.connected', () => applyRuntimeEvent('realtime.connected', {})),
@@ -148,6 +161,18 @@ export function useAioncoreChat() {
           chatLog('messages', `runtime-only stream event ${payload?.type || '(unknown type)'}`, payload);
           return;
         }
+        const signatureKey = `${payload.conversation_id || ''}:${payload.msg_id}:${payload.type || ''}`;
+        let signature;
+        try { signature = JSON.stringify(payload); } catch { signature = String(payload); }
+        if (queuedSignaturesRef.current.get(signatureKey) === signature) {
+          chatLog('messages', `ignored duplicate stream event ${signatureKey}`);
+          return;
+        }
+        queuedSignaturesRef.current.set(signatureKey, signature);
+        if (queuedSignaturesRef.current.size > 1000) {
+          const oldest = queuedSignaturesRef.current.keys().next().value;
+          queuedSignaturesRef.current.delete(oldest);
+        }
         queueRef.current.push(payload);
         if (!frameRef.current) frameRef.current = requestAnimationFrame(flushMessageQueue);
       }),
@@ -155,6 +180,10 @@ export function useAioncoreChat() {
     return () => {
       for (const unsubscribe of subscriptions) unsubscribe();
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      messageQueue.length = 0;
+      queuedSignatures.clear();
+      flushingRef.current = false;
       for (const timer of officeOpenTimers.values()) window.clearTimeout(timer);
       officeOpenTimers.clear();
       client.close();

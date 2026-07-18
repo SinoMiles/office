@@ -4,10 +4,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { headers } from 'next/headers';
+import { normalizeLocale } from '@/app/i18n/config';
+import { publicMetadata } from '@/app/i18n/publicSeo';
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const doc = getDocBySlug(slug);
+  const locale = normalizeLocale((await headers()).get('x-office-locale'));
   
   if (!doc) {
     return {
@@ -16,16 +20,9 @@ export async function generateMetadata({ params }) {
     }
   }
 
-  return {
-    title: `${doc.title} - 帮助文档 | OfficeGPT`,
-    description: `阅读关于 ${doc.title} 的详细介绍。OfficeGPT 官方帮助中心为您提供最权威的解答。`,
-    keywords: [doc.title, 'OfficeGPT 教程', '帮助文档'],
-    alternates: { canonical: `/docs/${doc.slug}` },
-    openGraph: {
-      title: `${doc.title} - 帮助文档 | OfficeGPT`,
-      url: `/docs/${doc.slug}`,
-    }
-  }
+  const shared = publicMetadata(locale, `/docs/${doc.slug}`);
+  const title = locale === 'zh-CN' ? `${doc.title} - 帮助文档 | OfficeGPT` : `OfficeGPT Help Center`;
+  return { ...shared, title, description: locale === 'zh-CN' ? `阅读关于 ${doc.title} 的详细介绍。` : shared.description, openGraph: { ...shared.openGraph, title } };
 }
 
 export function generateStaticParams() {

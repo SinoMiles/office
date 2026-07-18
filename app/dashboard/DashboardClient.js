@@ -16,6 +16,8 @@ import WorkspaceBrowser from '@/app/components/WorkspaceBrowser';
 import GenericFilePreview from '@/app/components/GenericFilePreview';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
 import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
+import { useI18n } from '@/app/i18n/I18nProvider';
+import { dashboardCopy, dashboardExtra, dashboardSuggestions } from '@/app/i18n/dashboardCopy';
 
 function dashboardTabFromPath(pathname) {
   if (pathname?.endsWith('/billing')) return 'billing';
@@ -23,9 +25,28 @@ function dashboardTabFromPath(pathname) {
   return 'workspace';
 }
 
+function paginationItems(page, totalPages) {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  if (page <= 4) return [1, 2, 3, 4, 5, 'end-ellipsis', totalPages];
+  if (page >= totalPages - 3) return [1, 'start-ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, 'start-ellipsis', page - 1, page, page + 1, 'end-ellipsis', totalPages];
+}
+
+function formatBillingDateTime(value, locale) {
+  const date = new Date(value);
+  return {
+    date: new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date),
+    time: new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(date),
+  };
+}
+
 export default function DashboardClient() {
   const router = useRouter();
   const pathname = usePathname();
+  const { locale, t } = useI18n();
+  const copy = dashboardCopy(locale);
+  const extra = dashboardExtra(locale);
+  const suggestionCopy = dashboardSuggestions(locale);
   const debugInstanceRef = useRef('dashboard-pending');
   const [activeTab, setActiveTab] = useState(() => dashboardTabFromPath(pathname));
   const [data, setData] = useState({ records: [], balance: 0 });
@@ -264,7 +285,7 @@ export default function DashboardClient() {
         {
           role: 'ai', content: task.runtime?.streamedText || '', loading: true,
           thought: task.runtime?.thought?.description ? task.runtime.thought : undefined,
-          progress: runtimeProgress ? { subject: runtimeProgress.title || '正在处理任务', startedAt: new Date(task.createdAt).getTime(), steps: [runtimeProgress] } : undefined,
+          progress: runtimeProgress ? { subject: runtimeProgress.title || extra.processing, startedAt: new Date(task.createdAt).getTime(), steps: [runtimeProgress] } : undefined,
         },
       ]);
       const artifacts = taskArtifactViews(task);
@@ -730,7 +751,7 @@ export default function DashboardClient() {
     return <FileSpreadsheet size={16} color="#16a34a" />; // Excel Green
   };
 
-  if (loading) return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>加载中...</div>;
+  if (loading) return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>{copy.loading}</div>;
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 73px)', background: 'var(--background)', overflow: 'hidden' }}>
@@ -739,9 +760,9 @@ export default function DashboardClient() {
       <aside style={{ width: sidebarCollapsed ? '72px' : '280px', flexShrink: 0, background: '#f9f9f9', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', transition: 'width 0.25s ease' }}>
         {sidebarCollapsed ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 10px', gap: '10px' }}>
-            <button onClick={startNewChat} title="开启新任务" style={{ width: '42px', height: '42px', borderRadius: '12px', border: '1px solid var(--border)', background: 'white', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={20} /></button>
-            <button onClick={() => navigateToTab('overview')} title="数据概览" style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'overview' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'overview' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LayoutDashboard size={19} /></button>
-            <button onClick={() => navigateToTab('billing')} title="账单与流水" style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'billing' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'billing' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CreditCard size={19} /></button>
+            <button onClick={startNewChat} title={t('dashboard.newChat')} style={{ width: '42px', height: '42px', borderRadius: '12px', border: '1px solid var(--border)', background: 'white', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={20} /></button>
+            <button onClick={() => navigateToTab('overview')} title={t('dashboard.overview')} style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'overview' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'overview' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LayoutDashboard size={19} /></button>
+            <button onClick={() => navigateToTab('billing')} title={t('dashboard.billing')} style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'billing' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'billing' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CreditCard size={19} /></button>
             <div style={{ flex: 1 }} />
             <button onClick={() => setShowUserMenu(!showUserMenu)} title={user?.username || '用户'} style={{ width: '42px', height: '42px', borderRadius: '50%', border: 'none', background: 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>{user?.username?.[0]?.toUpperCase() || 'U'}</button>
           </div>
@@ -755,25 +776,25 @@ export default function DashboardClient() {
             onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
           >
             <Plus size={18} color="var(--primary)" />
-            <span>开启新任务 (New Chat)</span>
+            <span>{t('dashboard.newChat')}</span>
           </button>
         </div>
 
         <nav style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid var(--border)' }}>
           <button onClick={() => navigateToTab('overview')} className="admin-nav-link" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderRadius: 'var(--radius-md)', color: activeTab === 'overview' ? 'var(--primary)' : 'var(--text-main)', background: activeTab === 'overview' ? 'var(--primary-light)' : 'transparent', textDecoration: 'none', fontWeight: 500, border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-            <LayoutDashboard size={18} /> 数据概览
+            <LayoutDashboard size={18} /> {t('dashboard.overview')}
           </button>
           <button onClick={() => navigateToTab('billing')} className="admin-nav-link" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderRadius: 'var(--radius-md)', color: activeTab === 'billing' ? 'var(--primary)' : 'var(--text-main)', background: activeTab === 'billing' ? 'var(--primary-light)' : 'transparent', textDecoration: 'none', fontWeight: 500, border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-            <CreditCard size={18} /> 账单与流水
+            <CreditCard size={18} /> {t('dashboard.billing')}
           </button>
         </nav>
         
         {/* History List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>历史记录 (Recent)</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('dashboard.recent')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {stats.recentTasks && stats.recentTasks.length === 0 && (
-              <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>暂无记录</div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>{copy.noRecords}</div>
             )}
             {stats.recentTasks && stats.recentTasks.map(t => (
               <div 
@@ -844,7 +865,7 @@ export default function DashboardClient() {
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
-                    title={t.isPinned ? '取消置顶' : '置顶对话'}
+                    title={t.isPinned ? copy.unpin : copy.pin}
                   >
                     {t.isPinned ? <PinOff size={14} /> : <Pin size={14} />}
                   </button>
@@ -872,7 +893,7 @@ export default function DashboardClient() {
                           onMouseOver={e=>e.currentTarget.style.background='var(--background)'}
                           onMouseOut={e=>e.currentTarget.style.background='transparent'}
                         >
-                          <Edit2 size={14} /> 重命名
+                          <Edit2 size={14} /> {copy.rename}
                         </button>
                         <button 
                           onClick={(e) => handleDeleteTask(e, t._id)}
@@ -880,7 +901,7 @@ export default function DashboardClient() {
                           onMouseOver={e=>e.currentTarget.style.background='#fee2e2'}
                           onMouseOut={e=>e.currentTarget.style.background='transparent'}
                         >
-                          <Trash2 size={14} /> 删除
+                          <Trash2 size={14} /> {copy.delete}
                         </button>
                       </div>
                     )}
@@ -900,9 +921,9 @@ export default function DashboardClient() {
               
               {/* Account Level */}
               <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--background)' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>当前套餐</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{copy.currentPlan}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
-                  <Crown size={16} color="#d97706" /> 免费版用户
+                  <Crown size={16} color="#d97706" /> {copy.freeUser}
                 </div>
               </div>
 
@@ -913,7 +934,7 @@ export default function DashboardClient() {
                   onMouseOver={e => e.currentTarget.style.background = 'var(--background)'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <Crown size={16} color="var(--primary)" /> 升级套餐 (Upgrade Plan)
+                  <Crown size={16} color="var(--primary)" /> {copy.upgrade}
                 </button>
                 <button 
                   onClick={() => { setActiveDrawer('profile'); setShowUserMenu(false); }}
@@ -921,7 +942,7 @@ export default function DashboardClient() {
                   onMouseOver={e => e.currentTarget.style.background = 'var(--background)'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <User size={16} /> 个人资料 (Profile)
+                  <User size={16} /> {copy.profile}
                 </button>
                 <button 
                   onClick={() => { setActiveDrawer('settings'); setShowUserMenu(false); }}
@@ -929,7 +950,7 @@ export default function DashboardClient() {
                   onMouseOver={e => e.currentTarget.style.background = 'var(--background)'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <Settings size={16} /> 设置 (Settings)
+                  <Settings size={16} /> {copy.settings}
                 </button>
               </div>
               
@@ -940,7 +961,7 @@ export default function DashboardClient() {
                   onMouseOver={e => e.currentTarget.style.background = '#fee2e2'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <LogOut size={16} /> 退出登录 (Log out)
+                  <LogOut size={16} /> {copy.logout}
                 </button>
               </div>
             </div>
@@ -973,7 +994,7 @@ export default function DashboardClient() {
       </aside>
 
       {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <main style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
         
         {/* Chat UI */}
         {activeTab === 'workspace' && (
@@ -987,34 +1008,34 @@ export default function DashboardClient() {
               {messages.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '0 20px' }}>
                   <Sparkles size={48} color="var(--primary)" style={{ marginBottom: '24px', opacity: 0.8 }} />
-                  <h2 style={{ marginBottom: '12px', color: 'var(--text-main)', fontSize: '1.8rem', fontWeight: 700 }}>我能帮您做什么？</h2>
-                  <p style={{ marginBottom: '40px', fontSize: '1.1rem' }}>上传 Excel、Word 或 PPT，并描述您的需求，我将为您自动完成文档处理。</p>
+                  <h2 style={{ marginBottom: '12px', color: 'var(--text-main)', fontSize: '1.8rem', fontWeight: 700 }}>{copy.emptyTitle}</h2>
+                  <p style={{ marginBottom: '40px', fontSize: '1.1rem' }}>{copy.emptyDesc}</p>
                   
                   {/* Suggestion Buttons */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', width: '100%', maxWidth: '800px' }}>
-                    <button onClick={() => setPrompt('请帮我写一份年度述职 PPT 的详细大纲，包含数据回顾和明年规划。')} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><Presentation size={18} color="#ea580c" /> 生成演示文稿</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>帮我写一份年度述职 PPT 的详细大纲，包含数据回顾...</div>
+                    <button onClick={() => setPrompt(suggestionCopy[0][1])} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><Presentation size={18} color="#ea580c" /> {copy.ppt}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{suggestionCopy[0][0]}</div>
                     </button>
-                    <button onClick={() => setPrompt('请分析这份 Excel 表格中的月度财务趋势，找出异常数据并生成总结报告。')} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><FileSpreadsheet size={18} color="#16a34a" /> 深度数据分析</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>分析 Excel 表格中的月度财务趋势，找出异常数据...</div>
+                    <button onClick={() => setPrompt(suggestionCopy[1][1])} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><FileSpreadsheet size={18} color="#16a34a" /> {copy.analysis}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{suggestionCopy[1][0]}</div>
                     </button>
-                    <button onClick={() => setPrompt('我需要总结一份超长文档，请帮我提取核心观点、关键数据和最终结论。')} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><Bot size={18} color="#8b5cf6" /> 极速提炼总结</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>总结超长文档，提取核心观点、关键数据和最终结论...</div>
+                    <button onClick={() => setPrompt(suggestionCopy[2][1])} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><Bot size={18} color="#8b5cf6" /> {copy.summary}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{suggestionCopy[2][0]}</div>
                     </button>
-                    <button onClick={() => setPrompt('请将这份公文的排版进行专业润色，纠正所有语病，并将语气调整为正式的商业化风格。')} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><Sparkles size={18} color="#3b82f6" /> 智能公文润色</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>将公文的排版进行专业润色，纠正所有语病...</div>
+                    <button onClick={() => setPrompt(suggestionCopy[3][1])} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><Sparkles size={18} color="#3b82f6" /> {copy.polish}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{suggestionCopy[3][0]}</div>
                     </button>
-                    <button onClick={() => setPrompt('请帮我将接下来的文档进行沉浸式双语翻译，要求保留核心结构，语气专业自然。')} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><MessageSquare size={18} color="#06b6d4" /> 专业内容翻译</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>进行沉浸式双语翻译，保留核心结构，语气专业...</div>
+                    <button onClick={() => setPrompt(suggestionCopy[4][1])} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><MessageSquare size={18} color="#06b6d4" /> {copy.translate}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{suggestionCopy[4][0]}</div>
                     </button>
-                    <button onClick={() => setPrompt('请帮我提取接下来文档中的结构化关键数据（如姓名、金额、日期等），并用表格清晰展示。')} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><FileJson size={18} color="#eab308" /> 票据简历提取</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>提取结构化关键数据（如姓名、金额、日期等）...</div>
+                    <button onClick={() => setPrompt(suggestionCopy[5][1])} style={{ padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }} onMouseOver={e => {e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'}} onMouseOut={e => {e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}><FileJson size={18} color="#eab308" /> {copy.extract}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{suggestionCopy[5][0]}</div>
                     </button>
                   </div>
                 </div>
@@ -1033,7 +1054,7 @@ export default function DashboardClient() {
                     
                     <div style={{ flex: 1, paddingTop: '6px' }}>
                       <div style={{ fontWeight: 600, marginBottom: '8px', color: 'var(--text-main)' }}>
-                        {msg.role === 'ai' ? 'OfficeGPT' : '您'}
+                        {msg.role === 'ai' ? 'OfficeGPT' : extra.you}
                       </div>
                       
                       {/* User File Attachment */}
@@ -1050,7 +1071,7 @@ export default function DashboardClient() {
                       {msg.progress && <TaskProgress progress={msg.progress} />}
                       {msg.loading && !msg.progress && !msg.thought && !msg.content ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
-                          <Loader2 size={16} className="spin-anim" /> 思考中...
+                          <Loader2 size={16} className="spin-anim" /> {copy.thinking}
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1106,7 +1127,7 @@ export default function DashboardClient() {
                           </div>
                           {msg.loading && !msg.progress && msg.content && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                              <Loader2 size={14} className="spin-anim" /> 正在继续生成…
+                              <Loader2 size={14} className="spin-anim" /> {extra.continuing}
                             </div>
                           )}
                       </div>
@@ -1126,9 +1147,9 @@ export default function DashboardClient() {
                               </span>
                               <span style={{ minWidth: 0, flex: 1 }}>
                                 <span style={{ display: 'block', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{artifact.filename}</span>
-                                <span style={{ display: 'block', marginTop: '3px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>{artifact.status === 'generating' && isGenerating ? '生成中 · 点击查看实时预览' : '点击打开预览'}</span>
+                                <span style={{ display: 'block', marginTop: '3px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>{artifact.status === 'generating' && isGenerating ? extra.generatingArtifact : extra.openPreview}</span>
                               </span>
-                              <span style={{ color: 'var(--primary)', fontSize: '0.82rem', fontWeight: 600 }}>预览</span>
+                              <span style={{ color: 'var(--primary)', fontSize: '0.82rem', fontWeight: 600 }}>{copy.preview}</span>
                             </button>
                           ))}
                         </div>
@@ -1166,7 +1187,7 @@ export default function DashboardClient() {
 
             {/* Input Area */}
             <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-              {activeTaskId && !showRightPanel && <button type="button" onClick={() => { setShowRightPanel(true); setSidebarCollapsed(true); setRightPanelMode('workspace'); }} style={{ float: 'right', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: '9px', background: 'white', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}><FolderOpen size={15} /> 文件工作区</button>}
+              {activeTaskId && !showRightPanel && <button type="button" onClick={() => { setShowRightPanel(true); setSidebarCollapsed(true); setRightPanelMode('workspace'); }} style={{ float: 'right', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: '9px', background: 'white', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}><FolderOpen size={15} /> {copy.workspace}</button>}
               
               {/* Active File Preview */}
               {file && (
@@ -1184,7 +1205,7 @@ export default function DashboardClient() {
                   value={prompt}
                   onChange={(e) => { setPrompt(e.target.value); resizePromptInput(e.currentTarget); }}
                   onKeyDown={handleKeyDown}
-                  placeholder={activeTaskId ? "在此文件基础上，继续补充处理需求..." : "上传 Excel、Word 或 PPT 文档并描述您的需求..."}
+                  placeholder={activeTaskId ? copy.continuePlaceholder : copy.placeholder}
                   style={{ display: 'block', width: '100%', height: '40px', minHeight: '40px', maxHeight: '200px', padding: '6px 16px 2px', overflowY: 'hidden', border: 'none', resize: 'none', outline: 'none', fontSize: '1rem', lineHeight: '26px', background: 'transparent' }}
                 />
 
@@ -1199,15 +1220,15 @@ export default function DashboardClient() {
                   <button
                     onClick={isGenerating ? handleCancel : handleProcess}
                     disabled={!isGenerating && !prompt.trim()}
-                    title={isGenerating ? '停止生成' : '发送'}
+                    title={isGenerating ? copy.stop : copy.send}
                     style={{ minWidth: isGenerating ? '88px' : '32px', height: '32px', padding: isGenerating ? '0 11px' : 0, borderRadius: isGenerating ? '8px' : '50%', background: isGenerating ? '#ef4444' : prompt.trim() ? 'var(--primary)' : 'var(--background)', color: isGenerating || prompt.trim() ? 'white' : 'var(--text-muted)', border: 'none', cursor: isGenerating || prompt.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isGenerating ? '6px' : 0, transition: 'all 0.2s', fontWeight: 600, fontSize: '0.8rem' }}
                   >
-                    {isGenerating ? <><StopCircle size={16} /> 停止生成</> : <Send size={16} style={{ marginLeft: '2px' }} />}
+                    {isGenerating ? <><StopCircle size={16} /> {copy.stop}</> : <Send size={16} style={{ marginLeft: '2px' }} />}
                   </button>
                 </div>
               </div>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                支持 PDF、Excel、Word、PPT 和常见图片。你可以连续发送多条指令在同一个文档上叠加操作。
+                {copy.support}
               </div>
             </div>
           </div>
@@ -1259,23 +1280,23 @@ export default function DashboardClient() {
             <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', zIndex: 1, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Trash2 size={24} style={{ color: 'var(--danger, #ef4444)' }} />
-                删除确认
+                {copy.deleteTitle}
               </h3>
               <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
-                您确定要删除这条历史记录吗？<br/>删除后该文档及对话上下文将无法恢复。
+                {copy.deleteText}
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button 
                   onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })}
                   style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 500 }}
                 >
-                  取消
+                  {copy.cancel}
                 </button>
                 <button 
                   onClick={executeDeleteTask}
                   style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'var(--danger, #ef4444)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
                 >
-                  确认删除
+                  {copy.confirmDelete}
                 </button>
               </div>
             </div>
@@ -1289,7 +1310,7 @@ export default function DashboardClient() {
         {activeTab === 'overview' && (
           <div style={{ padding: '40px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-              <h1 style={{ fontSize: '1.8rem' }}>数据概览</h1>
+              <h1 style={{ fontSize: '1.8rem' }}>{t('dashboard.overview')}</h1>
             </div>
             {/* Stats Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px', marginBottom: '32px' }}>
@@ -1320,29 +1341,29 @@ export default function DashboardClient() {
 
         {/* Billing Tab */}
         {activeTab === 'billing' && (
-          <div style={{ padding: '40px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-              <h1 style={{ fontSize: '1.8rem' }}>账单与流水</h1>
+          <div style={{ height: '100%', minHeight: 0, padding: '20px 24px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
+              <h1 style={{ fontSize: '1.45rem' }}>{t('dashboard.billing')}</h1>
             </div>
-            <div className="glass-card" style={{ padding: '32px', background: 'white', marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}><CreditCard size={18} /> 当前可用 Credits</div>
-                <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)' }}>{data.balance.toLocaleString()}</div>
+            <div className="glass-card" style={{ padding: '14px 18px', background: 'white', marginBottom: '14px', minHeight: '70px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+                <span style={{ width: '38px', height: '38px', display: 'grid', placeItems: 'center', borderRadius: '11px', background: 'var(--primary-light)', color: 'var(--primary)', flexShrink: 0 }}><CreditCard size={19} /></span>
+                <div><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '2px' }}>{t('dashboard.available')}</div><div style={{ fontSize: '1.55rem', lineHeight: 1.1, fontWeight: 800, color: 'var(--primary)' }}>{data.balance.toLocaleString(locale)}</div></div>
               </div>
-              <button type="button" className="btn btn-primary" onClick={() => setActiveDrawer('upgrade')}>微信支付充值</button>
+              <button type="button" className="btn btn-primary" style={{ padding: '9px 15px', flexShrink: 0 }} onClick={() => setActiveDrawer('upgrade')}>{t('dashboard.wechatTopup')}</button>
             </div>
 
-            <div className="glass-card" style={{ background: 'white', padding: '0', overflow: 'hidden' }}>
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><div><h2 style={{ fontSize: '1.2rem', marginBottom: '4px' }}>账单明细</h2><span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>共 {billingPagination.total.toLocaleString()} 条流水</span></div><button type="button" className="btn btn-outline" disabled={billingLoading} onClick={() => void fetchBillingPage(billingPagination.page)}>{billingLoading ? '加载中…' : '刷新'}</button></div>
-              <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', minWidth: '1080px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
+            <div className="glass-card" style={{ minHeight: 0, flex: 1, background: 'white', padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}><h2 style={{ fontSize: '1rem' }}>{t('dashboard.details')}</h2></div>
+              <div style={{ minHeight: 0, flex: 1, overflow: 'auto' }}><table style={{ width: '100%', minWidth: '1080px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                   <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>时间</th>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>类型</th>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>任务与模型</th>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>Token 用量</th>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>结算金额</th>
-                    <th style={{ padding: '16px', fontWeight: 600 }}>余额</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.time')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.type')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.taskModel')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.tokens')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.amount')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.balance')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1353,23 +1374,33 @@ export default function DashboardClient() {
                     const usage = r.metadata?.usage;
                     const pricing = r.metadata?.pricingSnapshot;
                     const balanceDelta = r.balanceDelta ?? (['charge', 'refund'].includes(r.type) ? r.amount : -r.amount);
+                    const billingTime = formatBillingDateTime(r.createdAt, locale);
                     return (
                     <tr key={r._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '16px', whiteSpace: 'nowrap', verticalAlign: 'top' }}><div>{new Date(r.createdAt).toLocaleDateString()}</div><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '4px' }}>{new Date(r.createdAt).toLocaleTimeString()}</div></td>
-                      <td style={{ padding: '16px' }}>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', verticalAlign: 'top' }}><div>{billingTime.date}</div><div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>{billingTime.time}</div></td>
+                      <td style={{ padding: '10px 14px' }}>
                         <span style={{ padding: '4px 8px', background: ['charge', 'refund'].includes(r.type) ? '#d1fae5' : r.type === 'reserve' ? '#e0e7ff' : '#fee2e2', color: ['charge', 'refund'].includes(r.type) ? '#059669' : r.type === 'reserve' ? '#4f46e5' : '#ef4444', borderRadius: '4px', fontSize: '0.8rem' }}>
                           {{ charge: '充值', reserve: '预授权', consume: '消费', refund: '退回', adjustment: '调整' }[r.type] || r.type}
                         </span>
                       </td>
-                      <td style={{ padding: '16px', maxWidth: '300px', verticalAlign: 'top' }}><div style={{ fontWeight: 600, marginBottom: '5px' }}>{r.description || '账户余额变动'}</div>{r.relatedTaskId ? <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.relatedTaskId.prompt}>{r.relatedTaskId.filename || r.relatedTaskId.prompt || `任务 ${r.relatedTaskId._id}`}</div> : null}<div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '5px' }}>{pricing?.model || r.metadata?.model || (r.metadata?.transactionId ? `微信订单 ${r.metadata.outTradeNo}` : '')}</div></td>
-                      <td style={{ padding: '16px', verticalAlign: 'top' }}>{usage ? <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '4px 12px', fontSize: '0.78rem' }}><span style={{ color: 'var(--text-muted)' }}>输入</span><b>{usage.inputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>输出</span><b>{usage.outputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>缓存</span><b>{usage.cachedInputTokens?.toLocaleString() || 0}</b></div> : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                      <td style={{ padding: '16px', verticalAlign: 'top' }}><div style={{ fontWeight: 700 }}>{r.amount.toLocaleString()} Credits</div>{pricing ? <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', lineHeight: 1.5, marginTop: '5px' }}>输入 {pricing.inputCreditsPer1K}/1K · 输出 {pricing.outputCreditsPer1K}/1K<br/>折扣倍率 {pricing.discountRate}</div> : null}</td>
-                      <td style={{ padding: '16px', verticalAlign: 'top' }}><div style={{ fontWeight: 'bold', color: balanceDelta >= 0 ? '#059669' : '#ef4444' }}>{balanceDelta > 0 ? '+' : ''}{balanceDelta.toLocaleString()}</div>{Number.isFinite(r.balanceAfter) ? <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '5px' }}>{r.balanceBefore?.toLocaleString()} → {r.balanceAfter.toLocaleString()}</div> : null}</td>
+                      <td style={{ padding: '10px 14px', maxWidth: '300px', verticalAlign: 'top' }}><div style={{ fontWeight: 600, marginBottom: '3px' }}>{r.description || '账户余额变动'}</div>{r.relatedTaskId ? <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.relatedTaskId.prompt}>{r.relatedTaskId.filename || r.relatedTaskId.prompt || `任务 ${r.relatedTaskId._id}`}</div> : null}<div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '3px' }}>{pricing?.model || r.metadata?.model || (r.metadata?.transactionId ? `微信订单 ${r.metadata.outTradeNo}` : '')}</div></td>
+                      <td style={{ padding: '10px 14px', verticalAlign: 'top' }}>{usage ? <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '2px 10px', fontSize: '0.75rem' }}><span style={{ color: 'var(--text-muted)' }}>输入</span><b>{usage.inputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>输出</span><b>{usage.outputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>缓存</span><b>{usage.cachedInputTokens?.toLocaleString() || 0}</b></div> : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                      <td style={{ padding: '10px 14px', verticalAlign: 'top' }}><div style={{ fontWeight: 700 }}>{r.amount.toLocaleString()} Credits</div>{pricing ? <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', lineHeight: 1.35, marginTop: '3px' }}>输入 {pricing.inputCreditsPer1K}/1K · 输出 {pricing.outputCreditsPer1K}/1K<br/>折扣倍率 {pricing.discountRate}</div> : null}</td>
+                      <td style={{ padding: '10px 14px', verticalAlign: 'top' }}><div style={{ fontWeight: 'bold', color: balanceDelta >= 0 ? '#059669' : '#ef4444' }}>{balanceDelta > 0 ? '+' : ''}{balanceDelta.toLocaleString()}</div>{Number.isFinite(r.balanceAfter) ? <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '3px' }}>{r.balanceBefore?.toLocaleString()} → {r.balanceAfter.toLocaleString()}</div> : null}</td>
                     </tr>
                   )})}
                 </tbody>
               </table></div>
-              <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>第 {billingPagination.page} / {billingPagination.totalPages} 页</span><div style={{ display: 'flex', gap: '8px' }}><button type="button" className="btn btn-outline" disabled={billingLoading || billingPagination.page <= 1} onClick={() => void fetchBillingPage(billingPagination.page - 1)}>上一页</button><button type="button" className="btn btn-outline" disabled={billingLoading || billingPagination.page >= billingPagination.totalPages} onClick={() => void fetchBillingPage(billingPagination.page + 1)}>下一页</button></div></div>
+              <div style={{ padding: '9px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexShrink: 0, background: 'white' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{t('dashboard.count', { count: billingPagination.total.toLocaleString(locale) })}</span>
+                <nav aria-label="账单分页" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <button type="button" className="btn btn-outline" style={{ padding: '7px 10px' }} disabled={billingLoading || billingPagination.page <= 1} onClick={() => void fetchBillingPage(billingPagination.page - 1)}>{t('dashboard.previous')}</button>
+                  {paginationItems(billingPagination.page, billingPagination.totalPages).map((item) => typeof item === 'number' ? (
+                    <button key={item} type="button" disabled={billingLoading} aria-current={item === billingPagination.page ? 'page' : undefined} onClick={() => void fetchBillingPage(item)} style={{ width: '32px', height: '32px', display: 'grid', placeItems: 'center', border: `1px solid ${item === billingPagination.page ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '8px', background: item === billingPagination.page ? 'var(--primary)' : 'white', color: item === billingPagination.page ? 'white' : 'var(--text-main)', fontWeight: item === billingPagination.page ? 700 : 500, cursor: billingLoading ? 'wait' : 'pointer' }}>{item}</button>
+                  ) : <span key={item} style={{ width: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>…</span>)}
+                  <button type="button" className="btn btn-outline" style={{ padding: '7px 10px' }} disabled={billingLoading || billingPagination.page >= billingPagination.totalPages} onClick={() => void fetchBillingPage(billingPagination.page + 1)}>{t('dashboard.next')}</button>
+                </nav>
+              </div>
             </div>
           </div>
         )}
@@ -1391,9 +1422,9 @@ export default function DashboardClient() {
             {/* Modal Header */}
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {activeDrawer === 'upgrade' && <><Crown color="var(--primary)" /> 升级套餐</>}
-                {activeDrawer === 'profile' && <><User color="var(--text-main)" /> 个人资料</>}
-                {activeDrawer === 'settings' && <><Settings color="var(--text-main)" /> 系统设置</>}
+                {activeDrawer === 'upgrade' && <><Crown color="var(--primary)" /> {copy.upgrade}</>}
+                {activeDrawer === 'profile' && <><User color="var(--text-main)" /> {copy.profile}</>}
+                {activeDrawer === 'settings' && <><Settings color="var(--text-main)" /> {copy.settings}</>}
               </h2>
               <button 
                 onClick={() => setActiveDrawer(null)}
@@ -1464,19 +1495,19 @@ export default function DashboardClient() {
                     <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '2.5rem', marginBottom: '16px', boxShadow: 'var(--shadow-md)' }}>
                       {user?.username?.[0]?.toUpperCase() || 'U'}
                     </div>
-                    <h3 style={{ fontSize: '1.4rem', fontWeight: 600, marginBottom: '4px' }}>{user?.username || '用户'}</h3>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 600, marginBottom: '4px' }}>{user?.username || copy.user}</h3>
                     <p style={{ color: 'var(--text-muted)' }}>{user?.email || 'user@example.com'}</p>
                   </div>
 
                   <div>
-                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' }}>账户权限</h4>
+                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' }}>{copy.accountAccess}</h4>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--background)', borderRadius: 'var(--radius-md)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <Shield size={20} color={user?.role === 'admin' ? '#ef4444' : 'var(--primary)'} />
-                        <span style={{ fontWeight: 500 }}>当前角色</span>
+                        <span style={{ fontWeight: 500 }}>{copy.role}</span>
                       </div>
                       <span style={{ background: user?.role === 'admin' ? '#fee2e2' : 'var(--primary-light)', color: user?.role === 'admin' ? '#ef4444' : 'var(--primary)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600 }}>
-                        {user?.role === 'admin' ? '超级管理员' : '普通用户'}
+                        {user?.role === 'admin' ? copy.admin : copy.member}
                       </span>
                     </div>
                   </div>
@@ -1502,13 +1533,13 @@ export default function DashboardClient() {
                   
                   {/* Theme Section */}
                   <section>
-                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'uppercase' }}>外观偏好</h4>
+                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'uppercase' }}>{copy.appearance}</h4>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ padding: '8px', background: 'var(--background)', borderRadius: '8px' }}><Moon size={18} color="var(--text-main)" /></div>
                         <div>
-                          <div style={{ fontWeight: 500 }}>深色模式</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>切换至暗黑主题界面</div>
+                          <div style={{ fontWeight: 500 }}>{copy.darkMode}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{copy.darkDesc}</div>
                         </div>
                       </div>
                       <div style={{ width: '44px', height: '24px', background: 'var(--border)', borderRadius: '12px', position: 'relative', cursor: 'not-allowed', opacity: 0.5 }}>
@@ -1519,13 +1550,13 @@ export default function DashboardClient() {
 
                   {/* Notification Section */}
                   <section>
-                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'uppercase' }}>通知设置</h4>
+                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'uppercase' }}>{copy.notifications}</h4>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ padding: '8px', background: 'var(--primary-light)', borderRadius: '8px' }}><Bell size={18} color="var(--primary)" /></div>
                         <div>
-                          <div style={{ fontWeight: 500 }}>任务完成提示音</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>大文件处理完毕时播放声音</div>
+                          <div style={{ fontWeight: 500 }}>{copy.sound}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{copy.soundDesc}</div>
                         </div>
                       </div>
                       <div style={{ width: '44px', height: '24px', background: 'var(--primary)', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}>
