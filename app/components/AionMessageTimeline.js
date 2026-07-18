@@ -8,11 +8,12 @@ import { dashboardExtra } from '@/app/i18n/dashboardCopy';
 
 function ThinkingBlock({ block }) {
   const { locale } = useI18n(); const copy = dashboardExtra(locale);
-  const [expanded, setExpanded] = useState(true);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const expanded = block.done ? manuallyExpanded : true;
   const seconds = Math.max(0, Math.round(Number(block.duration || block.duration_ms || 0) / 1000));
   return (
     <div style={{ margin: '4px 0 10px' }}>
-      <button type="button" onClick={() => setExpanded((value) => !value)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '4px 0', border: 0, background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '0.82rem' }}>
+      <button type="button" onClick={() => setManuallyExpanded((value) => !value)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '4px 0', border: 0, background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '0.82rem' }}>
         {block.done ? <Brain size={14} /> : <Loader2 size={14} className="spin-anim" />}
         <span>{block.done ? copy.thinkingDone : block.subject || copy.deepThinking}{block.done && seconds ? ` · ${seconds} ${copy.second}` : ''}</span>
         <ChevronRight size={13} style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform .18s' }} />

@@ -6,14 +6,14 @@ import { useI18n } from '@/app/i18n/I18nProvider';
 import { dashboardExtra } from '@/app/i18n/dashboardCopy';
 
 // Mirrors AionUi's MessageThinking: a real thought is only rendered when the
-// model actually streams reasoning. Keep it visible by default while still
-// allowing the user to collapse long reasoning when desired.
+// model actually streams reasoning. It stays open while streaming, then
+// collapses automatically when the thought is complete.
 export default function Thinking({ thought }) {
   const { locale } = useI18n(); const copy = dashboardExtra(locale);
-  const [manuallyExpanded, setManuallyExpanded] = useState(true);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
   if (!thought || !thought.description) return null;
   const done = Boolean(thought.done);
-  const expanded = manuallyExpanded;
+  const expanded = done ? manuallyExpanded : true;
 
   return (
     <div style={{ marginBottom: '14px', border: '1px solid #ede9fe', background: '#faf9ff', borderRadius: '12px', overflow: 'hidden' }}>
