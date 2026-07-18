@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { settleTaskCredits } from '@/lib/billing/service';
+import { readConversationUsage, subtractUsage } from '@/lib/aioncore/session-usage';
 import Task from '@/models/Task';
 
 export const runtime = 'nodejs';
@@ -31,6 +32,24 @@ export async function POST(request) {
     'billing.state': { $in: ['reserved', 'settling', 'settled', 'released'] },
   }).sort({ createdAt: -1 });
   if (!task) return NextResponse.json({ success: true, skipped: true });
-  const result = await settleTaskCredits({ taskId: task._id, userId: payload.userId, usage: payload.usage, source: 'aioncore-ws' });
+  let usage = payload.usage;
+  const reportedTokens = Number(usage?.input_tokens || 0) + Number(usage?.output_tokens || 0);
+  if (!Number.isFinite(reportedTokens) || reportedTokens <= 0) {
+    const [totalUsage, settledTasks] = await Promise.all([
+      readConversationUsage(payload.conversationId),
+      Task.find({
+        _id: { $ne: task._id },
+        userId: payload.userId,
+        aionConversationId: payload.conversationId,
+        'billing.state': 'settled',
+      }).select('billing.usage').lean(),
+    ]);
+    usage = subtractUsage(totalUsage, settledTasks);
+  }
+  const totalTokens = Number(usage?.input_tokens || 0) + Number(usage?.output_tokens || 0);
+  if (!Number.isFinite(totalTokens) || totalTokens <= 0) {
+    return NextResponse.json({ success: true, skipped: true, reason: 'usage_not_reported' });
+  }
+  const result = await settleTaskCredits({ taskId: task._id, userId: payload.userId, usage, source: 'aioncore-ws' });
   return NextResponse.json({ success: true, result });
 }

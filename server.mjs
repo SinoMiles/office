@@ -29,16 +29,20 @@ function authorize(token) {
 function usageFromFrame(rawData) {
   try {
     const frame = JSON.parse(String(rawData));
-    const name = frame.name || frame.event;
-    const payload = frame.data !== undefined ? frame.data : frame.payload;
-    if (name !== 'message.stream' || !['finish', 'error', 'cancelled'].includes(payload?.type)) return null;
-    const usage = payload.data?.usage || payload.usage || (payload.data && typeof payload.data === 'object' ? payload.data : {});
+    const payload = frame.data;
+    if (frame.name !== 'message.stream' || payload?.type !== 'finish') return null;
+    const usage = payload.data;
+    if (!usage || typeof usage !== 'object') return null;
+    if ((usage.input_tokens || 0) + (usage.output_tokens || 0) <= 0) {
+      chatWarn('billing', 'stream_end did not expose token usage', payload);
+    }
     return {
       conversationId: payload.conversation_id,
       usage: {
-        input_tokens: usage.input_tokens || 0,
-        output_tokens: usage.output_tokens || 0,
-        cached_input_tokens: usage.cached_input_tokens || usage.cache_read_input_tokens || 0,
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        cache_read_tokens: usage.cache_read_tokens,
+        cache_write_tokens: usage.cache_write_tokens,
       },
     };
   } catch {
@@ -111,7 +115,7 @@ server.on('upgrade', (request, socket, head) => {
     });
     upstream.on('error', (error) => {
       chatError('proxy:ws', 'upstream error', error);
-      client.close(1011, 'AionCore unavailable');
+      client.close(1011, 'OfficeGPT unavailable');
     });
     client.on('close', () => {
       chatLog('proxy:ws', 'browser disconnected');

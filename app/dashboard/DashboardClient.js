@@ -93,21 +93,55 @@ export default function DashboardClient() {
     console.info('[DashboardDebug] navigation click', { instance: debugInstanceRef.current, from: window.location.pathname, to: nextPath, tab });
     if (nextPath && nextPath !== window.location.pathname) {
       setActiveTab(tab);
-      window.history.pushState({ ...window.history.state, __NA: true }, '', nextPath);
+      router.push(nextPath, { scroll: false });
     }
   };
 
   useEffect(() => {
     const instance = `dashboard-${Math.random().toString(36).slice(2, 8)}`;
     debugInstanceRef.current = instance;
-    console.info('[DashboardDebug] mounted', { instance, pathname: window.location.pathname, at: performance.now() });
+    console.info('[DashboardRoute] mounted', {
+      instance,
+      browserPathname: window.location.pathname,
+      nextPathname: pathname,
+      href: window.location.href,
+      historyState: window.history.state,
+      at: performance.now(),
+    });
     return () => console.warn('[DashboardDebug] unmounted', { instance, pathname: window.location.pathname, at: performance.now() });
-  }, []);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return undefined;
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+    const instrument = (method, original) => function instrumentedHistory(state, unused, url) {
+      const before = window.location.href;
+      const result = original.call(this, state, unused, url);
+      console.groupCollapsed(`[DashboardRoute] history.${method}: ${before} -> ${window.location.href}`);
+      console.info({ instance: debugInstanceRef.current, state, url, nextPathname: pathname });
+      console.trace('[DashboardRoute] URL mutation stack');
+      console.groupEnd();
+      return result;
+    };
+    window.history.pushState = instrument('pushState', originalPushState);
+    window.history.replaceState = instrument('replaceState', originalReplaceState);
+    return () => {
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const tab = dashboardTabFromPath(pathname);
     setActiveTab(tab);
-    console.info('[DashboardDebug] pathname changed', { instance: debugInstanceRef.current, pathname, tab, at: performance.now() });
+    console.info('[DashboardRoute] pathname changed', {
+      instance: debugInstanceRef.current,
+      nextPathname: pathname,
+      browserPathname: window.location.pathname,
+      tab,
+      at: performance.now(),
+    });
   }, [pathname]);
 
   useEffect(() => {
@@ -151,6 +185,7 @@ export default function DashboardClient() {
   const menuRef = useRef(null);
   const historyRestoredRef = useRef(false);
   const cancellingRef = useRef(false);
+  const generationObservedRef = useRef(false);
 
   const resizePromptInput = useCallback((element) => {
     if (!element) return;
@@ -276,7 +311,7 @@ export default function DashboardClient() {
         if (intentPrompts[intent]) {
           setPrompt(intentPrompts[intent]);
           // Clear intent from URL
-          window.history.replaceState({}, '', '/dashboard');
+          router.replace('/dashboard', { scroll: false });
         }
       }
     }
@@ -394,7 +429,12 @@ export default function DashboardClient() {
 
   useEffect(() => {
     // Sync completion status back to MongoDB when aioncore finishes generating
-    if (!aionIsProcessing && processLoading && !cancellingRef.current && activeTaskId && messages.length > 0) {
+    if (aionIsProcessing) {
+      generationObservedRef.current = true;
+      return;
+    }
+    if (!generationObservedRef.current) return;
+    if (processLoading && !cancellingRef.current && activeTaskId && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.role === 'ai') {
         fetch(`/api/tasks/${activeTaskId}/finish`, {
@@ -413,6 +453,7 @@ export default function DashboardClient() {
           });
           openArtifact(payload.artifacts.at(-1));
         }).catch(e => console.error('Failed to sync finish state', e));
+        generationObservedRef.current = false;
         setProcessLoading(false);
       }
     }
@@ -736,11 +777,17 @@ export default function DashboardClient() {
     window.localStorage.removeItem('officeweb-active-task-id');
   };
 
-  const loadHistoryTask = useCallback(async (task) => {
+  const loadHistoryTask = useCallback(async (task, { navigate = true } = {}) => {
     setActiveTaskId(task._id);
-    if (window.location.pathname !== '/dashboard') {
+    console.info('[DashboardRoute] load history task', {
+      taskId: task._id,
+      navigate,
+      browserPathname: window.location.pathname,
+      nextPathname: pathname,
+    });
+    if (navigate && window.location.pathname !== '/dashboard') {
       setActiveTab('workspace');
-      window.history.pushState({ ...window.history.state, __NA: true }, '', '/dashboard');
+      router.push('/dashboard', { scroll: false });
     }
     setMessages([{ role: 'ai', content: '', loading: true }]);
     const payload = await fetch(`/api/tasks/${task._id}/conversation`).then((res) => res.json()).catch(() => null);
@@ -767,17 +814,35 @@ export default function DashboardClient() {
     setActiveArtifact(null);
     setShowRightPanel(false);
     setSidebarCollapsed(false);
-  }, [loadConversation]);
+  }, [loadConversation, pathname, router]);
 
   useEffect(() => {
+    // Only restore a chat while the workspace route is active. Restoring it from
+    // /dashboard/billing or /dashboard/overview would rewrite the current URL.
+    const browserPathname = window.location.pathname;
+    const browserTab = dashboardTabFromPath(browserPathname);
+    console.info('[DashboardRoute] history restore check', {
+      instance: debugInstanceRef.current,
+      browserPathname,
+      nextPathname: pathname,
+      browserTab,
+      loading,
+      alreadyRestored: historyRestoredRef.current,
+      recentTaskCount: stats.recentTasks?.length || 0,
+    });
+    if (browserTab !== 'workspace') {
+      console.info('[DashboardRoute] history restore skipped: non-workspace route', { browserPathname });
+      return;
+    }
     if (loading || historyRestoredRef.current || !stats.recentTasks?.length) return;
     historyRestoredRef.current = true;
     const savedTaskId = window.localStorage.getItem('officeweb-active-task-id');
+    console.info('[DashboardRoute] restoring saved conversation', { savedTaskId, browserPathname });
     if (!savedTaskId) return;
     const savedTask = stats.recentTasks.find((task) => task._id === savedTaskId);
-    if (savedTask) void loadHistoryTask(savedTask);
+    if (savedTask) void loadHistoryTask(savedTask, { navigate: false });
     else window.localStorage.removeItem('officeweb-active-task-id');
-  }, [loadHistoryTask, loading, stats.recentTasks]);
+  }, [loadHistoryTask, loading, pathname, stats.recentTasks]);
 
   const handleCancel = async () => {
     if (!activeTaskId) return;
@@ -811,6 +876,7 @@ export default function DashboardClient() {
     setMessages(newMessages);
     setPrompt('');
     setFiles([]);
+    generationObservedRef.current = false;
     setProcessLoading(true);
 
     try {
@@ -851,6 +917,8 @@ export default function DashboardClient() {
       fetchData(); // Update billing
 
     } catch (err) {
+      generationObservedRef.current = false;
+      setProcessLoading(false);
       toast.error('处理失败：' + err.message);
       setMessages(prev => {
         const next = [...prev];

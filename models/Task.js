@@ -44,6 +44,7 @@ const TaskSchema = new mongoose.Schema({
   tokensUsed: { type: Number, default: 0 },
   cost: { type: Number, default: 0 },
   billing: {
+    mode: { type: String, enum: ['reservation', 'direct'], default: undefined },
     state: { type: String, enum: ['unreserved', 'reserving', 'reserved', 'settling', 'settled', 'releasing', 'released', 'failed'], default: 'unreserved' },
     reservationCredits: { type: Number, default: 0 },
     chargedCredits: { type: Number, default: 0 },

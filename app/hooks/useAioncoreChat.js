@@ -13,6 +13,7 @@ import { autoConfirmPermission, buildAutoConfirmation, listPendingPermissions } 
 
 export function useAioncoreChat() {
   const [messages, setMessages] = useState([]);
+  const messagesRef = useRef([]);
   const [runtime, setRuntime] = useState(createRuntimeState);
   const runtimeRef = useRef(createRuntimeState());
   const [officeArtifact, setOfficeArtifact] = useState(null);
@@ -107,10 +108,12 @@ export function useAioncoreChat() {
     try {
       if (!queued.length) return;
       chatLog('messages', `merging ${queued.length} stream event(s)`);
-      setMessages((previous) => {
-        const next = queued.reduce(mergeStreamMessages, previous);
-        return next === previous ? previous : next;
-      });
+      const previous = messagesRef.current;
+      const next = queued.reduce(mergeStreamMessages, previous);
+      if (next !== previous) {
+        messagesRef.current = next;
+        setMessages(next);
+      }
     } finally {
       flushingRef.current = false;
     }
@@ -121,6 +124,9 @@ export function useAioncoreChat() {
     const officeOpenTimers = officeOpenTimersRef.current;
     const messageQueue = queueRef.current;
     const queuedSignatures = queuedSignaturesRef.current;
+    const belongsToActiveConversation = (payload) => !conversationIdRef.current
+      || !payload?.conversation_id
+      || payload.conversation_id === conversationIdRef.current;
     clientRef.current = client;
     const subscriptions = [
       client.on('realtime.connected', () => applyRuntimeEvent('realtime.connected', {})),
@@ -142,18 +148,23 @@ export function useAioncoreChat() {
       client.on('chat:history:page', (payload) => {
         if (Array.isArray(payload?.items)) {
           chatLog('history', `loaded ${payload.items.length} message(s)`, payload);
+          messagesRef.current = payload.items;
           setMessages(payload.items);
         }
       }),
-      client.on('chat:turn:state', (payload) => applyRuntimeEvent('chat:turn:state', payload)),
-      client.on('turn.completed', (payload) => applyRuntimeEvent('turn.completed', payload)),
+      client.on('chat:turn:state', (payload) => {
+        if (belongsToActiveConversation(payload)) applyRuntimeEvent('chat:turn:state', payload);
+      }),
+      client.on('turn.completed', (payload) => {
+        if (belongsToActiveConversation(payload)) applyRuntimeEvent('turn.completed', payload);
+      }),
       client.on('workspaceOfficeWatch.fileAdded', (event) => {
         if (workspaceRef.current && event.workspace !== workspaceRef.current) return;
         void openOfficePreview(event);
       }),
       client.on('message.stream', (payload) => {
+        if (!belongsToActiveConversation(payload)) return;
         applyRuntimeEvent('message.stream', payload);
-        if (conversationIdRef.current && payload.conversation_id && payload.conversation_id !== conversationIdRef.current) return;
         if (payload?.type === 'permission' || payload?.type === 'acp_permission') {
           approvePermission(payload);
         }
@@ -221,8 +232,8 @@ export function useAioncoreChat() {
     chatLog('conversation', `optimistic send to ${activeId}`, { conversation_id: activeId, attachmentCount: files.length });
     conversationIdRef.current = activeId;
     applyRuntimeEvent('local.send', {});
-    setMessages((previous) => [
-      ...previous,
+    const nextMessages = [
+      ...messagesRef.current,
       {
         role: 'user',
         type: 'text',
@@ -230,7 +241,9 @@ export function useAioncoreChat() {
         msg_id: `local-user-${crypto.randomUUID()}`,
         conversation_id: activeId,
       },
-    ]);
+    ];
+    messagesRef.current = nextMessages;
+    setMessages(nextMessages);
   }, [applyRuntimeEvent]);
 
   const cancelGeneration = useCallback(async (overrideConversationId = null) => {

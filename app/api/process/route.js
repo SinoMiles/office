@@ -8,6 +8,7 @@ import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { chatError, chatLog } from '@/lib/aioncore/logger';
 import { buildConversationExtra } from '@/lib/aioncore/request-policy';
+import { publicErrorMessage } from '@/lib/aioncore/public-error';
 import { releaseTaskReservation, reserveTaskCredits } from '@/lib/billing/service';
 
 export const runtime = 'nodejs';
@@ -86,7 +87,7 @@ export async function POST(request) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (!convRes.ok) throw new Error('创建 AionCore 会话失败');
+      if (!convRes.ok) throw new Error('创建 OfficeGPT 会话失败');
       const convJson = await convRes.json();
       aionConversationId = convJson.data?.id || crypto.randomUUID();
       chatLog('process', `conversation created ${aionConversationId}`, { conversation_id: aionConversationId });
@@ -99,6 +100,16 @@ export async function POST(request) {
         body: JSON.stringify({ extra: buildConversationExtra({ product_locale: productLocale }), merge_extra: true }),
       });
       chatLog('process', `conversation policy response ${policyRes.status}`, { conversation_id: aionConversationId });
+    }
+
+    const runtimeRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`);
+    if (runtimeRes.ok) {
+      const runtimePayload = await runtimeRes.json();
+      if (runtimePayload.data?.runtime?.can_send_message === false) {
+        const conflict = new Error('上一条指令仍在处理中，请等待完成后再发送');
+        conflict.status = 409;
+        throw conflict;
+      }
     }
 
     task = await Task.create({
@@ -184,7 +195,12 @@ export async function POST(request) {
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error('[AionCore] Reject message:', errText);
-      throw new Error('启动 AionCore 推理失败');
+      if (aiRes.status === 409) {
+        const conflict = new Error('上一条指令仍在处理中，请等待完成后再发送');
+        conflict.status = 409;
+        throw conflict;
+      }
+      throw new Error('OfficeGPT 暂时无法启动生成，请稍后重试');
     }
 
     return NextResponse.json({
@@ -197,12 +213,13 @@ export async function POST(request) {
 
   } catch (error) {
     chatError('process', 'task initiation failed', error);
+    const userMessage = publicErrorMessage(error);
     if (task?._id && billingUserId) {
       await releaseTaskReservation({ taskId: task._id, userId: billingUserId, reason: '任务启动失败，退回预授权额度' }).catch((releaseError) => {
         chatError('billing', 'failed to release reservation after startup error', releaseError);
       });
-      await Task.updateOne({ _id: task._id }, { $set: { status: 'failed', 'runtime.state': 'failed', errorMessage: error.message } }).catch(() => undefined);
+      await Task.updateOne({ _id: task._id }, { $set: { status: 'failed', 'runtime.state': 'failed', errorMessage: userMessage } }).catch(() => undefined);
     }
-    return NextResponse.json({ error: error.message || '内部处理错误' }, { status: 500 });
+    return NextResponse.json({ error: userMessage }, { status: error.status || 500 });
   }
 }

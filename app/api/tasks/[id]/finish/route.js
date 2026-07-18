@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth';
 import Task from '@/models/Task';
 import { reconcileTaskArtifacts } from '@/lib/workspace/artifact-reconcile';
 import { taskArtifactViews } from '@/lib/office/artifacts';
+import { settleTaskCredits } from '@/lib/billing/service';
+import { readConversationUsage, subtractUsage } from '@/lib/aioncore/session-usage';
 
 export async function PUT(request, { params }) {
   try {
@@ -29,6 +31,22 @@ export async function PUT(request, { params }) {
       artifact.updatedAt = new Date();
     }
     await task.save();
+
+    if (task.billing?.state === 'reserved' && task.aionConversationId) {
+      const [totalUsage, settledTasks] = await Promise.all([
+        readConversationUsage(task.aionConversationId),
+        Task.find({
+          _id: { $ne: task._id },
+          userId: user._id,
+          aionConversationId: task.aionConversationId,
+          'billing.state': 'settled',
+        }).select('billing.usage').lean(),
+      ]);
+      const usage = subtractUsage(totalUsage, settledTasks);
+      if (usage && usage.input_tokens + usage.output_tokens > 0) {
+        await settleTaskCredits({ taskId: task._id, userId: user._id, usage, source: 'aioncore-session' });
+      }
+    }
 
     return NextResponse.json({ success: true, artifacts: taskArtifactViews(task) });
   } catch (error) {

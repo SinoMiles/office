@@ -13,6 +13,9 @@ const TABS = [
 
 const headingStyle = { fontSize: '1.3rem', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '16px', fontWeight: 700 };
 const labelStyle = { display: 'grid', gap: '7px', fontWeight: 500 };
+const billingGroupStyle = { padding: '20px', border: '1px solid var(--border)', borderRadius: '14px', background: '#fff' };
+const billingGroupTitleStyle = { fontSize: '1rem', margin: 0, color: 'var(--text-main)', fontWeight: 700 };
+const billingGroupDescriptionStyle = { margin: '5px 0 16px', color: 'var(--text-muted)', fontSize: '.82rem', lineHeight: 1.6 };
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState(null);
@@ -134,16 +137,45 @@ export default function AdminSettingsPage() {
 
       {activeTab === 'billing' && (
         <section className="premium-stat-card">
-          <h2 style={headingStyle}><span style={{ color: 'var(--primary)', marginRight: '8px' }}>✦</span>商用计费策略（Credits）</h2>
-          <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '18px' }}>本页只保存计费配置，不会修改大模型或微信登录设置。</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px' }}>
-            {[['inputCreditsPer1K', '输入 / 1K Tokens'], ['outputCreditsPer1K', '输出 / 1K Tokens'], ['cachedInputCreditsPer1K', '缓存输入 / 1K Tokens']].map(([key, label]) => <label key={key} style={labelStyle}>{label}<input type="number" min="0" step="0.001" className="input-base" value={settings.billing.models['deepseek-v4-flash'][key]} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, models: { ...current.billing.models, 'deepseek-v4-flash': { ...current.billing.models['deepseek-v4-flash'], [key]: Number(event.target.value) } } } }))} /></label>)}
-            <label style={labelStyle}>Credits / ¥1<input type="number" min="1" step="1" className="input-base" value={settings.billing.creditsPerCny} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, creditsPerCny: Number(event.target.value) } }))} /></label>
-            <label style={labelStyle}>预留输入 Tokens<input type="number" min="0" step="1000" className="input-base" value={settings.billing.reservationInputTokens} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, reservationInputTokens: Number(event.target.value) } }))} /></label>
-            <label style={labelStyle}>预留输出 Tokens<input type="number" min="0" step="1000" className="input-base" value={settings.billing.reservationOutputTokens} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, reservationOutputTokens: Number(event.target.value) } }))} /></label>
-            {['FREE', 'PRO', 'ENTERPRISE'].map((level) => <label key={level} style={labelStyle}>{level} 计费倍率<input type="number" min="0" max="1" step="0.05" className="input-base" value={settings.billing.discountRates[level]} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, discountRates: { ...current.billing.discountRates, [level]: Number(event.target.value) } } }))} /></label>)}
+          <h2 style={{ ...headingStyle, marginBottom: '16px' }}><span style={{ color: 'var(--primary)', marginRight: '8px' }}>✦</span>计费策略</h2>
+          <div style={{ padding: '13px 16px', marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', border: '1px solid #a7f3d0', borderRadius: '12px', background: '#f0fdf8' }}>
+            <div><div style={{ color: '#047857', fontWeight: 750 }}>按实际 Token 直接结算</div><div style={{ marginTop: '3px', color: '#527066', fontSize: '.78rem' }}>任务完成后一次性扣款，不产生预授权扣款和余额退回流水。</div></div>
+            <span style={{ flexShrink: 0, padding: '5px 9px', borderRadius: '999px', background: '#d1fae5', color: '#047857', fontSize: '.72rem', fontWeight: 750 }}>已启用</span>
           </div>
-          <div style={{ marginTop: '24px' }}>{saveButton('billing')}</div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            <div style={billingGroupStyle}>
+              <h3 style={billingGroupTitleStyle}>Token 单价</h3>
+              <p style={billingGroupDescriptionStyle}>模型：deepseek-v4-flash，单位为每 1,000 Tokens 消耗的 Credits。</p>
+              <div style={{ display: 'grid', gap: '14px' }}>
+                {[['inputCreditsPer1K', '输入 Tokens'], ['outputCreditsPer1K', '输出 Tokens'], ['cachedInputCreditsPer1K', '缓存输入 Tokens']].map(([key, label]) => <label key={key} style={labelStyle}>{label}<div style={{ position: 'relative' }}><input type="number" min="0" step="0.001" className="input-base" style={{ width: '100%', paddingRight: '92px' }} value={settings.billing.models['deepseek-v4-flash'][key]} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, models: { ...current.billing.models, 'deepseek-v4-flash': { ...current.billing.models['deepseek-v4-flash'], [key]: Number(event.target.value) } } } }))} /><span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '.72rem' }}>Credits / 1K</span></div></label>)}
+              </div>
+            </div>
+
+            <div style={billingGroupStyle}>
+              <h3 style={billingGroupTitleStyle}>会员计费倍率</h3>
+              <p style={billingGroupDescriptionStyle}>最终费用 = Token 原价 × 会员倍率。1 表示原价，0.8 表示八折。</p>
+              <div style={{ display: 'grid', gap: '14px' }}>
+                {[['FREE', '免费用户'], ['PRO', '专业版'], ['ENTERPRISE', '企业版']].map(([level, label]) => <label key={level} style={labelStyle}>{label}<div style={{ position: 'relative' }}><input type="number" min="0" max="1" step="0.05" className="input-base" style={{ width: '100%', paddingRight: '58px' }} value={settings.billing.discountRates[level]} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, discountRates: { ...current.billing.discountRates, [level]: Number(event.target.value) } } }))} /><span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '.72rem' }}>× 原价</span></div></label>)}
+              </div>
+            </div>
+
+            <div style={billingGroupStyle}>
+              <h3 style={billingGroupTitleStyle}>充值换算</h3>
+              <p style={billingGroupDescriptionStyle}>用于微信支付充值时，将人民币金额换算为到账 Credits。</p>
+              <label style={labelStyle}>每 ¥1 到账 Credits<div style={{ position: 'relative' }}><input type="number" min="1" step="1" className="input-base" style={{ width: '100%', paddingRight: '88px' }} value={settings.billing.creditsPerCny} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, creditsPerCny: Number(event.target.value) } }))} /><span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '.72rem' }}>Credits / ¥1</span></div></label>
+            </div>
+
+            <div style={billingGroupStyle}>
+              <h3 style={billingGroupTitleStyle}>任务额度校验</h3>
+              <p style={billingGroupDescriptionStyle}>仅用于开始任务前估算最低余额，不会冻结或扣除余额；最终仍按实际 Token 结算。</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+                <label style={labelStyle}>估算输入 Tokens<input type="number" min="0" step="1000" className="input-base" value={settings.billing.reservationInputTokens} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, reservationInputTokens: Number(event.target.value) } }))} /></label>
+                <label style={labelStyle}>估算输出 Tokens<input type="number" min="0" step="1000" className="input-base" value={settings.billing.reservationOutputTokens} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, reservationOutputTokens: Number(event.target.value) } }))} /></label>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: '20px', paddingTop: '18px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)' }}>{saveButton('billing')}</div>
         </section>
       )}
 

@@ -22,7 +22,7 @@ export async function GET(request) {
     const page = positiveInteger(searchParams.get('page'), 1);
     const pageSize = Math.min(50, Math.max(10, positiveInteger(searchParams.get('pageSize'), 20)));
     const type = searchParams.get('type');
-    const query = { userId: user._id, ...(type && type !== 'all' ? { type } : {}) };
+    const query = { userId: user._id, ...(type && type !== 'all' ? { type } : { type: { $in: ['charge', 'consume', 'adjustment'] } }) };
     const [records, total, billingSetting] = await Promise.all([
       BillingRecord.find(query).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).populate('relatedTaskId', 'prompt filename').lean(),
       BillingRecord.countDocuments(query),
