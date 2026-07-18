@@ -27,7 +27,7 @@ export default function Thinking({ thought }) {
         <ChevronDown size={16} style={{ transform: expanded ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform .2s' }} />
       </button>
       {expanded && (
-        <div style={{ padding: '0 13px 12px', fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '260px', overflowY: 'auto' }}>
+        <div style={{ minWidth: 0, maxWidth: '100%', padding: '0 13px 12px', fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: '260px', overflowY: 'auto', overflowX: 'hidden', scrollbarGutter: 'stable' }}>
           {thought.description}
         </div>
       )}

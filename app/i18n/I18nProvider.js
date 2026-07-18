@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import messages from './messages';
-import { DEFAULT_LOCALE, LOCALE_COOKIE, normalizeLocale } from './config';
+import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALE_EXPLICIT_COOKIE, normalizeLocale } from './config';
 
 const I18nContext = createContext(null);
 
@@ -23,6 +23,7 @@ export function I18nProvider({ initialLocale = DEFAULT_LOCALE, children }) {
     const normalized = normalizeLocale(nextLocale);
     updateLocale(normalized);
     document.cookie = `${LOCALE_COOKIE}=${encodeURIComponent(normalized)}; path=/; max-age=31536000; samesite=lax`;
+    document.cookie = `${LOCALE_EXPLICIT_COOKIE}=1; path=/; max-age=31536000; samesite=lax`;
   }, []);
 
   const t = useCallback((key, params = {}) => {

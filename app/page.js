@@ -128,7 +128,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it Works Section - Flow Design */}
-      <section id="solutions" style={{ padding: '120px 24px', background: 'white', position: 'relative', overflow: 'hidden' }}>
+      <section id="features" style={{ padding: '120px 24px', background: 'white', position: 'relative', overflow: 'hidden' }}>
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '80px', position: 'relative', zIndex: 2 }}>
             <div style={{ display: 'inline-block', color: 'var(--primary)', fontWeight: 700, marginBottom: '16px', padding: '8px 16px', background: 'var(--primary-light)', borderRadius: '20px', fontSize: '0.9rem' }}>{copy.workflow[0]}</div>

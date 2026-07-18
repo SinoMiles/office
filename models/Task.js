@@ -9,11 +9,19 @@ const ArtifactSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
+const AttachmentSchema = new mongoose.Schema({
+  filename: { type: String, required: true },
+  filePath: { type: String, required: true },
+  size: { type: Number, default: 0 },
+  mimeType: { type: String },
+}, { _id: false });
+
 const TaskSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   parentTaskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task' }, // Links to previous chat turn
   filename: { type: String },
   originalFile: { type: String }, // Path to the uploaded file
+  attachments: { type: [AttachmentSchema], default: [] },
   processedFile: { type: String }, // Path to the modified file
   prompt: { type: String },
   aionConversationId: { type: String },

@@ -8,7 +8,7 @@ import TopNav from './components/TopNav'
 import { Toaster } from 'react-hot-toast'
 import { getSiteUrl } from '@/lib/seo'
 import { I18nProvider } from './i18n/I18nProvider'
-import { LOCALE_COOKIE, normalizeLocale } from './i18n/config'
+import { LOCALE_COOKIE, LOCALE_EXPLICIT_COOKIE, normalizeLocale } from './i18n/config'
 import { publicMetadata } from './i18n/publicSeo'
 
 const baseMetadata = {
@@ -51,7 +51,10 @@ export default async function RootLayout({ children }) {
   const token = cookieStore.get('auth_token')?.value;
   const isLoggedIn = !!token;
   const headerStore = await headers();
-  const locale = normalizeLocale(headerStore.get('x-office-locale') || cookieStore.get(LOCALE_COOKIE)?.value || headerStore.get('accept-language'));
+  const explicitLocale = cookieStore.get(LOCALE_EXPLICIT_COOKIE)?.value === '1'
+    ? cookieStore.get(LOCALE_COOKIE)?.value
+    : null;
+  const locale = normalizeLocale(headerStore.get('x-office-locale') || explicitLocale || headerStore.get('accept-language'));
 
   return (
     <html lang={locale} data-scroll-behavior="smooth">

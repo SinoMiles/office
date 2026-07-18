@@ -91,12 +91,12 @@ export function useAioncoreChat() {
   }, [startOfficePreview]);
 
   const applyRuntimeEvent = useCallback((name, payload) => {
-    setRuntime((previous) => {
-      const next = reduceRuntime(previous, name, payload);
-      runtimeRef.current = next;
-      chatLog('runtime', `${name}: ${previous.state}/${previous.isProcessing} -> ${next.state}/${next.isProcessing}`, payload);
-      return next;
-    });
+    const previous = runtimeRef.current;
+    const next = reduceRuntime(previous, name, payload);
+    if (next === previous) return;
+    runtimeRef.current = next;
+    chatLog('runtime', `${name}: ${previous.state}/${previous.isProcessing} -> ${next.state}/${next.isProcessing}`, payload);
+    setRuntime(next);
   }, []);
 
   const flushMessageQueue = useCallback(() => {
@@ -211,13 +211,14 @@ export function useAioncoreChat() {
     chatLog('conversation', 'realtime connection confirmed ready');
   }, []);
 
-  const sendMessage = useCallback((text, attachedFile, overrideConversationId = null) => {
+  const sendMessage = useCallback((text, attachedFiles = [], overrideConversationId = null) => {
     const activeId = overrideConversationId || conversationIdRef.current;
     if (!activeId) {
       chatWarn('conversation', 'send ignored because conversation id is missing');
       return;
     }
-    chatLog('conversation', `optimistic send to ${activeId}`, { conversation_id: activeId, attachment: Boolean(attachedFile) });
+    const files = Array.isArray(attachedFiles) ? attachedFiles : attachedFiles ? [attachedFiles] : [];
+    chatLog('conversation', `optimistic send to ${activeId}`, { conversation_id: activeId, attachmentCount: files.length });
     conversationIdRef.current = activeId;
     applyRuntimeEvent('local.send', {});
     setMessages((previous) => [
@@ -225,7 +226,7 @@ export function useAioncoreChat() {
       {
         role: 'user',
         type: 'text',
-        content: { content: text, filename: attachedFile?.name },
+        content: { content: text, filename: files[0]?.name, filenames: files.map((file) => file.name) },
         msg_id: `local-user-${crypto.randomUUID()}`,
         conversation_id: activeId,
       },

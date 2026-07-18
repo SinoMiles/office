@@ -43,3 +43,16 @@ test('attaches each turn files to its assistant message', () => {
   assert.equal(result[1].artifacts[0].filename, 'a.pptx');
   assert.equal(result[3].artifacts[0].filename, 'b.xlsx');
 });
+
+test('restores uploaded attachments onto historical user messages', () => {
+  const messages = [{ role: 'user', content: '分析文件' }, { role: 'ai', content: '完成' }];
+  const turns = [{
+    _id: 'upload-turn',
+    filename: 'legacy.xlsx',
+    attachments: [{ filename: '成绩统计表.xlsx', filePath: '/tmp/成绩统计表.xlsx' }],
+  }];
+  const result = attachArtifactsToMessages(messages, turns);
+  assert.deepEqual(result[0].filenames, ['成绩统计表.xlsx']);
+  assert.equal(result[0].filename, '成绩统计表.xlsx');
+  assert.equal(result[0].attachments[0].previewUrl, '/api/tasks/upload-turn/office-preview/attachment/0/');
+});

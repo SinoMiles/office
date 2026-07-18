@@ -1,6 +1,6 @@
 const zh = {
   language: { select: '选择语言' },
-  nav: { documents: '文档处理', features: '产品功能', solutions: '解决方案', pricing: '价格方案', login: '登录', start: '免费开始体验', home: 'OfficeGPT 首页', expand: '展开左侧导航', collapse: '收起左侧导航' },
+  nav: { documents: '文档处理', features: '产品功能', solutions: '常见问题', pricing: '价格方案', login: '登录', start: '免费开始体验', home: 'OfficeGPT 首页', expand: '展开左侧导航', collapse: '收起左侧导航' },
   footer: { summary: '基于最新大语言模型驱动的下一代数据处理与办公自动化 SaaS 平台。', products: '产品与服务', workflow: '核心工作流', billing: '按量计费方案', docs: '帮助文档中心', legal: '法律与支持', about: '关于我们', privacy: '隐私政策', terms: '服务条款', rights: '© 2026 深圳市星尚硕教育科技有限公司 保留所有权利。' },
   faq: { title: '常见问题解答', subtitle: '了解更多关于 OfficeGPT 的核心优势与安全机制', items: [
     ['OfficeGPT 与传统 Excel/Word 相比有什么优势？', '无需记忆复杂函数或手动排版，只需使用自然语言描述目标，AI 即可完成计算、整理和排版。'],
@@ -12,7 +12,7 @@ const zh = {
 
 const en = {
   language: { select: 'Select language' },
-  nav: { documents: 'Document tools', features: 'Features', solutions: 'Solutions', pricing: 'Pricing', login: 'Log in', start: 'Start for free', home: 'OfficeGPT home', expand: 'Expand sidebar', collapse: 'Collapse sidebar' },
+  nav: { documents: 'Document tools', features: 'Features', solutions: 'FAQ', pricing: 'Pricing', login: 'Log in', start: 'Start for free', home: 'OfficeGPT home', expand: 'Expand sidebar', collapse: 'Collapse sidebar' },
   footer: { summary: 'A next-generation SaaS platform for data processing and office automation, powered by large language models.', products: 'Products & services', workflow: 'Core workflow', billing: 'Usage-based pricing', docs: 'Help center', legal: 'Legal & support', about: 'About us', privacy: 'Privacy policy', terms: 'Terms of service', rights: '© 2026 Shenzhen Xingshangshuo Education Technology Co., Ltd. All rights reserved.' },
   faq: { title: 'Frequently asked questions', subtitle: 'Learn about OfficeGPT’s core benefits and security', items: [
     ['How is OfficeGPT better than traditional Excel or Word?', 'Describe your goal in natural language instead of memorizing formulas or formatting documents manually. AI handles calculations, organization, and layout.'],
@@ -27,12 +27,12 @@ const translations = {
   en,
   ja: {
     language: { select: '言語を選択' },
-    nav: { documents: '文書処理', features: '機能', solutions: 'ソリューション', pricing: '料金', login: 'ログイン', start: '無料で始める', home: 'OfficeGPT ホーム', expand: 'サイドバーを開く', collapse: 'サイドバーを閉じる' },
+    nav: { documents: '文書処理', features: '機能', solutions: 'よくある質問', pricing: '料金', login: 'ログイン', start: '無料で始める', home: 'OfficeGPT ホーム', expand: 'サイドバーを開く', collapse: 'サイドバーを閉じる' },
     footer: { summary: '大規模言語モデルを活用した、次世代のデータ処理・オフィス自動化 SaaS プラットフォーム。', products: '製品とサービス', workflow: '主要ワークフロー', billing: '従量課金', docs: 'ヘルプセンター', legal: '法務・サポート', about: '会社概要', privacy: 'プライバシーポリシー', terms: '利用規約', rights: '© 2026 Shenzhen Xingshangshuo Education Technology Co., Ltd. All rights reserved.' },
     faq: { title: 'よくある質問', subtitle: 'OfficeGPT の主な特長とセキュリティについて', items: [['従来の Excel や Word との違いは？','数式や書式を覚えず、自然な言葉で目的を伝えるだけで AI が計算・整理・レイアウトを行います。'],['アップロードした文書は安全ですか？','処理は分離環境で実行され、ファイルは処理中のみ使用されます。個人データを学習には使用しません。'],['AI はどのように文書を処理しますか？','意図を理解して正確な操作手順を作成し、安全な環境で読み取り、計算、変換、生成を行います。'],['無料で試せますか？','はい。新規ユーザーには主要機能を試せる無料クレジットがあります。']] },
   },
   ko: {
-    language: { select: '언어 선택' }, nav: { documents: '문서 처리', features: '제품 기능', solutions: '솔루션', pricing: '요금제', login: '로그인', start: '무료로 시작', home: 'OfficeGPT 홈', expand: '사이드바 열기', collapse: '사이드바 닫기' },
+    language: { select: '언어 선택' }, nav: { documents: '문서 처리', features: '제품 기능', solutions: '자주 묻는 질문', pricing: '요금제', login: '로그인', start: '무료로 시작', home: 'OfficeGPT 홈', expand: '사이드바 열기', collapse: '사이드바 닫기' },
     footer: { summary: '대규모 언어 모델 기반의 차세대 데이터 처리 및 업무 자동화 SaaS 플랫폼입니다.', products: '제품 및 서비스', workflow: '핵심 워크플로', billing: '사용량 기반 요금', docs: '도움말 센터', legal: '법률 및 지원', about: '회사 소개', privacy: '개인정보 처리방침', terms: '서비스 약관', rights: '© 2026 Shenzhen Xingshangshuo Education Technology Co., Ltd. All rights reserved.' },
     faq: { title: '자주 묻는 질문', subtitle: 'OfficeGPT의 핵심 장점과 보안을 알아보세요', items: [['기존 Excel이나 Word와 무엇이 다른가요?','복잡한 수식이나 서식을 외울 필요 없이 자연어로 목표를 설명하면 AI가 계산, 정리, 서식을 처리합니다.'],['업로드한 문서는 안전한가요?','문서 작업은 격리된 환경에서 실행되며 파일은 처리 중에만 사용됩니다. 개인정보를 모델 학습에 사용하지 않습니다.'],['AI는 문서를 어떻게 처리하나요?','요청 의도를 이해하고 정확한 작업 단계를 만든 뒤 안전한 환경에서 읽기, 계산, 변환, 생성을 수행합니다.'],['무료 체험이 있나요?','네. 신규 사용자에게 핵심 기능을 체험할 수 있는 무료 크레딧을 제공합니다.']] },
   },
@@ -47,7 +47,7 @@ const western = {
 
 for (const [locale, v] of Object.entries(western)) {
   translations[locale] = {
-    language: { select: v[0] }, nav: { documents:v[1],features:v[2],solutions:v[3],pricing:v[4],login:v[5],start:v[6],home:v[7],expand:v[8],collapse:v[9] },
+    language: { select: v[0] }, nav: { documents:v[1],features:v[2],solutions:v[19],pricing:v[4],login:v[5],start:v[6],home:v[7],expand:v[8],collapse:v[9] },
     footer: { summary:v[10],products:v[11],workflow:v[12],billing:v[13],docs:v[14],legal:v[15],about:v[16],privacy:v[17],terms:v[18],rights:en.footer.rights },
     faq: { title:v[19],subtitle:v[20],items:en.faq.items },
   };

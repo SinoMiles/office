@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { LOCALE_COOKIE, normalizeLocale } from '@/app/i18n/config';
+import { LOCALE_COOKIE, LOCALE_EXPLICIT_COOKIE, normalizeLocale } from '@/app/i18n/config';
 
 const localeSegments = { 'zh-CN': 'zh-cn', en: 'en', ja: 'ja', ko: 'ko', es: 'es', pt: 'pt', fr: 'fr', de: 'de' };
 const segmentLocales = Object.fromEntries(Object.entries(localeSegments).map(([locale, segment]) => [segment, locale]));
@@ -26,7 +26,10 @@ export function proxy(request) {
 
   const root = parts[0] || '';
   if (!publicRoots.has(root)) return NextResponse.next();
-  const locale = normalizeLocale(request.cookies.get(LOCALE_COOKIE)?.value || request.headers.get('accept-language'));
+  const explicitLocale = request.cookies.get(LOCALE_EXPLICIT_COOKIE)?.value === '1'
+    ? request.cookies.get(LOCALE_COOKIE)?.value
+    : null;
+  const locale = normalizeLocale(explicitLocale || request.headers.get('accept-language'));
   const url = request.nextUrl.clone();
   url.pathname = `/${localeSegments[locale]}${pathname === '/' ? '' : pathname}`;
   return NextResponse.redirect(url, 308);

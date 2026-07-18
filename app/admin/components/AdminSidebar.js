@@ -1,14 +1,14 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Settings, LogOut } from 'lucide-react';
+import { BarChart3, Users, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminSidebar({ user }) {
   const pathname = usePathname();
 
   const links = [
-    { href: '/admin', icon: LayoutDashboard, label: '系统仪表盘' },
+    { href: '/admin', icon: BarChart3, label: '数据统计' },
     { href: '/admin/users', icon: Users, label: '用户管理' },
     { href: '/admin/settings', icon: Settings, label: '系统设置' },
   ];

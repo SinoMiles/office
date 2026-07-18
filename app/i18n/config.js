@@ -1,4 +1,5 @@
 export const LOCALE_COOKIE = 'office_locale';
+export const LOCALE_EXPLICIT_COOKIE = 'office_locale_explicit';
 export const DEFAULT_LOCALE = 'zh-CN';
 
 export const SUPPORTED_LOCALES = [

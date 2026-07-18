@@ -20,18 +20,21 @@ function rewritePreviewHtml(html, prefix) {
     </style></head>`);
 }
 
-async function proxy(request, { params }) {
+export async function proxy(request, { params }) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ error: '请先登录' }, { status: 401 });
   const { id, path = [] } = await params;
   await connectToDatabase();
-  const task = await Task.findOne({ _id: id, userId: user._id }).select('outputFile artifacts').lean();
+  const task = await Task.findOne({ _id: id, userId: user._id }).select('outputFile artifacts attachments').lean();
   if (!task) return Response.json({ error: '任务不存在' }, { status: 404 });
   const candidateId = path[0];
   const artifact = candidateId ? task.artifacts?.find((item) => String(item._id) === candidateId) : null;
-  const upstreamPath = artifact ? path.slice(1) : path;
-  const filePath = artifact?.filePath || task.outputFile;
-  const watchKey = artifact ? `${id}:${candidateId}` : id;
+  const attachmentMatch = candidateId?.match(/^attachment-(\d+)$/);
+  const attachment = attachmentMatch ? task.attachments?.[Number(attachmentMatch[1])] : null;
+  const selectedFile = artifact || attachment;
+  const upstreamPath = selectedFile ? path.slice(1) : path;
+  const filePath = selectedFile?.filePath || task.outputFile;
+  const watchKey = selectedFile ? `${id}:${candidateId}` : id;
   let port = getWatchPort(watchKey);
   if (!port && filePath) {
     try {
@@ -50,7 +53,7 @@ async function proxy(request, { params }) {
   headers.delete('content-security-policy');
 
   if (response.headers.get('content-type')?.includes('text/html')) {
-    const prefix = `/api/tasks/${id}/office-preview/proxy${artifact ? `/${candidateId}` : ''}`;
+    const prefix = `/api/tasks/${id}/office-preview/proxy${selectedFile ? `/${candidateId}` : ''}`;
     const html = rewritePreviewHtml(await response.text(), prefix);
     headers.delete('content-length');
     return new Response(html, { status: response.status, headers });

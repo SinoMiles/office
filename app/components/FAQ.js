@@ -43,7 +43,7 @@ export default function FAQ() {
   };
 
   return (
-    <section style={{ padding: '80px 24px', background: 'var(--background)' }}>
+    <section id="faq" style={{ padding: '80px 24px', background: 'var(--background)', scrollMarginTop: '88px' }}>
       {/* JSON-LD Schema Injection */}
       <script
         type="application/ld+json"

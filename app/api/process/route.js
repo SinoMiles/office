@@ -14,6 +14,8 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_UPLOAD_FILES = 10;
+const MAX_TOTAL_UPLOAD_BYTES = 100 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.pptx', '.png', '.jpg', '.jpeg', '.webp']);
 const AIONCORE_URL = getAioncoreBaseUrl();
 
@@ -30,9 +32,13 @@ export async function POST(request) {
     const prompt = String(formData.get('prompt') || '').trim();
     const productLocale = request.headers.get('accept-language')?.split(',')[0]?.trim() || 'zh-CN';
     const parentTaskId = String(formData.get('taskId') || '').trim();
-    const file = formData.get('file');
+    const files = formData.getAll('files').filter((item) => item && typeof item.arrayBuffer === 'function');
+    const legacyFile = formData.get('file');
+    if (!files.length && legacyFile && typeof legacyFile.arrayBuffer === 'function') files.push(legacyFile);
     if (!prompt) return NextResponse.json({ error: '请输入处理需求' }, { status: 400 });
-    chatLog('process', 'request accepted', { parentTaskId: parentTaskId || undefined, hasFile: Boolean(file) });
+    if (files.length > MAX_UPLOAD_FILES) return NextResponse.json({ error: `每次最多上传 ${MAX_UPLOAD_FILES} 个文件` }, { status: 400 });
+    if (files.reduce((total, item) => total + Number(item.size || 0), 0) > MAX_TOTAL_UPLOAD_BYTES) return NextResponse.json({ error: '文件总大小不能超过 100MB' }, { status: 400 });
+    chatLog('process', 'request accepted', { parentTaskId: parentTaskId || undefined, fileCount: files.length });
     const parentTask = parentTaskId
       ? await Task.findOne({ _id: parentTaskId, userId: user._id })
       : null;
@@ -114,38 +120,29 @@ export async function POST(request) {
     });
 
     let filename = parentTask?.filename || '';
-    let aionFilePath = '';
-
-    if (file && typeof file.arrayBuffer === 'function') {
-      if (file.size > MAX_UPLOAD_BYTES) {
-        throw new Error('文件不能超过 25MB');
-      }
-      filename = path.basename(file.name).replace(/[^\p{L}\p{N}._-]+/gu, '_');
-      const extension = path.extname(filename).toLowerCase();
-      if (!ALLOWED_EXTENSIONS.has(extension)) throw new Error('不支持该文件格式');
-
-      // Upload file directly to AionCore's file system so it can process it
+    const uploadedAttachments = [];
+    for (const file of files) {
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error(`文件 ${file.name} 不能超过 25MB`);
+      const safeFilename = path.basename(file.name).replace(/[^\p{L}\p{N}._-]+/gu, '_');
+      const extension = path.extname(safeFilename).toLowerCase();
+      if (!ALLOWED_EXTENSIONS.has(extension)) throw new Error(`不支持文件格式：${file.name}`);
       const uploadData = new FormData();
       uploadData.append('file', file);
-      uploadData.append('file_name', filename);
+      uploadData.append('file_name', safeFilename);
       uploadData.append('conversation_id', aionConversationId);
-
       const aioncoreRes = await fetch(`${AIONCORE_URL}/api/fs/upload`, {
         method: 'POST',
         body: uploadData,
       });
-
-      if (!aioncoreRes.ok) {
-        throw new Error('上传附件至处理引擎失败');
-      }
-      
+      if (!aioncoreRes.ok) throw new Error(`上传附件失败：${file.name}`);
       const resJson = await aioncoreRes.json();
-      aionFilePath = resJson.data; // Absolute path on disk returned by AionCore
-      
-      // Update Task with file references
+      uploadedAttachments.push({ filename: safeFilename, filePath: resJson.data, size: file.size, mimeType: file.type });
+    }
+    if (uploadedAttachments.length) {
+      filename = uploadedAttachments[0].filename;
       await Task.updateOne(
         { _id: task._id },
-        { $set: { filename, originalFile: aionFilePath } }
+        { $set: { filename, originalFile: uploadedAttachments[0].filePath, attachments: uploadedAttachments } }
       );
     }
 
@@ -179,7 +176,7 @@ export async function POST(request) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         content: prompt,
-        files: filename ? [filename] : [],
+        files: uploadedAttachments.map((attachment) => attachment.filePath),
       })
     });
     chatLog('process', `message start response ${aiRes.status}`, { conversation_id: aionConversationId });

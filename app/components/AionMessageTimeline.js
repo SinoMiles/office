@@ -18,7 +18,7 @@ function ThinkingBlock({ block }) {
         <span>{block.done ? copy.thinkingDone : block.subject || copy.deepThinking}{block.done && seconds ? ` · ${seconds} ${copy.second}` : ''}</span>
         <ChevronRight size={13} style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform .18s' }} />
       </button>
-      {expanded && block.description && <div style={{ margin: '4px 0 2px 21px', padding: '9px 11px', borderLeft: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.82rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{block.description}</div>}
+      {expanded && block.description && <div style={{ minWidth: 0, maxWidth: '100%', maxHeight: '260px', margin: '4px 0 2px 21px', padding: '9px 11px', overflowY: 'auto', overflowX: 'hidden', overflowWrap: 'anywhere', scrollbarGutter: 'stable', borderLeft: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.82rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{block.description}</div>}
     </div>
   );
 }
@@ -49,7 +49,7 @@ function TextBlock({ content, error }) {
 export default function AionMessageTimeline({ message }) {
   const { locale } = useI18n(); const copy = dashboardExtra(locale);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minWidth: 0, maxWidth: '100%', display: 'flex', flexDirection: 'column', overflowX: 'hidden', overflowY: 'visible' }}>
       {(message.blocks || []).map((block, index) => {
         if (block.type === 'thinking') return <ThinkingBlock key={`${block.id}-${index}`} block={block} />;
         if (block.type === 'tools') return null;

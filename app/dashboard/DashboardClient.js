@@ -3,10 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, FileType2, ImageIcon, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
@@ -14,6 +10,7 @@ import Thinking from '@/app/components/Thinking';
 import AionMessageTimeline from '@/app/components/AionMessageTimeline';
 import WorkspaceBrowser from '@/app/components/WorkspaceBrowser';
 import GenericFilePreview from '@/app/components/GenericFilePreview';
+import ChatMarkdown from '@/app/components/ChatMarkdown';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
 import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
 import { useI18n } from '@/app/i18n/I18nProvider';
@@ -30,6 +27,15 @@ function paginationItems(page, totalPages) {
   if (page <= 4) return [1, 2, 3, 4, 5, 'end-ellipsis', totalPages];
   if (page >= totalPages - 3) return [1, 'start-ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
   return [1, 'start-ellipsis', page - 1, page, page + 1, 'end-ellipsis', totalPages];
+}
+
+function timelineSummary(value, limit = 120) {
+  const text = String(value || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#>*_`~\[\]()|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
 
 function formatBillingDateTime(value, locale) {
@@ -63,6 +69,7 @@ export default function DashboardClient() {
   const [followLatest, setFollowLatest] = useState(true);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState(null);
   const [previewError, setPreviewError] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -71,6 +78,14 @@ export default function DashboardClient() {
   const [rechargeAmountYuan, setRechargeAmountYuan] = useState(50);
   const [wechatPayment, setWechatPayment] = useState(null);
   const [wechatPaymentLoading, setWechatPaymentLoading] = useState(false);
+  const activeArtifactId = activeArtifact?.id;
+  const activeArtifactUrl = activeArtifact?.previewUrl;
+  const activeArtifactGeneric = Boolean(activeArtifact?.generic);
+
+  useEffect(() => {
+    setPreviewError('');
+    setPreviewLoading(Boolean(activeArtifactId && !activeArtifactGeneric));
+  }, [activeArtifactGeneric, activeArtifactId, activeArtifactUrl]);
 
   const navigateToTab = (tab) => {
     const routes = { workspace: '/dashboard', overview: '/dashboard/overview', billing: '/dashboard/billing' };
@@ -111,15 +126,22 @@ export default function DashboardClient() {
   // Chat UI states
   const [messages, setMessages] = useState([]);
   const [prompt, setPrompt] = useState('');
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [hoveredConversationTurn, setHoveredConversationTurn] = useState(null);
+  const [activeConversationTurn, setActiveConversationTurn] = useState(0);
   const [processLoading, setProcessLoading] = useState(false);
   const isGenerating = processLoading || aionIsProcessing;
   const [activeTaskId, setActiveTaskId] = useState(null); // Tracks the current conversational thread context
   const messagesEndRef = useRef(null);
   const artifactRefs = useRef(new Map());
+  const conversationTurnRefs = useRef(new Map());
+  const autoOpenedArtifactRef = useRef(new Set());
+  const activeConversationTurnRef = useRef(0);
   const promptInputRef = useRef(null);
   const chatScrollRef = useRef(null);
   const followLatestRef = useRef(true);
+  const conversationJumpingRef = useRef(false);
   const previewPanelRef = useRef(null);
   
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -142,15 +164,15 @@ export default function DashboardClient() {
     resizePromptInput(promptInputRef.current);
   }, [prompt, resizePromptInput]);
 
-  const fileTimeline = messages.flatMap((message, messageIndex) =>
-    (message.artifacts || []).map((artifact) => ({ artifact, messageIndex }))
-  );
-
-  const jumpToArtifactRow = useCallback((artifactId) => {
-    const element = artifactRefs.current.get(artifactId);
-    if (!element) return;
-    setFollowLatest(false);
-    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const conversationTimeline = messages.reduce((turns, message, messageIndex) => {
+    if (message.role !== 'user') return turns;
+    const reply = messages.slice(messageIndex + 1).find((candidate) => candidate.role === 'ai');
+    turns.push({
+      messageIndex,
+      question: timelineSummary(message.content, 80) || '新对话',
+      reply: timelineSummary(reply?.content, 140) || (reply?.loading ? '正在回复…' : '暂无回复'),
+    });
+    return turns;
   }, []);
 
   const openArtifact = useCallback((artifact) => {
@@ -281,7 +303,14 @@ export default function DashboardClient() {
       setProcessLoading(true);
       const runtimeProgress = ['tool', 'progress', 'preview'].includes(task.runtime?.progress?.type) ? task.runtime.progress : null;
       setMessages([
-        { role: 'user', content: task.prompt, filename: task.filename },
+        {
+          role: 'user',
+          content: task.prompt,
+          filename: task.filename,
+          filenames: task.attachments?.length
+            ? task.attachments.map((attachment) => attachment.filename)
+            : task.filename ? [task.filename] : [],
+        },
         {
           role: 'ai', content: task.runtime?.streamedText || '', loading: true,
           thought: task.runtime?.thought?.description ? task.runtime.thought : undefined,
@@ -319,6 +348,7 @@ export default function DashboardClient() {
       ...officeArtifact,
       id: `${officeArtifact.taskId || activeTaskId}:${officeArtifact.artifactId || officeArtifact.filename}`,
     };
+    autoOpenedArtifactRef.current.add(artifact.id);
     setMessages((current) => {
       const next = [...current];
       const index = next.findLastIndex((message) => message.role === 'ai');
@@ -332,6 +362,35 @@ export default function DashboardClient() {
     });
     openArtifact(artifact);
   }, [officeArtifact, activeTaskId, openArtifact]);
+
+  useEffect(() => {
+    if (!activeTaskId || !processLoading) return;
+    let disposed = false;
+    const pollArtifacts = async () => {
+      try {
+        const response = await fetch(`/api/tasks/${activeTaskId}/artifacts`, { cache: 'no-store' });
+        const payload = await response.json();
+        if (!response.ok || disposed || !payload.artifacts?.length) return;
+        setMessages((current) => {
+          const next = [...current];
+          const index = next.findLastIndex((message) => message.role === 'ai');
+          if (index < 0) return current;
+          next[index] = { ...next[index], artifacts: payload.artifacts };
+          return next;
+        });
+        const unseen = payload.artifacts.find((artifact) => !autoOpenedArtifactRef.current.has(artifact.id));
+        if (unseen) {
+          autoOpenedArtifactRef.current.add(unseen.id);
+          openArtifact(unseen);
+        }
+      } catch {
+        // Realtime preview remains the primary path; polling is a resilient fallback.
+      }
+    };
+    void pollArtifacts();
+    const timer = window.setInterval(pollArtifacts, 1500);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [activeTaskId, processLoading, openArtifact]);
 
   useEffect(() => {
     // Sync completion status back to MongoDB when aioncore finishes generating
@@ -360,14 +419,33 @@ export default function DashboardClient() {
   }, [aionIsProcessing, processLoading, activeTaskId]);
 
   useEffect(() => {
-    // Auto scroll to bottom of chat
-    if (followLatest && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, followLatest]);
+    if (!followLatest || !chatScrollRef.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      const element = chatScrollRef.current;
+      if (!element) return;
+      if (isGenerating) element.scrollTop = element.scrollHeight;
+      else element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, followLatest, isGenerating]);
 
   const handleChatScroll = useCallback((event) => {
     const element = event.currentTarget;
+    const viewportTop = element.getBoundingClientRect().top;
+    let nearestTurn = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    conversationTurnRefs.current.forEach((turnElement, turnIndex) => {
+      const distance = Math.abs(turnElement.getBoundingClientRect().top - viewportTop - 72);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestTurn = turnIndex;
+      }
+    });
+    if (activeConversationTurnRef.current !== nearestTurn) {
+      activeConversationTurnRef.current = nearestTurn;
+      setActiveConversationTurn(nearestTurn);
+    }
+    if (conversationJumpingRef.current) return;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
     const nextFollowLatest = followLatestRef.current
       ? distanceFromBottom < 180
@@ -592,15 +670,62 @@ export default function DashboardClient() {
     router.push('/');
   };
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+  const addFiles = useCallback((incomingFiles) => {
+    const allowedExtensions = new Set(['pdf', 'xlsx', 'xls', 'csv', 'docx', 'pptx', 'png', 'jpg', 'jpeg', 'webp']);
+    const selected = Array.from(incomingFiles || []).filter((file) => {
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      return extension && allowedExtensions.has(extension);
+    });
+    if (selected.length !== Array.from(incomingFiles || []).length) toast.error('部分文件格式不受支持');
+    if (!selected.length) return;
+    setFiles((current) => {
+      const unique = [...current];
+      for (const candidate of selected) {
+        if (!unique.some((item) => item.name === candidate.name && item.size === candidate.size && item.lastModified === candidate.lastModified)) unique.push(candidate);
+      }
+      if (unique.length > 10) toast.error('每次最多上传 10 个文件');
+      const limited = unique.slice(0, 10);
+      if (limited.reduce((total, item) => total + item.size, 0) > 100 * 1024 * 1024) {
+        toast.error('文件总大小不能超过 100MB');
+        return current;
+      }
+      return limited;
+    });
+  }, []);
+
+  const jumpToConversationTurn = useCallback((turnIndex) => {
+    conversationJumpingRef.current = true;
+    followLatestRef.current = false;
+    setFollowLatest(false);
+    if (activeConversationTurnRef.current !== turnIndex) {
+      activeConversationTurnRef.current = turnIndex;
+      setActiveConversationTurn(turnIndex);
     }
+    conversationTurnRefs.current.get(turnIndex)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => {
+      conversationJumpingRef.current = false;
+    }, 700);
+  }, []);
+
+  const handleFileChange = (e) => {
+    addFiles(e.target.files);
+    e.target.value = '';
+  };
+
+  const handleFileDrop = (event) => {
+    event.preventDefault();
+    setIsDraggingFiles(false);
+    addFiles(event.dataTransfer.files);
+  };
+
+  const handleDragLeave = (event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    setIsDraggingFiles(false);
   };
 
   const startNewChat = () => {
     setMessages([]);
-    setFile(null);
+    setFiles([]);
     setPrompt('');
     setActiveTaskId(null);
     navigateToTab('workspace');
@@ -621,7 +746,7 @@ export default function DashboardClient() {
     const payload = await fetch(`/api/tasks/${task._id}/conversation`).then((res) => res.json()).catch(() => null);
     const conversation = payload?.tasks || [task];
     const persistedMessages = conversation.flatMap((turn) => [
-      { role: 'user', content: turn.prompt, filename: turn.filename },
+      { role: 'user', content: turn.prompt, filename: turn.filename, filenames: turn.attachments?.length ? turn.attachments.map((item) => item.filename) : turn.filename ? [turn.filename] : [] },
       {
         role: 'ai',
         content: turn.aiTextResponse || turn.runtime?.streamedText || (turn.status === 'cancelled'
@@ -674,18 +799,18 @@ export default function DashboardClient() {
     if (!prompt.trim() || isGenerating) return;
 
     const currentPrompt = prompt;
-    const currentFile = file;
+    const currentFiles = files;
     const parentTaskId = activeTaskId;
     
     // Optimistically add user message and an empty AI loading message
     const newMessages = [
       ...messages,
-      { role: 'user', content: currentPrompt, filename: currentFile ? currentFile.name : null },
+      { role: 'user', content: currentPrompt, filename: currentFiles[0]?.name || null, filenames: currentFiles.map((item) => item.name) },
       { role: 'ai', content: '', loading: true }
     ];
     setMessages(newMessages);
     setPrompt('');
-    setFile(null);
+    setFiles([]);
     setProcessLoading(true);
 
     try {
@@ -694,7 +819,7 @@ export default function DashboardClient() {
       await waitUntilConnected();
 
       const formData = new FormData();
-      if (currentFile) formData.append('file', currentFile);
+      for (const currentFile of currentFiles) formData.append('files', currentFile);
       formData.append('prompt', currentPrompt);
       if (parentTaskId) formData.append('taskId', parentTaskId);
 
@@ -721,7 +846,7 @@ export default function DashboardClient() {
       loadConversation(resData.aionConversationId, resData.taskId, resData.aionWorkspace);
       
       // Now send the message through AionCore WebSocket
-      sendMessage(currentPrompt, currentFile, resData.aionConversationId);
+      sendMessage(currentPrompt, currentFiles, resData.aionConversationId);
       
       fetchData(); // Update billing
 
@@ -1001,10 +1126,10 @@ export default function DashboardClient() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}>
             
             {/* Left Column (Chat Area + Input) */}
-            <div style={{ flex: showRightPanel ? '0 0 42%' : 1, minWidth: showRightPanel ? '360px' : 0, display: 'flex', flexDirection: 'column', height: '100%', transition: 'flex-basis 0.25s ease', position: 'relative' }}>
+            <div style={{ flex: showRightPanel ? '0 0 42%' : 1, width: showRightPanel ? '42%' : 'auto', minWidth: showRightPanel ? '360px' : 0, maxWidth: showRightPanel ? '42%' : '100%', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: 'flex-basis 0.25s ease', position: 'relative' }}>
             
             {/* Chat Area */}
-            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, overflowY: 'auto', padding: fileTimeline.length && !showRightPanel ? '24px 72px 24px 24px' : '24px', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding-right .2s ease' }}>
+            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding .2s ease' }}>
               {messages.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '0 20px' }}>
                   <Sparkles size={48} color="var(--primary)" style={{ marginBottom: '24px', opacity: 0.8 }} />
@@ -1041,29 +1166,42 @@ export default function DashboardClient() {
                 </div>
               ) : (
                 messages.map((msg, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '16px', maxWidth: '800px', margin: '0 auto', width: '100%', padding: '12px', borderRadius: '16px' }}>
+                  <div
+                    key={i}
+                    ref={(element) => {
+                      if (msg.role !== 'user') return;
+                      const turnIndex = conversationTimeline.findIndex((turn) => turn.messageIndex === i);
+                      if (element) conversationTurnRefs.current.set(turnIndex, element);
+                      else conversationTurnRefs.current.delete(turnIndex);
+                    }}
+                    style={{ flex: '0 0 auto', minWidth: 0, maxWidth: 'min(800px, 100%)', overflowX: 'hidden', overflowY: 'visible', position: 'relative', display: 'block', margin: '0 auto', width: '100%', padding: '12px 0', borderRadius: '16px', scrollMarginTop: '20px' }}
+                  >
                     {msg.role === 'ai' ? (
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ position: 'absolute', top: '12px', left: 0, width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Sparkles size={20} color="var(--primary)" />
                       </div>
                     ) : (
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontWeight: 'bold' }}>
+                      <div style={{ position: 'absolute', top: '12px', left: 0, width: '36px', height: '36px', borderRadius: '50%', background: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
                         U
                       </div>
                     )}
                     
-                    <div style={{ flex: 1, paddingTop: '6px' }}>
-                      <div style={{ fontWeight: 600, marginBottom: '8px', color: 'var(--text-main)' }}>
+                    <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', overflowX: 'hidden', overflowY: 'visible', paddingTop: '6px' }}>
+                      <div style={{ minHeight: '36px', display: 'flex', alignItems: 'center', fontWeight: 600, margin: '0 0 8px 52px', color: 'var(--text-main)' }}>
                         {msg.role === 'ai' ? 'OfficeGPT' : extra.you}
                       </div>
                       
                       {/* User File Attachment */}
-                      {msg.role === 'user' && msg.filename && (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: '12px', fontSize: '0.9rem' }}>
-                          {getFileIcon(msg.filename)}
-                          <span style={{ fontWeight: 500 }}>{msg.filename}</span>
+                      {msg.role === 'user' && (msg.filenames?.length || msg.filename) ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginBottom: '12px' }}>
+                          {(msg.filenames?.length ? msg.filenames : [msg.filename]).map((filename, index) => (
+                            <button type="button" key={`${filename}-${index}`} onClick={() => msg.attachments?.[index] && openArtifact(msg.attachments[index])} disabled={!msg.attachments?.[index]} title={msg.attachments?.[index] ? `预览 ${filename}` : filename} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'white', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', cursor: msg.attachments?.[index] ? 'pointer' : 'default', textAlign: 'left' }}>
+                              {getFileIcon(filename)}
+                              <span style={{ fontWeight: 500 }}>{filename}</span>
+                            </button>
+                          ))}
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Ordered AionCore timeline: thinking, tools and text keep their original positions. */}
                       {msg.blocks?.length > 0 ? <AionMessageTimeline message={msg} /> : <>
@@ -1075,56 +1213,7 @@ export default function DashboardClient() {
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          <div className="markdown-body" style={{ lineHeight: '1.6', color: msg.error ? '#ef4444' : 'var(--text-main)' }}>
-                          {msg.error ? (
-                            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
-                          ) : (
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                code({node, inline, className, children, ...props}) {
-                                  const match = /language-(\w+)/.exec(className || '');
-                                  const language = match ? match[1] : '';
-                                  const codeText = String(children).replace(/\n$/, '');
-
-                                  if (!inline && language) {
-                                    return (
-                                      <div style={{ margin: '16px 0', border: '1px solid var(--border)', borderRadius: '8px', overflowX: 'auto', maxWidth: '100%', background: 'transparent' }}>
-                                          <SyntaxHighlighter
-                                            {...props}
-                                            style={oneLight}
-                                            language={language}
-                                            PreTag="div"
-                                            customStyle={{ margin: 0, padding: '16px', fontSize: '0.9rem', borderRadius: 0, border: 'none' }}
-                                          >
-                                            {codeText}
-                                          </SyntaxHighlighter>
-                                      </div>
-                                    );
-                                  }
-                                  return (
-                                    <code {...props} className={className} style={{ background: 'var(--background)', padding: '3px 6px', borderRadius: '4px', color: '#e53e3e', fontSize: '0.9em' }}>
-                                      {children}
-                                    </code>
-                                  )
-                                },
-                                table: ({node, ...props}) => <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }} {...props} />,
-                                th: ({node, ...props}) => <th style={{ border: '1px solid var(--border)', padding: '12px', background: 'var(--background)', textAlign: 'left', fontWeight: 600 }} {...props} />,
-                                td: ({node, ...props}) => <td style={{ border: '1px solid var(--border)', padding: '12px' }} {...props} />,
-                                a: ({node, ...props}) => <a style={{ color: 'var(--primary)', textDecoration: 'none' }} {...props} />,
-                                h1: ({node, ...props}) => <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '24px 0 16px 0' }} {...props} />,
-                                h2: ({node, ...props}) => <h2 style={{ fontSize: '1.3rem', fontWeight: 600, margin: '24px 0 16px 0' }} {...props} />,
-                                h3: ({node, ...props}) => <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: '20px 0 12px 0' }} {...props} />,
-                                ul: ({node, ...props}) => <ul style={{ paddingLeft: '24px', marginBottom: '16px', listStyleType: 'disc' }} {...props} />,
-                                ol: ({node, ...props}) => <ol style={{ paddingLeft: '24px', marginBottom: '16px', listStyleType: 'decimal' }} {...props} />,
-                                li: ({node, ...props}) => <li style={{ marginBottom: '8px' }} {...props} />,
-                                p: ({node, ...props}) => <p style={{ marginBottom: '16px' }} {...props} />
-                              }}
-                            >
-                              {msg.content}
-                            </ReactMarkdown>
-                          )}
-                          </div>
+                          <ChatMarkdown error={msg.error}>{msg.content}</ChatMarkdown>
                           {msg.loading && !msg.progress && msg.content && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                               <Loader2 size={14} className="spin-anim" /> {extra.continuing}
@@ -1166,39 +1255,61 @@ export default function DashboardClient() {
               )}
               <div ref={messagesEndRef} />
             </div>
-            {fileTimeline.length > 0 && !showRightPanel && (
-              <aside aria-label="会话文件时间线" style={{ position: 'absolute', zIndex: 4, top: '50%', right: 'max(12px, calc(50% - 454px))', width: '40px', maxHeight: '52%', padding: '8px 5px', overflowY: 'auto', transform: 'translateY(-50%)' }}>
-                <div style={{ position: 'relative', display: 'grid', justifyItems: 'center', gap: '12px', padding: '3px 0' }}>
-                  <span aria-hidden="true" style={{ position: 'absolute', top: '16px', bottom: '16px', left: '50%', width: '2px', transform: 'translateX(-50%)', borderRadius: '2px', background: 'var(--border)' }} />
-                  {fileTimeline.map(({ artifact, messageIndex }, timelineIndex) => (
-                    <button key={`${artifact.id}:${messageIndex}`} type="button" onClick={() => jumpToArtifactRow(artifact.id)} aria-label="跳转到文件" style={{ position: 'relative', zIndex: 1, width: '30px', height: '30px', padding: 0, display: 'grid', placeItems: 'center', border: 0, borderRadius: '50%', background: 'white', cursor: 'pointer', boxShadow: '0 1px 5px rgba(15,23,42,.12)' }}>
-                      {artifact.fileType?.startsWith('ppt') ? <Presentation size={16} color="#ea580c" />
-                        : artifact.fileType?.startsWith('xls') || artifact.fileType === 'excel' ? <FileSpreadsheet size={16} color="#16a34a" />
-                        : ['doc', 'docx', 'word'].includes(artifact.fileType) ? <FileType2 size={16} color="#2563eb" />
-                        : artifact.fileType === 'pdf' ? <FileText size={16} color="#dc2626" />
-                        : artifact.fileType === 'image' ? <ImageIcon size={16} color="#7c3aed" />
-                        : <FileJson size={16} color={timelineIndex === fileTimeline.length - 1 ? 'var(--primary)' : '#64748b'} />}
-                    </button>
-                  ))}
+            {conversationTimeline.length > 0 && (
+              <aside aria-label="对话时间轴" style={{ position: 'absolute', zIndex: 5, top: '50%', left: 'max(10px, calc(50% - 446px))', width: '38px', transform: 'translateY(-50%)' }}>
+                <div style={{ display: 'grid', justifyItems: 'start', gap: '6px' }}>
+                  {conversationTimeline.map((turn, turnIndex) => {
+                    const active = turnIndex === activeConversationTurn;
+                    const hovered = turnIndex === hoveredConversationTurn;
+                    return (
+                      <button
+                        key={turn.messageIndex}
+                        type="button"
+                        onMouseEnter={() => setHoveredConversationTurn(turnIndex)}
+                        onMouseLeave={() => setHoveredConversationTurn(null)}
+                        onFocus={() => setHoveredConversationTurn(turnIndex)}
+                        onBlur={() => setHoveredConversationTurn(null)}
+                        onClick={() => jumpToConversationTurn(turnIndex)}
+                        aria-label={`跳转到对话：${turn.question}`}
+                        style={{ position: 'relative', width: '38px', height: '7px', padding: 0, display: 'flex', alignItems: 'center', border: 0, background: 'transparent', cursor: 'pointer' }}
+                      >
+                        <span style={{ flex: '0 0 auto', width: active || hovered ? '14px' : turnIndex % 3 === 0 ? '9px' : '5px', height: '1px', borderRadius: '2px', background: active ? '#111827' : hovered ? '#475569' : '#a8b3c2', transition: 'width .16s, background .16s' }} />
+                        {hovered && (
+                          <span role="tooltip" style={{ position: 'absolute', left: '44px', top: '50%', width: '320px', padding: '13px 15px', transform: 'translateY(-50%)', display: 'grid', gap: '6px', border: '1px solid var(--border)', borderRadius: '12px', background: 'rgba(255,255,255,.98)', boxShadow: '0 10px 30px rgba(15,23,42,.14)', color: 'var(--text-main)', textAlign: 'left', pointerEvents: 'none' }}>
+                            <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.9rem', fontWeight: 600 }}>{turn.question}</strong>
+                            <span style={{ display: '-webkit-box', overflow: 'hidden', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.55 }}>{turn.reply}</span>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </aside>
             )}
             {!followLatest && <button type="button" onClick={jumpToLatest} title="回到最新消息" style={{ position: 'absolute', right: '22px', bottom: '148px', zIndex: 3, width: '38px', height: '38px', display: 'grid', placeItems: 'center', border: '1px solid var(--border)', borderRadius: '50%', background: 'white', boxShadow: 'var(--shadow-md)', cursor: 'pointer', color: 'var(--text-main)' }}><ArrowDown size={18} /></button>}
 
             {/* Input Area */}
-            <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-              {activeTaskId && !showRightPanel && <button type="button" onClick={() => { setShowRightPanel(true); setSidebarCollapsed(true); setRightPanelMode('workspace'); }} style={{ float: 'right', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: '9px', background: 'white', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}><FolderOpen size={15} /> {copy.workspace}</button>}
+            <div style={{ padding: '24px 0', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              {activeTaskId && !showRightPanel && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}><button type="button" onClick={() => { setShowRightPanel(true); setSidebarCollapsed(true); setRightPanelMode('workspace'); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: '9px', background: 'white', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}><FolderOpen size={15} /> {copy.workspace}</button></div>}
               
-              {/* Active File Preview */}
-              {file && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'white', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', marginBottom: '12px', fontSize: '0.9rem', boxShadow: 'var(--shadow-sm)' }}>
-                  {getFileIcon(file.name)}
-                  <span style={{ fontWeight: 500 }}>{file.name}</span>
-                  <button onClick={() => setFile(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', marginLeft: '8px' }}>×</button>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', transition: 'all 0.3s', overflow: 'hidden' }}>
+              <div
+                onDragEnter={(event) => { event.preventDefault(); setIsDraggingFiles(true); }}
+                onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setIsDraggingFiles(true); }}
+                onDragLeave={handleDragLeave}
+                onDrop={handleFileDrop}
+                style={{ display: 'flex', flexDirection: 'column', minHeight: files.length ? '132px' : '84px', background: isDraggingFiles ? 'var(--primary-light)' : 'white', border: `1px solid ${isDraggingFiles ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', transition: 'min-height 0.2s, background 0.2s, border-color 0.2s', overflow: 'hidden' }}
+              >
+                {files.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '8px', padding: '10px 12px 4px', overflowX: 'auto', overflowY: 'hidden' }}>
+                    {files.map((file, index) => (
+                      <div key={`${file.name}-${file.size}-${file.lastModified}`} title={file.name} style={{ flex: '0 0 auto', maxWidth: '220px', display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '7px 9px', background: 'var(--background)', borderRadius: '9px', fontSize: '0.82rem' }}>
+                        {getFileIcon(file.name)}
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{file.name}</span>
+                        <button type="button" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`移除 ${file.name}`} style={{ flex: '0 0 auto', width: '20px', height: '20px', padding: 0, display: 'grid', placeItems: 'center', border: 'none', borderRadius: '50%', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <textarea 
                   ref={promptInputRef}
                   rows={1}
@@ -1206,12 +1317,12 @@ export default function DashboardClient() {
                   onChange={(e) => { setPrompt(e.target.value); resizePromptInput(e.currentTarget); }}
                   onKeyDown={handleKeyDown}
                   placeholder={activeTaskId ? copy.continuePlaceholder : copy.placeholder}
-                  style={{ display: 'block', width: '100%', height: '40px', minHeight: '40px', maxHeight: '200px', padding: '6px 16px 2px', overflowY: 'hidden', border: 'none', resize: 'none', outline: 'none', fontSize: '1rem', lineHeight: '26px', background: 'transparent' }}
+                  style={{ display: 'block', width: '100%', height: '40px', minHeight: '40px', maxHeight: '200px', padding: files.length ? '4px 16px 2px' : '6px 16px 2px', overflowY: 'hidden', border: 'none', resize: 'none', outline: 'none', fontSize: '1rem', lineHeight: '26px', background: 'transparent' }}
                 />
 
                 <div style={{ minHeight: '44px', padding: '4px 12px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   {/* Upload Button */}
-                  <input type="file" id="file-upload" accept=".pdf,.xlsx,.xls,.csv,.docx,.pptx,.png,.jpg,.jpeg,.webp" onChange={handleFileChange} style={{ display: 'none' }} />
+                  <input type="file" id="file-upload" multiple accept=".pdf,.xlsx,.xls,.csv,.docx,.pptx,.png,.jpg,.jpeg,.webp" onChange={handleFileChange} style={{ display: 'none' }} />
                   <label htmlFor="file-upload" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: 'var(--background)', color: 'var(--text-muted)', transition: 'all 0.2s' }}>
                     <Paperclip size={18} />
                   </label>
@@ -1253,15 +1364,22 @@ export default function DashboardClient() {
             <div style={{ padding: rightPanelMode === 'workspace' ? 0 : '20px', overflow: 'hidden', flex: 1 }}>
               {rightPanelMode === 'workspace' ? <WorkspaceBrowser taskId={activeTaskId} onOpen={openWorkspaceFile} /> : activeArtifact && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-                  {activeArtifact.generic ? <GenericFilePreview key={activeArtifact.previewUrl} artifact={activeArtifact} /> : <iframe
-                    key={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}:${activeArtifact.previewVersion || 0}`}
-                    src={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}?v=${activeArtifact.previewVersion || 0}`}
-                    title="Office document preview"
-                    sandbox="allow-scripts allow-same-origin"
-                    onError={() => setPreviewError('实时预览加载失败')}
-                    style={{ width: '100%', minHeight: '560px', flex: 1, border: '1px solid var(--border)', borderRadius: '8px', background: 'white' }}
-                  />}
-                  {previewError && <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1px solid #fecaca', borderRadius: '9px', background: '#fff7f7', color: '#b91c1c', fontSize: '0.82rem' }}><span>{previewError}</span><button type="button" onClick={() => { setPreviewError(''); setActiveArtifact((current) => ({ ...current, previewUrl: `${current.previewUrl.split('?')[0]}?retry=${Date.now()}` })); }} style={{ padding: '6px 10px', border: '1px solid #fecaca', borderRadius: '7px', background: 'white', color: '#b91c1c', cursor: 'pointer' }}>重试</button></div>}
+                  {activeArtifact.generic ? <GenericFilePreview key={activeArtifact.previewUrl} artifact={activeArtifact} /> : <div style={{ position: 'relative', minHeight: '560px', flex: 1, overflow: 'hidden', border: '1px solid var(--border)', borderRadius: '8px', background: '#f8fafc' }}>
+                    {previewLoading && <div style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', background: 'linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.98))', color: 'var(--text-muted)' }}>
+                      <div style={{ width: '46px', height: '46px', display: 'grid', placeItems: 'center', borderRadius: '14px', background: 'var(--primary-light)', color: 'var(--primary)' }}><Loader2 size={23} className="spin-anim" /></div>
+                      <div style={{ textAlign: 'center' }}><div style={{ color: 'var(--text-main)', fontSize: '0.92rem', fontWeight: 650 }}>正在准备文件预览</div><div style={{ maxWidth: '320px', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>{activeArtifact.filename}</div></div>
+                    </div>}
+                    <iframe
+                      key={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}:${activeArtifact.previewVersion || 0}`}
+                      src={activeArtifact.live ? activeArtifact.previewUrl : `${activeArtifact.previewUrl}?v=${activeArtifact.previewVersion || 0}`}
+                      title="Office document preview"
+                      sandbox="allow-scripts allow-same-origin"
+                      onLoad={() => setPreviewLoading(false)}
+                      onError={() => { setPreviewLoading(false); setPreviewError('实时预览加载失败'); }}
+                      style={{ width: '100%', height: '100%', minHeight: '560px', border: 0, background: 'white', opacity: previewLoading ? 0 : 1, transition: 'opacity .18s ease' }}
+                    />
+                  </div>}
+                  {previewError && <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: '1px solid #fecaca', borderRadius: '9px', background: '#fff7f7', color: '#b91c1c', fontSize: '0.82rem' }}><span>{previewError}</span><button type="button" onClick={() => { setPreviewError(''); setPreviewLoading(true); setActiveArtifact((current) => ({ ...current, previewUrl: `${current.previewUrl.split('?')[0]}?retry=${Date.now()}` })); }} style={{ padding: '6px 10px', border: '1px solid #fecaca', borderRadius: '7px', background: 'white', color: '#b91c1c', cursor: 'pointer' }}>重试</button></div>}
                   {activeArtifact.downloadUrl && !(activeArtifact.status === 'generating' && isGenerating) ? (
                     <a href={activeArtifact.downloadUrl} className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       下载

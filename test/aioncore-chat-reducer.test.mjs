@@ -139,6 +139,21 @@ test('server workspace paths never reach user-visible assistant text', () => {
   assert.equal(sanitizeAssistantText(inline), '文件已保存到 report.xlsx，请下载。');
 });
 
+test('repeated content events reuse an unchanged runtime state', () => {
+  const running = reduceRuntime(createRuntimeState(), 'message.stream', { type: 'content', turn_id: 'turn-1' });
+  const repeated = reduceRuntime(running, 'message.stream', { type: 'content', turn_id: 'turn-1' });
+  assert.strictEqual(repeated, running);
+});
+
+test('user messages preserve every uploaded filename', () => {
+  const [user] = mapMessagesToUi([{
+    role: 'user',
+    content: { content: '分析这些文件' },
+    files: ['D:\\uploads\\report.xlsx', '/uploads/brief.docx'],
+  }], { isProcessing: false });
+  assert.deepEqual(user.filenames, ['report.xlsx', 'brief.docx']);
+});
+
 test('internal document engine branding and installation probes never reach the UI', () => {
   assert.equal(sanitizeAssistantText('我先确认 officecli 是否安装，然后开始创建 PPT。'), '然后开始创建 PPT。');
   assert.equal(sanitizeAssistantText('使用 Office CLI 创建并验证文件。'), '使用 OfficeGPT 创建并验证文件。');
@@ -148,6 +163,12 @@ test('internal document engine branding and installation probes never reach the 
   ], { isProcessing: false });
   assert.doesNotMatch(JSON.stringify(assistant), /office\s*cli/i);
   assert.match(assistant.content, /OfficeGPT/);
+});
+
+test('internal DSML tool protocol never reaches assistant text', () => {
+  const leaked = '现在开始生成： < | | DSML | | tool_calls> < | | DSML | | invoke name="ExecCommand"> < | | DSML | | parameter name="cmd" string="true">rm -f "成绩统计表.xlsx"</ | | DSML | | parameter></ | | DSML | | invoke></ | | DSML | | tool_calls>';
+  assert.equal(sanitizeAssistantText(leaked), '现在开始生成：');
+  assert.equal(sanitizeAssistantText('准备文件\n< | | DSML | | invoke name="ExecCommand">'), '准备文件');
 });
 
 test('AionCore HTTP history positions normalize into user and assistant roles', () => {
