@@ -26,6 +26,20 @@ export async function POST(request) {
       await Task.updateOne({ _id: task._id, 'billing.state': 'settling' }, { $set: { 'billing.state': 'reserved' } });
     }
   }
+  // 僵尸任务清扫：AionCore 重启会丢掉会话，任务却永远停在 processing，
+  // 工作台每次加载都会把它渲染成「思考中…」。这里做时间兜底，
+  // 免得用户不打开工作台就永远清不掉。
+  const zombies = await Task.find({
+    status: { $in: ['processing', 'cancelling'] },
+    updatedAt: { $lt: new Date(Date.now() - 60 * 60_000) },
+  }).limit(100);
+  for (const zombie of zombies) {
+    await releaseTaskReservation({ taskId: zombie._id, userId: zombie.userId, reason: '任务长时间无响应，已自动结束' }).catch(() => undefined);
+    await Task.updateOne({ _id: zombie._id, status: { $in: ['processing', 'cancelling'] } }, {
+      $set: { status: 'failed', 'runtime.state': 'failed', 'runtime.updatedAt': new Date(), errorMessage: '任务长时间无响应，已自动结束，请重新发送' },
+    });
+  }
+
   const tasks = await Task.find({
     'billing.state': 'reserved',
     aionConversationId: { $exists: true, $ne: '' },
@@ -53,5 +67,5 @@ export async function POST(request) {
       results.push({ taskId: String(task._id), action: 'error', error: error.message });
     }
   }
-  return NextResponse.json({ success: true, scanned: tasks.length, results });
+  return NextResponse.json({ success: true, scanned: tasks.length, zombiesCleared: zombies.length, results });
 }
