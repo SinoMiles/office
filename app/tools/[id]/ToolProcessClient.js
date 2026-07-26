@@ -8,6 +8,7 @@ import { ArrowRight, UploadCloud, File as FileIcon, X, CheckCircle2, Download, L
 import { toast } from 'react-hot-toast';
 import { useI18n } from '@/app/i18n/I18nProvider';
 import { localizedToolName } from '@/app/i18n/toolNames';
+import { toolContent } from '@/app/i18n/toolContent';
 
 export default function ToolProcessPage() {
   const params = useParams();
@@ -35,7 +36,9 @@ export default function ToolProcessPage() {
   if (!tool) return null;
   const localizedName = localizedToolName(tool, locale);
 
-  const seoContent = locale === 'zh-CN' && tool.seo ? tool.seo : { summary: t('tools.genericSummary', { name: localizedName }), useCases: [t('tools.caseQuick'), t('tools.caseBatch'), t('tools.caseAi')], faqs: [[t('tools.safeQ'), t('tools.safeA')], [t('tools.editQ'), t('tools.editA')]], related: tool.seo?.related || [] };
+  // 中英两个语种都有逐个撰写的正文；其它语种（历史链接）退回通用模板。
+  const authored = toolContent(tool, locale);
+  const seoContent = authored || { summary: t('tools.genericSummary', { name: localizedName }), useCases: [t('tools.caseQuick'), t('tools.caseBatch'), t('tools.caseAi')], faqs: [[t('tools.safeQ'), t('tools.safeA')], [t('tools.editQ'), t('tools.editA')]], related: tool.seo?.related || [] };
   const relatedTools = (seoContent.related || []).map(getToolById).filter(Boolean);
 
   const handleDragOver = (e) => {

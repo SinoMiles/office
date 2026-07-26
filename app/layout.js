@@ -80,6 +80,20 @@ export default async function RootLayout({ children }) {
                   "operatingSystem": "Web",
                   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
                   "publisher": { "@id": `${getSiteUrl()}/#organization` }
+                },
+                {
+                  // WebSite + SearchAction 让 Google 有机会在搜索结果里
+                  // 直接显示本站的站内搜索框（sitelinks searchbox）。
+                  "@type": "WebSite",
+                  "@id": `${getSiteUrl()}/#website`,
+                  "name": "OfficeGPT",
+                  "url": getSiteUrl(),
+                  "publisher": { "@id": `${getSiteUrl()}/#organization` },
+                  "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": { "@type": "EntryPoint", "urlTemplate": `${getSiteUrl()}/tools?q={search_term_string}` },
+                    "query-input": "required name=search_term_string"
+                  }
                 }
               ]
             })

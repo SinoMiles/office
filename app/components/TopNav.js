@@ -92,6 +92,7 @@ export default function TopNav({ isLoggedIn }) {
               FREE
             </span>
           </Link>
+          <Link href="/pricing" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: pathname === '/pricing' ? 'var(--primary)' : 'var(--text-main)', background: pathname === '/pricing' ? 'var(--primary-light)' : 'transparent', transition: 'all 0.2s' }}>{t('nav.pricing')}</Link>
           <Link href="/#features" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>{t('nav.features')}</Link>
           <Link href="/#faq" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>{t('nav.solutions')}</Link>
         </div>

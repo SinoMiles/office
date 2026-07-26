@@ -10,8 +10,13 @@ const words = {
   de: { to:'zu', text:'Text', images:'Bilder', extract:'Extrahieren', notes:'Notizen', clean:'Bereinigen', metadata:'Metadaten', page:'Seite', numbers:'Nummern', dedupe:'Duplikate entfernen', merge:'Zusammenführen', split:'Teilen', sheets:'Blätter', columns:'Spalten', formula:'Formeln', audit:'Prüfung', workbook:'Arbeitsmappe', summary:'Zusammenfassung', watermark:'Wasserzeichen', encrypt:'Verschlüsseln', translate:'Übersetzen', polish:'Überarbeiten', chat:'Dialog', contract:'Vertrag', review:'Prüfung', document:'Dokument', compare:'Vergleichen', redact:'Schwärzen', meeting:'Besprechung', minutes:'Protokoll', weekly:'Wöchentlich', report:'Bericht', annual:'Jährlich', resume:'Lebenslauf', analysis:'Analyse', outline:'Gliederung', official:'Amtlich' },
 };
 
+import { toolSeoEn } from './toolSeoEn';
+
 export function localizedToolName(tool, locale) {
   if (locale === 'zh-CN') return tool.name;
+  // 英文有逐个撰写的正式名称，优先用它；机械拼词只作为兜底。
+  const authored = locale === 'en' ? toolSeoEn(tool.id)?.name : null;
+  if (authored) return authored;
   const dictionary = words[locale] || words.en;
   const parts = tool.id.split('-');
   const toIndex = parts.indexOf('to');

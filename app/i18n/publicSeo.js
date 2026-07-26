@@ -1,6 +1,6 @@
 import { SUPPORTED_LOCALES } from './config';
 
-export const localeSegments = { 'zh-CN': 'zh-cn', en: 'en', ja: 'ja', ko: 'ko', es: 'es', pt: 'pt', fr: 'fr', de: 'de' };
+export const localeSegments = { 'zh-CN': 'zh-cn', en: 'en' };
 
 export function localizedPath(locale, pathname = '/') {
   const suffix = pathname === '/' ? '' : pathname.startsWith('/') ? pathname : `/${pathname}`;
@@ -27,5 +27,13 @@ const seo = {
 export function publicMetadata(locale, pathname = '/') {
   const [title, description] = seo[locale] || seo['zh-CN'];
   const canonical = localizedPath(locale, pathname);
-  return { title, description, alternates: { canonical, languages: languageAlternates(pathname) }, openGraph: { title, description, url: canonical, locale: locale.replace('-', '_') } };
+  return {
+    title,
+    description,
+    alternates: { canonical, languages: languageAlternates(pathname) },
+    openGraph: { title, description, url: canonical, locale: locale.replace('-', '_'), type: 'website', siteName: 'OfficeGPT' },
+    // 图片由 opengraph-image.js 动态生成，Next 会自动注入到 og:image 与
+    // twitter:image，这里只需要声明卡片类型。
+    twitter: { card: 'summary_large_image', title, description },
+  };
 }

@@ -1,33 +1,53 @@
 'use client';
 
 import { ArrowRight, Search, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useMemo, useState } from 'react';
 import { toolCategories } from '@/lib/toolsData';
 import Footer from '@/app/components/Footer';
 import { useI18n } from '@/app/i18n/I18nProvider';
 import { localizedToolName } from '@/app/i18n/toolNames';
+import { toolContent } from '@/app/i18n/toolContent';
 
 const categoryLabels = {
   'zh-CN': ['格式极速转换', '表格与数据转换', 'PDF 实用工具箱', 'AI 智能文档处理'],
   en: ['Fast format conversion', 'Spreadsheet & data conversion', 'PDF utilities', 'AI document processing'],
-  ja: ['高速形式変換', '表計算・データ変換', 'PDF ユーティリティ', 'AI 文書処理'],
-  ko: ['빠른 형식 변환', '스프레드시트 및 데이터 변환', 'PDF 유틸리티', 'AI 문서 처리'],
-  es: ['Conversión rápida de formatos', 'Conversión de hojas y datos', 'Utilidades PDF', 'Procesamiento de documentos con IA'],
-  pt: ['Conversão rápida de formatos', 'Conversão de planilhas e dados', 'Utilitários PDF', 'Processamento de documentos com IA'],
-  fr: ['Conversion rapide de formats', 'Conversion de feuilles et données', 'Utilitaires PDF', 'Traitement de documents par IA'],
-  de: ['Schnelle Formatkonvertierung', 'Tabellen- und Datenkonvertierung', 'PDF-Werkzeuge', 'KI-Dokumentverarbeitung'],
 };
 
+// 根布局声明了 SearchAction 指向 /tools?q=，这里必须真的消费这个参数，
+// 否则等于给搜索引擎一个无效承诺。useSearchParams 需要 Suspense 边界，
+// 故拆成内外两层。
 export default function ToolboxPage() {
+  return (
+    <Suspense fallback={null}>
+      <Toolbox />
+    </Suspense>
+  );
+}
+
+function Toolbox() {
   const router = useRouter();
   const { locale, t } = useI18n();
-  const [query, setQuery] = useState('');
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get('q') || '');
+
   const visibleCategories = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    const localized = toolCategories.map((category, index) => ({ ...category, title: categoryLabels[locale]?.[index] || category.title, tools: category.tools.map((tool) => ({ ...tool, displayName: localizedToolName(tool, locale) })) }));
+    const localized = toolCategories.map((category, index) => ({
+      ...category,
+      title: categoryLabels[locale]?.[index] || categoryLabels.en[index] || category.title,
+      tools: category.tools.map((tool) => {
+        const authored = toolContent(tool, locale);
+        return {
+          ...tool,
+          displayName: localizedToolName(tool, locale),
+          // 卡片描述优先用逐个撰写的摘要，取第一句保持卡片高度一致。
+          displayDesc: locale === 'zh-CN' ? tool.desc : (authored?.summary?.split(/(?<=\.)\s/)[0] || tool.desc),
+        };
+      }),
+    }));
     if (!keyword) return localized;
-    return localized.map((category) => ({ ...category, tools: category.tools.filter((tool) => `${tool.displayName} ${tool.desc}`.toLowerCase().includes(keyword)) })).filter((category) => category.tools.length > 0);
+    return localized.map((category) => ({ ...category, tools: category.tools.filter((tool) => `${tool.displayName} ${tool.displayDesc} ${tool.id}`.toLowerCase().includes(keyword)) })).filter((category) => category.tools.length > 0);
   }, [locale, query]);
   const availableCount = toolCategories.reduce((count, category) => count + category.tools.filter((tool) => !tool.comingSoon).length, 0);
 
@@ -95,7 +115,7 @@ export default function ToolboxPage() {
                       {tool.icon}
                     </div>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '8px' }}>{tool.displayName}</h3>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{locale === 'zh-CN' ? tool.desc : t('tools.genericSummary', { name: tool.displayName })}</p>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{tool.displayDesc}</p>
                   </div>
                   
                   {!tool.comingSoon && (
