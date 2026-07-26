@@ -103,10 +103,18 @@ export function useAioncoreChat() {
     setRuntime(next);
   }, []);
 
-  const flushMessageQueue = useCallback(() => {
-    if (flushingRef.current) return;
-    flushingRef.current = true;
+  // 具名函数表达式，便于重入时把自己重新排进下一帧。
+  const flushMessageQueue = useCallback(function flush() {
+    // 这一帧已经消费掉了：无论走哪条分支，都必须先把 frameRef 清空，
+    // 否则「已触发但未清空」的 id 会让下方 `if (!frameRef.current)` 永远为假，
+    // 后续帧再也调度不出新的 rAF，界面就此停止更新。
     frameRef.current = null;
+    if (flushingRef.current) {
+      // 重入时不丢数据：留到下一帧再处理。
+      if (queueRef.current.length) frameRef.current = requestAnimationFrame(flush);
+      return;
+    }
+    flushingRef.current = true;
     const queued = queueRef.current.splice(0);
     try {
       if (!queued.length) return;

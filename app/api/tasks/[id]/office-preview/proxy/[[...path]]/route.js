@@ -40,7 +40,14 @@ export async function proxy(request, { params }) {
     try {
       port = await startWatch(watchKey, filePath);
     } catch (error) {
-      return Response.json({ error: error.message || '实时预览恢复失败' }, { status: 502 });
+      // 以前直接把 error.message 甩给前端，用户在预览区看到的就是
+      // 裸的 OFFICECLI_NOT_FOUND / OFFICECLI_PORT_TIMEOUT 这类内部代码。
+      console.error('[OfficeGPT:Preview] 预览引擎启动失败:', error);
+      const hint = {
+        OFFICECLI_NOT_FOUND: '文档预览引擎未就绪，文件仍可正常下载',
+        OFFICECLI_PORT_TIMEOUT: '文档预览引擎启动超时，请稍后重试或直接下载文件',
+      }[error.message] || '实时预览暂时不可用，文件仍可正常下载';
+      return Response.json({ error: hint }, { status: 502 });
     }
   }
   if (!port) return Response.json({ error: '预览不存在' }, { status: 404 });

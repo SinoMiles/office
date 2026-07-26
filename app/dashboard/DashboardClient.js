@@ -38,6 +38,28 @@ function timelineSummary(value, limit = 120) {
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
 
+// 逐字段浅比较两条消息是否等价。流式帧里 content/blocks 会被整体替换成新对象，
+// 因此对这两个字段退化为序列化比较 —— 长度有限，代价可以接受。
+function shallowEqualMessage(left, right) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    const a = left[key];
+    const b = right[key];
+    if (a === b) continue;
+    if (a && b && typeof a === 'object' && typeof b === 'object') {
+      try {
+        if (JSON.stringify(a) === JSON.stringify(b)) continue;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
 function formatBillingDateTime(value, locale) {
   const date = new Date(value);
   return {
@@ -325,13 +347,18 @@ export default function DashboardClient() {
        const lastAionMsg = aionMessages[aionMessages.length - 1];
        if (lastAionMsg && lastAionMsg.role === 'ai') {
          setMessages(prev => {
-            const next = [...prev];
-            if (next.length > 0 && next[next.length - 1].role === 'ai') {
-               next[next.length - 1] = { ...next[next.length - 1], ...lastAionMsg, artifacts: next[next.length - 1].artifacts, loading: aionIsProcessing };
-            } else {
-               next.push({ ...lastAionMsg, loading: aionIsProcessing });
+            const last = prev.length > 0 ? prev[prev.length - 1] : null;
+            if (last && last.role === 'ai') {
+               const merged = { ...last, ...lastAionMsg, artifacts: last.artifacts, loading: aionIsProcessing };
+               // 这里以前无条件 `[...prev]` 并整体替换，即使内容一字未变也会产生新引用，
+               // 于是每一个流式帧都强制触发一次重渲染；一旦上游依赖出现抖动，
+               // 就会被放大成 "Maximum update depth exceeded"。内容相同就原样返回。
+               if (shallowEqualMessage(last, merged)) return prev;
+               const next = [...prev];
+               next[next.length - 1] = merged;
+               return next;
             }
-            return next;
+            return [...prev, { ...lastAionMsg, loading: aionIsProcessing }];
          });
        }
     }
