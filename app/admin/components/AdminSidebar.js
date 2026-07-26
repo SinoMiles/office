@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { BarChart3, Users, Settings } from 'lucide-react';
+import { BarChart3, Users, Settings, Receipt } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminSidebar({ user }) {
@@ -10,6 +10,7 @@ export default function AdminSidebar({ user }) {
   const links = [
     { href: '/admin', icon: BarChart3, label: '数据统计' },
     { href: '/admin/users', icon: Users, label: '用户管理' },
+    { href: '/admin/orders', icon: Receipt, label: '订单管理' },
     { href: '/admin/settings', icon: Settings, label: '系统设置' },
   ];
 

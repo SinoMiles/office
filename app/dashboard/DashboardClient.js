@@ -77,6 +77,11 @@ export default function DashboardClient() {
   const [rechargeAmountYuan, setRechargeAmountYuan] = useState(50);
   const [wechatPayment, setWechatPayment] = useState(null);
   const [wechatPaymentLoading, setWechatPaymentLoading] = useState(false);
+  const [plans, setPlans] = useState([]);
+  const [subscription, setSubscription] = useState(null);
+  const [selectedPlanId, setSelectedPlanId] = useState('PRO');
+  const [selectedPeriodMonths, setSelectedPeriodMonths] = useState(1);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
   const activeArtifactId = activeArtifact?.id;
   const activeArtifactUrl = activeArtifact?.previewUrl;
   const activeArtifactGeneric = Boolean(activeArtifact?.generic);
@@ -533,6 +538,64 @@ export default function DashboardClient() {
     }
   };
 
+  const refreshSubscription = useCallback(async () => {
+    const response = await fetch('/api/user/subscription');
+    const payload = await response.json().catch(() => ({}));
+    if (payload?.success) setSubscription(payload.subscription);
+  }, []);
+
+  // 套餐目录只在打开升级弹窗时拉取，避免拖慢工作台首屏。
+  useEffect(() => {
+    if (activeDrawer !== 'upgrade' || plans.length) return;
+    void (async () => {
+      const response = await fetch('/api/billing/plans');
+      const payload = await response.json().catch(() => ({}));
+      if (!payload?.success) return;
+      setPlans(payload.plans);
+      if (payload.plans[0]) setSelectedPlanId((current) => payload.plans.some((plan) => plan.id === current) ? current : payload.plans[0].id);
+    })();
+  }, [activeDrawer, plans.length]);
+
+  // 订阅状态在账单页和升级弹窗都要展示。
+  useEffect(() => {
+    if (activeTab !== 'billing' && activeDrawer !== 'upgrade') return;
+    void refreshSubscription();
+  }, [activeTab, activeDrawer, refreshSubscription]);
+
+  const handleSubscribe = async () => {
+    setSubscribeLoading(true);
+    try {
+      const response = await fetch('/api/user/subscription/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: selectedPlanId, periodMonths: selectedPeriodMonths }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '订阅下单失败');
+      setWechatPayment({ id: payload.orderId, status: 'paying', purpose: 'subscription', ...payload });
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSubscribeLoading(false);
+    }
+  };
+
+  const handleToggleAutoRenew = async (resume) => {
+    try {
+      const response = await fetch('/api/user/subscription/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '操作失败');
+      toast.success(payload.message);
+      await refreshSubscription();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
   useEffect(() => {
     if (!wechatPayment?.id || wechatPayment.status !== 'paying') return undefined;
     const poll = window.setInterval(async () => {
@@ -541,16 +604,25 @@ export default function DashboardClient() {
       if (!response.ok || !payload.order) return;
       setWechatPayment((current) => current?.id === wechatPayment.id ? { ...current, ...payload.order } : current);
       if (payload.order.status === 'paid') {
-        toast.success(`充值成功，已到账 ${payload.order.credits.toLocaleString()} Credits`);
+        toast.success(payload.order.purpose === 'subscription'
+          ? `会员已开通，赠送 ${payload.order.credits.toLocaleString()} Credits 已到账`
+          : `充值成功，已到账 ${payload.order.credits.toLocaleString()} Credits`);
         void fetch('/api/user/billing?page=1&pageSize=20').then((billingResponse) => billingResponse.json()).then((billingPayload) => {
           if (!billingPayload.success) return;
           setData({ records: billingPayload.records, balance: billingPayload.balance });
           setBillingPagination(billingPayload.pagination);
         });
+        if (payload.order.purpose === 'subscription') {
+          void refreshSubscription();
+          // 会员等级变了，顶部头像旁的等级徽章需要跟着刷新。
+          void fetch('/api/auth/me').then((meResponse) => meResponse.json()).then((mePayload) => {
+            if (mePayload?.user) setUser(mePayload.user);
+          }).catch(() => undefined);
+        }
       }
     }, 2500);
     return () => window.clearInterval(poll);
-  }, [wechatPayment?.id, wechatPayment?.status]);
+  }, [wechatPayment?.id, wechatPayment?.status, refreshSubscription]);
 
   const handleRenameTask = async (e, id) => {
     e.stopPropagation();
@@ -1475,7 +1547,20 @@ export default function DashboardClient() {
                 <span style={{ width: '38px', height: '38px', display: 'grid', placeItems: 'center', borderRadius: '11px', background: 'var(--primary-light)', color: 'var(--primary)', flexShrink: 0 }}><CreditCard size={19} /></span>
                 <div><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '2px' }}>{t('dashboard.available')}</div><div style={{ fontSize: '1.55rem', lineHeight: 1.1, fontWeight: 800, color: 'var(--primary)' }}>{data.balance.toLocaleString(locale)}</div></div>
               </div>
-              <button type="button" className="btn btn-primary" style={{ padding: '9px 15px', flexShrink: 0 }} onClick={() => setActiveDrawer('upgrade')}>{t('dashboard.wechatTopup')}</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+                {subscription ? (
+                  <div style={{ textAlign: 'right', paddingRight: '14px', borderRight: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                      <Crown size={15} color="var(--primary)" />
+                      <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{subscription.membershipLevel}</span>
+                    </div>
+                    <div style={{ color: subscription.daysLeft <= 7 ? '#c2410c' : 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>
+                      {subscription.daysLeft <= 7 ? `${subscription.daysLeft} 天后到期` : `有效期至 ${new Date(subscription.currentPeriodEnd).toLocaleDateString('zh-CN')}`}
+                    </div>
+                  </div>
+                ) : null}
+                <button type="button" className="btn btn-primary" style={{ padding: '9px 15px', flexShrink: 0 }} onClick={() => setActiveDrawer('upgrade')}>{subscription ? '续费 / 充值' : t('dashboard.wechatTopup')}</button>
+              </div>
             </div>
 
             <div className="glass-card" style={{ minHeight: 0, flex: 1, background: 'white', padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -1543,7 +1628,8 @@ export default function DashboardClient() {
           />
           
           {/* Modal Panel */}
-          <div style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', background: '#fefefe', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative', zIndex: 1, animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* 升级弹窗要放下并排的套餐卡片，比资料/设置弹窗宽得多 */}
+          <div style={{ width: activeDrawer === 'upgrade' ? '880px' : '480px', maxWidth: '100%', maxHeight: '90vh', background: '#fefefe', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative', zIndex: 1, animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             
             {/* Modal Header */}
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
@@ -1568,11 +1654,120 @@ export default function DashboardClient() {
               {/* UPGRADE PLAN CONTENT */}
               {activeDrawer === 'upgrade' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.1) 100%)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
-                    <div style={{ color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>当前可用 Credits</div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)' }}>{data.balance.toLocaleString()}</div>
+                  {/* 余额与当前订阅并排，把宽度用起来 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: subscription ? '1fr 1fr' : '1fr', gap: '14px' }}>
+                    <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.1) 100%)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
+                      <div style={{ color: 'var(--text-muted)', marginBottom: '6px', fontSize: '0.9rem' }}>当前可用 Credits</div>
+                      <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1.1 }}>{data.balance.toLocaleString()}</div>
+                    </div>
+                    {subscription ? (
+                      <div style={{ padding: '20px 24px', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(79,70,229,0.25)', background: 'rgba(79,70,229,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', marginBottom: '6px', fontSize: '0.9rem' }}>当前会员</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                            <Crown size={20} color="var(--primary)" />
+                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1.1 }}>{subscription.membershipLevel}</span>
+                          </div>
+                          <div style={{ color: subscription.daysLeft <= 7 ? '#c2410c' : 'var(--text-muted)', fontSize: '0.8rem', marginTop: '6px' }}>
+                            有效期至 {new Date(subscription.currentPeriodEnd).toLocaleDateString('zh-CN')}（剩余 {subscription.daysLeft} 天）
+                          </div>
+                        </div>
+                        <div style={{ marginTop: '10px' }}>
+                          <button type="button" className="btn btn-outline" style={{ padding: '6px 11px', fontSize: '0.78rem', whiteSpace: 'nowrap' }} onClick={() => void handleToggleAutoRenew(!subscription.autoRenew)}>
+                            {subscription.autoRenew ? '关闭续订提醒' : '恢复续订提醒'}
+                          </button>
+                          {!subscription.autoRenew && (
+                            <div style={{ marginTop: '7px', fontSize: '0.75rem', color: '#c2410c' }}>已关闭续订，到期后自动降级为免费版</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  
+
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '14px', color: 'var(--text-main)' }}>会员订阅</h3>
+
+                    {plans.length === 0 ? (
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>正在加载套餐…</div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '14px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${plans.length}, 1fr)`, gap: '12px' }}>
+                          {plans.map((plan) => {
+                            const active = selectedPlanId === plan.id;
+                            return (
+                              <button
+                                key={plan.id}
+                                type="button"
+                                onClick={() => setSelectedPlanId(plan.id)}
+                                style={{ position: 'relative', textAlign: 'left', padding: '18px 20px', border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '14px', background: active ? 'var(--primary-light)' : 'white', cursor: 'pointer', boxShadow: active ? '0 6px 18px -8px rgba(79,70,229,0.45)' : 'none', transition: 'all 0.18s ease' }}
+                              >
+                                {active && <Check size={17} color="var(--primary)" style={{ position: 'absolute', top: '16px', right: '16px' }} />}
+                                <div style={{ fontWeight: 700, fontSize: '1.02rem', color: active ? 'var(--primary)' : 'var(--text-main)' }}>{plan.name}</div>
+                                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+                                  <span style={{ fontSize: '1.9rem', fontWeight: 800, lineHeight: 1 }}>¥{(plan.monthlyFen / 100).toFixed(0)}</span>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)' }}>/月起</span>
+                                </div>
+                                <ul style={{ margin: '14px 0 0', padding: 0, listStyle: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5, display: 'grid', gap: '7px' }}>
+                                  {plan.highlights.map((item) => (
+                                    <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+                                      <Check size={13} color="#059669" style={{ flexShrink: 0, marginTop: '3px' }} />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {(() => {
+                          const plan = plans.find((item) => item.id === selectedPlanId);
+                          const quote = plan?.quotes.find((item) => item.periodMonths === selectedPeriodMonths) || plan?.quotes[0];
+                          if (!plan || !quote) return null;
+                          return (
+                            <>
+                              {/* 周期选择与费用明细并排：左边选，右边即时看到结果 */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
+                                <div style={{ display: 'grid', gap: '8px' }}>
+                                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>订阅周期</div>
+                                  {plan.quotes.map((item) => {
+                                    const picked = item.periodMonths === quote.periodMonths;
+                                    return (
+                                      <button
+                                        key={item.periodMonths}
+                                        type="button"
+                                        onClick={() => setSelectedPeriodMonths(item.periodMonths)}
+                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '11px 14px', border: `1px solid ${picked ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '10px', background: picked ? 'var(--primary-light)' : 'white', color: picked ? 'var(--primary)' : 'var(--text-main)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+                                      >
+                                        <span>{item.periodLabel}</span>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          {item.savedFen > 0 && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#059669', background: '#d1fae5', padding: '2px 7px', borderRadius: '20px' }}>省 ¥{(item.savedFen / 100).toFixed(0)}</span>}
+                                          <span style={{ fontWeight: 700 }}>¥{(item.amountFen / 100).toFixed(2)}</span>
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div style={{ padding: '16px 18px', borderRadius: '12px', background: 'var(--background)', fontSize: '0.85rem', lineHeight: 2.1, color: 'var(--text-muted)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>应付金额</span><b style={{ color: 'var(--text-main)', fontSize: '1.25rem' }}>¥{(quote.amountFen / 100).toFixed(2)}</b></div>
+                                  {quote.savedFen > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>原价</span><s style={{ color: 'var(--text-muted)' }}>¥{(quote.listAmountFen / 100).toFixed(2)}</s></div>}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>赠送额度</span><b style={{ color: '#059669' }}>{quote.grantCredits.toLocaleString('zh-CN')} Credits</b></div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Token 折扣</span><b style={{ color: 'var(--text-main)' }}>{(plan.discountRate * 10).toFixed(1)} 折</b></div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', marginTop: '6px', paddingTop: '6px' }}><span>{subscription ? '续订后有效期' : '有效期'}</span><b style={{ color: 'var(--text-main)' }}>{quote.periodMonths} 个月</b></div>
+                                </div>
+                              </div>
+                              <button type="button" onClick={handleSubscribe} disabled={subscribeLoading || (wechatPayment && wechatPayment.status === 'paying')} className="btn btn-primary" style={{ justifyContent: 'center', padding: '14px' }}>
+                                {subscribeLoading ? <><Loader2 size={16} className="spin-anim" /> 正在创建订单…</> : subscription ? `续费 ${plan.name} · ¥${(quote.amountFen / 100).toFixed(2)}` : `订阅 ${plan.name} · ¥${(quote.amountFen / 100).toFixed(2)}`}
+                              </button>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 充值与卡密兑换并排，宽屏下不再是一条长长的竖直列表 */}
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'grid', gridTemplateColumns: wechatPayment && ['paying', 'paid'].includes(wechatPayment.status) ? '1fr' : '1fr 1fr', gap: '24px', alignItems: 'start' }}>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--text-main)' }}>微信支付充值</h3>
                     {!wechatPayment || !['paying', 'paid'].includes(wechatPayment.status) ? <div style={{ display: 'grid', gap: '14px' }}>
@@ -1580,11 +1775,11 @@ export default function DashboardClient() {
                       <label style={{ display: 'grid', gap: '7px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>自定义金额（人民币）<input type="number" min="1" max="10000" step="1" value={rechargeAmountYuan} onChange={(event) => setRechargeAmountYuan(Number(event.target.value))} style={{ padding: '13px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: '1rem' }} /></label>
                       <button type="button" onClick={handleWechatRecharge} disabled={wechatPaymentLoading} className="btn btn-primary" style={{ justifyContent: 'center', padding: '13px' }}>{wechatPaymentLoading ? <><Loader2 size={16} className="spin-anim" /> 正在创建订单…</> : '微信扫码支付'}</button>
                     </div> : <div style={{ textAlign: 'center', padding: '18px', border: '1px solid var(--border)', borderRadius: '14px', background: '#f8fafc' }}>
-                      {wechatPayment.status === 'paid' ? <><Check size={42} color="#059669" /><h4 style={{ marginTop: '8px', color: '#059669' }}>充值成功</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)' }}>{wechatPayment.credits?.toLocaleString()} Credits 已到账</p><button type="button" className="btn btn-outline" style={{ marginTop: '14px' }} onClick={() => setWechatPayment(null)}>继续充值</button></> : <><Image src={wechatPayment.qrCodeDataUrl} alt="微信支付二维码" width={240} height={240} unoptimized style={{ width: '240px', height: '240px', borderRadius: '10px' }} /><h4 style={{ marginTop: '10px' }}>微信扫码支付 ¥{wechatPayment.amountYuan}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>支付完成后将自动到账，无需手动刷新</p><button type="button" className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => setWechatPayment(null)}>取消本次支付</button></>}
+                      {wechatPayment.status === 'paid' ? <><Check size={42} color="#059669" /><h4 style={{ marginTop: '8px', color: '#059669' }}>{wechatPayment.purpose === 'subscription' ? '会员已开通' : '充值成功'}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)' }}>{wechatPayment.credits?.toLocaleString()} Credits 已到账</p><button type="button" className="btn btn-outline" style={{ marginTop: '14px' }} onClick={() => setWechatPayment(null)}>完成</button></> : <><Image src={wechatPayment.qrCodeDataUrl} alt="微信支付二维码" width={240} height={240} unoptimized style={{ width: '240px', height: '240px', borderRadius: '10px' }} /><h4 style={{ marginTop: '10px' }}>微信扫码支付 ¥{wechatPayment.amountYuan}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{wechatPayment.purpose === 'subscription' ? '支付完成后会员立即生效，无需手动刷新' : '支付完成后将自动到账，无需手动刷新'}</p><button type="button" className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => setWechatPayment(null)}>取消本次支付</button></>}
                     </div>}
                   </div>
 
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+                  <div style={{ display: wechatPayment && ['paying', 'paid'].includes(wechatPayment.status) ? 'none' : 'block' }}>
                     <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--text-main)' }}>卡密充值兑换</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <input 
@@ -1604,8 +1799,9 @@ export default function DashboardClient() {
                       </button>
                     </div>
                   </div>
-                  
-                  <div style={{ marginTop: '24px', padding: '16px', background: '#f8fafc', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  </div>
+
+                  <div style={{ padding: '16px', background: '#f8fafc', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                     <p style={{ marginBottom: '8px', fontWeight: 600, color: 'var(--text-main)' }}>充值说明：</p>
                     <p>1. Credits 根据模型实际返回的输入、输出和缓存 Token 用量结算。</p>
                     <p>2. 卡密一经兑换即刻生效，不设有效期。</p>

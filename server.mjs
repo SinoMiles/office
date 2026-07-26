@@ -77,16 +77,26 @@ function settleUsage(userId, settlement, attempt = 0) {
   });
 }
 
-function reconcileBilling() {
+function callInternal(pathname, label) {
   const body = '{}';
   const signature = crypto.createHmac('sha256', process.env.JWT_SECRET).update(body).digest('hex');
-  void fetch(`http://127.0.0.1:${port}/api/internal/billing/reconcile`, {
+  void fetch(`http://127.0.0.1:${port}${pathname}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-officeweb-signature': signature },
     body,
   }).then(async (response) => {
-    if (!response.ok) chatWarn('billing', `reconciler returned ${response.status}`);
-  }).catch((error) => chatError('billing', 'reconciler failed', error));
+    if (!response.ok) chatWarn('billing', `${label} returned ${response.status}`);
+  }).catch((error) => chatError('billing', `${label} failed`, error));
+}
+
+function reconcileBilling() {
+  callInternal('/api/internal/billing/reconcile', 'reconciler');
+}
+
+// 订阅到期降级、续费提醒、过期订单清理、退款兜底对账。
+// 这些都是天级别的业务，10 分钟一轮足够，不必跟着计费对账的 60 秒节奏跑。
+function tickSubscriptions() {
+  callInternal('/api/internal/subscriptions/tick', 'subscription ticker');
 }
 
 await startAioncore();
@@ -184,6 +194,8 @@ server.on('upgrade', (request, socket, head) => {
 server.listen(port, hostname, () => console.log(`OfficeWeb ready at http://${hostname}:${port}`));
 const billingReconcileTimer = setInterval(reconcileBilling, 60_000);
 setTimeout(reconcileBilling, 5_000);
+const subscriptionTickTimer = setInterval(tickSubscriptions, 10 * 60_000);
+setTimeout(tickSubscriptions, 20_000);
 
 let shuttingDown = false;
 async function shutdown(signal) {
@@ -192,6 +204,7 @@ async function shutdown(signal) {
   console.log(`OfficeWeb received ${signal}, shutting down`);
   proxyServer.clients.forEach((client) => client.close(1001, 'Server shutting down'));
   clearInterval(billingReconcileTimer);
+  clearInterval(subscriptionTickTimer);
   await new Promise((resolve) => server.close(resolve));
   await stopAioncore();
   process.exit(0);

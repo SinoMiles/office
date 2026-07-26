@@ -36,5 +36,5 @@ export async function GET(_request, { params }) {
       // turn a valid payment into a failed order.
     }
   }
-  return NextResponse.json({ success: true, order: { id: String(order._id), status: order.status === 'crediting' ? 'paying' : order.status, amountYuan: order.amountFen / 100, credits: order.credits, expiresAt: order.expiresAt, paidAt: order.paidAt } });
+  return NextResponse.json({ success: true, order: { id: String(order._id), status: order.status === 'crediting' ? 'paying' : order.status, purpose: order.purpose, planId: order.planId, periodMonths: order.periodMonths, amountYuan: order.amountFen / 100, credits: order.credits, expiresAt: order.expiresAt, paidAt: order.paidAt } });
 }
