@@ -193,3 +193,24 @@ test('history selection stops before the next turn in a shared AionCore conversa
   const secondTurn = sliceHistoryThroughPrompts(history, ['第一问', '第二问']);
   assert.deepEqual(secondTurn.map((message) => message.msg_id), ['u1', 'a1', 'u2', 'a2']);
 });
+
+test('sanitizeAssistantText keeps the blank lines Markdown needs', () => {
+  // 段落、列表、表格全靠空行分隔。清洗器过去把空行一并丢掉，
+  // 于是流式正文渲染成一整块无格式文字，刷新读原文后又恢复格式。
+  const markdown = '## 标题\n\n- 甲\n- 乙\n\n| 列一 | 列二 |\n|---|---|\n| A | B |\n\n第一段。\n\n第二段。';
+  assert.equal(sanitizeAssistantText(markdown), markdown);
+});
+
+test('sanitizeAssistantText still drops a path label left empty by cleaning', () => {
+  assert.equal(sanitizeAssistantText('结果已生成。\n文件路径：\n下一段。'), '结果已生成。\n下一段。');
+});
+
+test('streamed deltas rebuild Markdown structure intact', () => {
+  // AionCore 发的是极细粒度增量（"##"、" "、"\n\n"、"-" 这种）。
+  const deltas = ['##', ' ', '标题', '\n\n', '-', ' ', '甲', '\n', '-', ' ', '乙'];
+  const merged = deltas.reduce((messages, content) => mergeStreamMessages(messages, {
+    msg_id: 'a1', type: 'content', data: { content },
+  }), []);
+  const ui = mapMessagesToUi(merged.map((message) => ({ ...message, role: 'assistant' })), { isProcessing: false });
+  assert.equal(ui[0].content, '## 标题\n\n- 甲\n- 乙');
+});

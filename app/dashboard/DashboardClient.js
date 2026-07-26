@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, FileType2, ImageIcon, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
@@ -40,6 +40,11 @@ function timelineSummary(value, limit = 120) {
 
 // 逐字段浅比较两条消息是否等价。流式帧里 content/blocks 会被整体替换成新对象，
 // 因此对这两个字段退化为序列化比较 —— 长度有限，代价可以接受。
+// 聊天区占整行的百分比：默认 42%，往左可拖到只剩 360px，往右最多一半。
+const DEFAULT_CHAT_WIDTH = 42;
+const MAX_CHAT_WIDTH = 50;
+const MIN_CHAT_PX = 360;
+
 function shallowEqualMessage(left, right) {
   if (left === right) return true;
   if (!left || !right) return false;
@@ -83,6 +88,9 @@ export default function DashboardClient() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState(null); // 'profile' | 'settings' | 'upgrade' | null
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const [resizingSplit, setResizingSplit] = useState(false);
+  const splitRowRef = useRef(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeArtifact, setActiveArtifact] = useState(null);
   const [previewTabs, setPreviewTabs] = useState([]);
@@ -180,15 +188,57 @@ export default function DashboardClient() {
     resizePromptInput(promptInputRef.current);
   }, [prompt, resizePromptInput]);
 
-  const conversationTimeline = messages.reduce((turns, message, messageIndex) => {
+  // 流式正文在渲染期派生，不再由 effect 回写 messages。
+  // 以前每来一帧就 setMessages 一次，而滚动 effect 又依赖 messages，
+  // 于是「passive effect 里发起更新 -> 提交 -> 又有 passive effect 待执行」这条环
+  // 一直不断，React 的 nested passive update 计数归不了零，
+  // 一轮生成上百帧，到第 50 帧就抛 Maximum update depth exceeded。
+  const renderMessages = useMemo(() => {
+    const lastAionMsg = aionMessages?.length ? aionMessages[aionMessages.length - 1] : null;
+    if (!lastAionMsg || lastAionMsg.role !== 'ai') return messages;
+    const last = messages.length ? messages[messages.length - 1] : null;
+    if (!last || last.role !== 'ai') return [...messages, { ...lastAionMsg, loading: aionIsProcessing }];
+    const merged = { ...last, ...lastAionMsg, artifacts: last.artifacts, loading: aionIsProcessing };
+    if (shallowEqualMessage(last, merged)) return messages;
+    const next = [...messages];
+    next[next.length - 1] = merged;
+    return next;
+  }, [messages, aionMessages, aionIsProcessing]);
+
+  const conversationTimeline = renderMessages.reduce((turns, message, messageIndex) => {
     if (message.role !== 'user') return turns;
-    const reply = messages.slice(messageIndex + 1).find((candidate) => candidate.role === 'ai');
+    const reply = renderMessages.slice(messageIndex + 1).find((candidate) => candidate.role === 'ai');
     turns.push({
       messageIndex,
       question: timelineSummary(message.content, 80) || '新对话',
       reply: timelineSummary(reply?.content, 140) || (reply?.loading ? '正在回复…' : '暂无回复'),
     });
     return turns;
+  }, []);
+
+  const beginSplitDrag = useCallback((event) => {
+    const row = splitRowRef.current;
+    if (!row) return;
+    event.preventDefault();
+    setResizingSplit(true);
+    const move = (moveEvent) => {
+      const rect = row.getBoundingClientRect();
+      if (!rect.width) return;
+      // 下限用像素换算，窄屏上才不会把聊天区压到比 minWidth 还小、
+      // 出现「拖了但纹丝不动」的手感。
+      const minPercent = Math.min(MAX_CHAT_WIDTH, (MIN_CHAT_PX / rect.width) * 100);
+      const percent = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+      setChatWidth(Math.min(MAX_CHAT_WIDTH, Math.max(minPercent, percent)));
+    };
+    const stop = () => {
+      setResizingSplit(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
   }, []);
 
   const openArtifact = useCallback((artifact) => {
@@ -201,6 +251,31 @@ export default function DashboardClient() {
     setRightPanelMode('preview');
     setShowRightPanel(true);
     setSidebarCollapsed(true);
+  }, []);
+
+  // 把任务的附件转成预览面板认识的产物描述。
+  // 聊天气泡里的文件按钮一直写着 onClick={() => openArtifact(msg.attachments[index])}，
+  // 但三处构造消息的地方都只填了 filenames、没填 attachments，
+  // 于是 disabled 恒为 true —— 点了没反应。后端其实早就支持按下标预览附件。
+  const attachmentArtifacts = useCallback((taskId, attachments) => {
+    if (!taskId || !Array.isArray(attachments)) return [];
+    return attachments.map((attachment, index) => {
+      const filename = attachment?.filename || `附件 ${index + 1}`;
+      const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
+      // Office 文档走实时预览引擎，其余类型交给通用预览
+      const office = ['docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt'].includes(extension);
+      return {
+        id: `${taskId}:attachment-${index}`,
+        taskId,
+        filename,
+        fileType: extension,
+        previewType: extension,
+        status: 'ready',
+        generic: !office,
+        previewUrl: `/api/tasks/${taskId}/office-preview/proxy/attachment-${index}/`,
+        downloadUrl: `/api/tasks/${taskId}/download?attachmentIndex=${index}`,
+      };
+    });
   }, []);
 
   const openWorkspaceFile = useCallback((workspaceFile) => {
@@ -326,6 +401,7 @@ export default function DashboardClient() {
           filenames: task.attachments?.length
             ? task.attachments.map((attachment) => attachment.filename)
             : task.filename ? [task.filename] : [],
+          attachments: attachmentArtifacts(task._id, task.attachments),
         },
         {
           role: 'ai', content: task.runtime?.streamedText || '', loading: true,
@@ -340,27 +416,21 @@ export default function DashboardClient() {
   }, [openArtifact]);
 
   useEffect(() => {
-    // We no longer poll MongoDB for real-time generation updates since AionCore streams via WS.
-    // Instead, we just sync the real-time aionMessages into our local state.
-    if (aionMessages && aionMessages.length > 0) {
-       const lastAionMsg = aionMessages[aionMessages.length - 1];
-       if (lastAionMsg && lastAionMsg.role === 'ai') {
-         setMessages(prev => {
-            const last = prev.length > 0 ? prev[prev.length - 1] : null;
-            if (last && last.role === 'ai') {
-               const merged = { ...last, ...lastAionMsg, artifacts: last.artifacts, loading: aionIsProcessing };
-               // 这里以前无条件 `[...prev]` 并整体替换，即使内容一字未变也会产生新引用，
-               // 于是每一个流式帧都强制触发一次重渲染；一旦上游依赖出现抖动，
-               // 就会被放大成 "Maximum update depth exceeded"。内容相同就原样返回。
-               if (shallowEqualMessage(last, merged)) return prev;
-               const next = [...prev];
-               next[next.length - 1] = merged;
-               return next;
-            }
-            return [...prev, { ...lastAionMsg, loading: aionIsProcessing }];
-         });
-       }
-    }
+    // 生成过程中一律不落库：显示交给上面的 renderMessages 派生。
+    // 只在一轮结束时把最终结果写进 messages，好让下一轮继续在它后面累积，
+    // 这样每轮只有一次 setState，而不是每帧一次。
+    if (aionIsProcessing) return;
+    const lastAionMsg = aionMessages?.length ? aionMessages[aionMessages.length - 1] : null;
+    if (!lastAionMsg || lastAionMsg.role !== 'ai') return;
+    setMessages((prev) => {
+      const last = prev.length ? prev[prev.length - 1] : null;
+      if (!last || last.role !== 'ai') return [...prev, { ...lastAionMsg, loading: false }];
+      const merged = { ...last, ...lastAionMsg, artifacts: last.artifacts, loading: false };
+      if (shallowEqualMessage(last, merged)) return prev;
+      const next = [...prev];
+      next[next.length - 1] = merged;
+      return next;
+    });
   }, [aionMessages, aionIsProcessing]);
 
   useEffect(() => {
@@ -420,8 +490,8 @@ export default function DashboardClient() {
       return;
     }
     if (!generationObservedRef.current) return;
-    if (processLoading && !cancellingRef.current && activeTaskId && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
+    if (processLoading && !cancellingRef.current && activeTaskId && renderMessages.length > 0) {
+      const lastMsg = renderMessages[renderMessages.length - 1];
       if (lastMsg && lastMsg.role === 'ai') {
         fetch(`/api/tasks/${activeTaskId}/finish`, {
           method: 'PUT',
@@ -443,7 +513,7 @@ export default function DashboardClient() {
         setProcessLoading(false);
       }
     }
-  }, [aionIsProcessing, processLoading, activeTaskId]);
+  }, [aionIsProcessing, processLoading, activeTaskId, renderMessages, openArtifact]);
 
   useEffect(() => {
     if (!followLatest || !chatScrollRef.current) return;
@@ -454,7 +524,7 @@ export default function DashboardClient() {
       else element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, followLatest, isGenerating]);
+  }, [renderMessages, followLatest, isGenerating]);
 
   const handleChatScroll = useCallback((event) => {
     const element = event.currentTarget;
@@ -834,7 +904,8 @@ export default function DashboardClient() {
     const payload = await fetch(`/api/tasks/${task._id}/conversation`).then((res) => res.json()).catch(() => null);
     const conversation = payload?.tasks || [task];
     const persistedMessages = conversation.flatMap((turn) => [
-      { role: 'user', content: turn.prompt, filename: turn.filename, filenames: turn.attachments?.length ? turn.attachments.map((item) => item.filename) : turn.filename ? [turn.filename] : [] },
+      // 附件预览按任务维度定位，因此用这一轮自己的 turn._id，而不是整条会话的根任务 id
+      { role: 'user', content: turn.prompt, filename: turn.filename, filenames: turn.attachments?.length ? turn.attachments.map((item) => item.filename) : turn.filename ? [turn.filename] : [], attachments: attachmentArtifacts(turn._id, turn.attachments) },
       {
         role: 'ai',
         content: turn.aiTextResponse || turn.runtime?.streamedText || (turn.status === 'cancelled'
@@ -854,7 +925,7 @@ export default function DashboardClient() {
     setActiveArtifact(null);
     setShowRightPanel(false);
     setSidebarCollapsed(false);
-  }, [loadConversation, router]);
+  }, [attachmentArtifacts, loadConversation, router]);
 
   const handleCancel = async () => {
     if (!activeTaskId) return;
@@ -882,7 +953,7 @@ export default function DashboardClient() {
     
     // Optimistically add user message and an empty AI loading message
     const newMessages = [
-      ...messages,
+      ...renderMessages,
       { role: 'user', content: currentPrompt, filename: currentFiles[0]?.name || null, filenames: currentFiles.map((item) => item.name) },
       { role: 'ai', content: '', loading: true }
     ];
@@ -918,6 +989,19 @@ export default function DashboardClient() {
       const resData = await response.json();
       
       setActiveTaskId(resData.taskId);
+
+      // 发送那一刻任务还没创建，拿不到 taskId，附件描述只能等这里回填 ——
+      // 补上之后刚发出去的那条消息里的文件也能点开预览，不必等刷新。
+      if (currentFiles.length) {
+        const artifacts = attachmentArtifacts(resData.taskId, currentFiles.map((item) => ({ filename: item.name })));
+        setMessages((current) => {
+          const index = current.findLastIndex((message) => message.role === 'user');
+          if (index < 0) return current;
+          const next = [...current];
+          next[index] = { ...next[index], attachments: artifacts };
+          return next;
+        });
+      }
       // Wait for React to apply activeTaskId before sending message,
       // or we can just pass the aionConversationId directly to sendMessage if we update the hook.
       // But loadConversation will be triggered by useEffect when activeTaskId changes.
@@ -1207,17 +1291,33 @@ export default function DashboardClient() {
         
         {/* Chat UI */}
         {activeTab === 'workspace' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}>
-            
+          <div ref={splitRowRef} style={{ flex: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden', userSelect: resizingSplit ? 'none' : undefined, cursor: resizingSplit ? 'col-resize' : undefined }}>
+
             {/* Left Column (Chat Area + Input) */}
-            <div style={{ flex: showRightPanel ? '0 0 42%' : 1, width: showRightPanel ? '42%' : 'auto', minWidth: showRightPanel ? '360px' : 0, maxWidth: showRightPanel ? '42%' : '100%', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: 'flex-basis 0.25s ease', position: 'relative' }}>
+            <div style={{ flex: showRightPanel ? `0 0 ${chatWidth}%` : 1, width: showRightPanel ? `${chatWidth}%` : 'auto', minWidth: showRightPanel ? '360px' : 0, maxWidth: showRightPanel ? `${chatWidth}%` : '100%', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: resizingSplit ? 'none' : 'flex-basis 0.25s ease', position: 'relative' }}>
             
+            {/* 聊天区与预览区之间的拖拽分隔条。绝对定位贴在聊天列右缘，
+                不占布局位置，往左拖让预览更宽，往右最多拖到一半。 */}
+            {showRightPanel && !previewFullscreen && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="调整聊天区与预览区宽度"
+                onPointerDown={beginSplitDrag}
+                onDoubleClick={() => setChatWidth(DEFAULT_CHAT_WIDTH)}
+                title="拖动调整宽度，双击复位"
+                style={{ position: 'absolute', zIndex: 6, top: 0, right: 0, bottom: 0, width: '7px', cursor: 'col-resize', touchAction: 'none', background: resizingSplit ? 'var(--primary)' : 'transparent', opacity: resizingSplit ? 0.55 : 1, transition: 'background .15s' }}
+                onPointerEnter={(event) => { if (!resizingSplit) event.currentTarget.style.background = 'var(--border)'; }}
+                onPointerLeave={(event) => { if (!resizingSplit) event.currentTarget.style.background = 'transparent'; }}
+              />
+            )}
+
             {/* Chat Area */}
-            {/* minHeight:0 不能少 —— flex 列容器的子项默认 min-height:auto，
+            {/* minHeight:0 不能少—— flex 列容器的子项默认 min-height:auto，
                 会阻止它收缩到内容高度以下，overflowY:auto 因此形同虚设，
                 溢出被推给祖先元素，表现为聊天区外面又套了一层滚动条。 */}
             <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding .2s ease' }}>
-              {messages.length === 0 ? (
+              {renderMessages.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '0 20px' }}>
                   <Sparkles size={48} color="var(--primary)" style={{ marginBottom: '24px', opacity: 0.8 }} />
                   <h2 style={{ marginBottom: '12px', color: 'var(--text-main)', fontSize: '1.8rem', fontWeight: 700 }}>{copy.emptyTitle}</h2>
@@ -1252,7 +1352,7 @@ export default function DashboardClient() {
                   </div>
                 </div>
               ) : (
-                messages.map((msg, i) => (
+                renderMessages.map((msg, i) => (
                   <div
                     key={i}
                     ref={(element) => {
@@ -1437,7 +1537,7 @@ export default function DashboardClient() {
 
         {/* Right Panel: OfficeGPT document preview */}
         {showRightPanel && (
-          <div ref={previewPanelRef} style={{ flex: 1, minWidth: 0, width: previewFullscreen ? '100vw' : undefined, height: previewFullscreen ? '100vh' : undefined, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
+          <div ref={previewPanelRef} style={{ flex: 1, minWidth: 0, pointerEvents: resizingSplit ? 'none' : undefined, width: previewFullscreen ? '100vw' : undefined, height: previewFullscreen ? '100vh' : undefined, background: 'white', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
             <div style={{ minHeight: '58px', padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}><button type="button" onClick={() => setRightPanelMode('preview')} style={{ padding: '7px 9px', border: 0, borderRadius: '7px', background: rightPanelMode === 'preview' ? 'var(--primary-light)' : 'transparent', color: rightPanelMode === 'preview' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem' }}>预览</button><button type="button" onClick={() => setRightPanelMode('workspace')} style={{ padding: '7px 9px', border: 0, borderRadius: '7px', background: rightPanelMode === 'workspace' ? 'var(--primary-light)' : 'transparent', color: rightPanelMode === 'workspace' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem' }}>文件</button></div>
               <div style={{ display: 'flex', gap: '6px', minWidth: 0, overflowX: 'auto', flex: 1, scrollbarWidth: 'none' }}>
