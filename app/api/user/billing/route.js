@@ -22,9 +22,12 @@ export async function GET(request) {
     const page = positiveInteger(searchParams.get('page'), 1);
     const pageSize = Math.min(50, Math.max(10, positiveInteger(searchParams.get('pageSize'), 20)));
     const type = searchParams.get('type');
-    const query = { userId: user._id, ...(type && type !== 'all' ? { type } : { type: { $in: ['charge', 'consume', 'adjustment'] } }) };
+    // refund 必须在默认视图里：退款和预授权退回都是真实的余额增加，
+    // 藏起来会让「余额」一列的前→后接不上，看着就像账错了。
+    // reserve 反过来 —— 它只是笔占位，结算时会被冲掉，列出来只会让人以为扣了两次。
+    const query = { userId: user._id, ...(type && type !== 'all' ? { type } : { type: { $in: ['charge', 'consume', 'refund', 'adjustment'] } }) };
     const [records, total, billingSetting] = await Promise.all([
-      BillingRecord.find(query).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).populate('relatedTaskId', 'prompt filename').lean(),
+      BillingRecord.find(query).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).lean(),
       BillingRecord.countDocuments(query),
       SystemSetting.findOne({ key: 'billing' }).lean(),
     ]);

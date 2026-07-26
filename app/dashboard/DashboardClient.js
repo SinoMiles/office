@@ -1686,12 +1686,12 @@ export default function DashboardClient() {
 
             <div className="glass-card" style={{ minHeight: 0, flex: 1, background: 'white', padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}><h2 style={{ fontSize: '1rem' }}>{t('dashboard.details')}</h2></div>
-              <div style={{ minHeight: 0, flex: 1, overflow: 'auto' }}><table style={{ width: '100%', minWidth: '1080px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left' }}>
+              <div style={{ minHeight: 0, flex: 1, overflow: 'auto' }}><table style={{ width: '100%', minWidth: '620px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                   <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.time')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.type')}</th>
-                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.taskModel')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.detail')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.tokens')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.amount')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.balance')}</th>
@@ -1703,7 +1703,7 @@ export default function DashboardClient() {
                   )}
                   {data.records.map((r) => {
                     const usage = r.metadata?.usage;
-                    const pricing = r.metadata?.pricingSnapshot;
+                    const totalTokens = usage?.totalTokens ?? ((usage?.inputTokens || 0) + (usage?.outputTokens || 0));
                     const balanceDelta = r.balanceDelta ?? (['charge', 'refund'].includes(r.type) ? r.amount : -r.amount);
                     const billingTime = formatBillingDateTime(r.createdAt, locale);
                     return (
@@ -1714,10 +1714,10 @@ export default function DashboardClient() {
                           {{ charge: '充值', reserve: '预授权', consume: '消费', refund: '退回', adjustment: '调整' }[r.type] || r.type}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 14px', maxWidth: '300px', verticalAlign: 'top' }}><div style={{ fontWeight: 600, marginBottom: '3px' }}>{r.description || '账户余额变动'}</div>{r.relatedTaskId ? <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.relatedTaskId.prompt}>{r.relatedTaskId.filename || r.relatedTaskId.prompt || `任务 ${r.relatedTaskId._id}`}</div> : null}<div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '3px' }}>{pricing?.model || r.metadata?.model || (r.metadata?.transactionId ? `微信订单 ${r.metadata.outTradeNo}` : '')}</div></td>
-                      <td style={{ padding: '10px 14px', verticalAlign: 'top' }}>{usage ? <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '2px 10px', fontSize: '0.75rem' }}><span style={{ color: 'var(--text-muted)' }}>输入</span><b>{usage.inputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>输出</span><b>{usage.outputTokens?.toLocaleString() || 0}</b><span style={{ color: 'var(--text-muted)' }}>缓存</span><b>{usage.cachedInputTokens?.toLocaleString() || 0}</b></div> : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                      <td style={{ padding: '10px 14px', verticalAlign: 'top' }}><div style={{ fontWeight: 700 }}>{r.amount.toLocaleString()} Credits</div>{pricing ? <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', lineHeight: 1.35, marginTop: '3px' }}>输入 {pricing.inputCreditsPer1K}/1K · 输出 {pricing.outputCreditsPer1K}/1K<br/>折扣倍率 {pricing.discountRate}</div> : null}</td>
-                      <td style={{ padding: '10px 14px', verticalAlign: 'top' }}><div style={{ fontWeight: 'bold', color: balanceDelta >= 0 ? '#059669' : '#ef4444' }}>{balanceDelta > 0 ? '+' : ''}{balanceDelta.toLocaleString()}</div>{Number.isFinite(r.balanceAfter) ? <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '3px' }}>{r.balanceBefore?.toLocaleString()} → {r.balanceAfter.toLocaleString()}</div> : null}</td>
+                      <td style={{ padding: '10px 14px', maxWidth: '360px' }}>{r.description || t('dashboard.balanceChange')}</td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>{totalTokens ? totalTokens.toLocaleString(locale) : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', fontWeight: 600 }}>{r.amount.toLocaleString(locale)}</td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}><span style={{ fontWeight: 700, color: balanceDelta >= 0 ? '#059669' : '#ef4444' }}>{balanceDelta > 0 ? '+' : ''}{balanceDelta.toLocaleString(locale)}</span>{Number.isFinite(r.balanceAfter) ? <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>→ {r.balanceAfter.toLocaleString(locale)}</span> : null}</td>
                     </tr>
                   )})}
                 </tbody>
