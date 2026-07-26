@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
 import { signToken } from '@/lib/auth';
-import BillingRecord from '@/models/BillingRecord';
 import { consumeEmailCode, consumeRateLimit, normalizeEmail, requestIp } from '@/lib/auth-security';
 
 export async function POST(req) {
@@ -26,19 +25,16 @@ export async function POST(req) {
     if (!await consumeEmailCode({ email, purpose: 'register', code })) {
       return NextResponse.json({ error: '邮箱验证码错误或已过期' }, { status: 400 });
     }
-    const bonusRate = await consumeRateLimit({ scope: 'signup-credit-ip', identifier: requestIp(req), limit: 1, windowMs: 30 * 24 * 60 * 60_000 });
-    const signupBonus = bonusRate.allowed ? 10000 : 0;
-
+    // 赠送额度不在这里发了 —— 注册只要一个邮箱，成本近乎为零，按 IP 限流
+    // 也挡不住换网络的小号。改到 /api/auth/phone/bind，绑定手机号后才发放，
+    // 幂等键按号码走，一个号码只能领一次。
     const user = await User.create({
       email,
       password,
       emailVerifiedAt: new Date(),
-      balance: signupBonus,
+      balance: 0,
       role: 'user'
     });
-    if (signupBonus) {
-      await BillingRecord.create({ userId: user._id, type: 'charge', amount: signupBonus, balanceDelta: signupBonus, balanceBefore: 0, balanceAfter: signupBonus, description: '新用户注册赠送', idempotencyKey: `signup:${user._id}` });
-    }
 
     const token = signToken({ id: user._id, role: user.role, version: user.tokenVersion });
     

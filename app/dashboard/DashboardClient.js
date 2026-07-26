@@ -12,6 +12,7 @@ import WorkspaceBrowser from '@/app/components/WorkspaceBrowser';
 import GenericFilePreview from '@/app/components/GenericFilePreview';
 import ChatMarkdown from '@/app/components/ChatMarkdown';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
+import PhoneBindDialog from '@/app/components/PhoneBindDialog';
 import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
 import { useI18n } from '@/app/i18n/I18nProvider';
 import { dashboardCopy, dashboardExtra, dashboardSuggestions } from '@/app/i18n/dashboardCopy';
@@ -87,6 +88,7 @@ export default function DashboardClient() {
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState(null); // 'profile' | 'settings' | 'upgrade' | null
+  const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
   const [resizingSplit, setResizingSplit] = useState(false);
@@ -946,6 +948,12 @@ export default function DashboardClient() {
   const handleProcess = async () => {
     if (!prompt.trim() || isGenerating) return;
 
+    // 未绑定手机号直接弹绑定框，不必先把文件传上去再被后端退回来
+    if (user && user.phoneVerified === false) {
+      setPhoneDialogOpen(true);
+      return;
+    }
+
     const currentPrompt = prompt;
     const currentFiles = files;
     const parentTaskId = activeTaskId;
@@ -983,6 +991,7 @@ export default function DashboardClient() {
 
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
+        if (resData.code === 'PHONE_REQUIRED') setPhoneDialogOpen(true);
         throw new Error(resData.error || '处理失败');
       }
 
@@ -1729,6 +1738,17 @@ export default function DashboardClient() {
         )}
       </main>
       
+      <PhoneBindDialog
+        open={phoneDialogOpen}
+        onClose={() => setPhoneDialogOpen(false)}
+        onBound={(payload) => {
+          setPhoneDialogOpen(false);
+          setUser((current) => current ? { ...current, phone: payload.user?.phone, phoneVerified: true } : current);
+          toast.success(payload.granted ? `绑定成功，${payload.granted.toLocaleString('zh-CN')} Credits 已到账` : '手机号绑定成功');
+          void fetchData();
+        }}
+      />
+
       {/* Global Centered Modal */}
       {activeDrawer && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>

@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs';
 const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   emailVerifiedAt: { type: Date },
+  // 手机号唯一是整套防薅羊毛的地基：注册赠送额度改为绑定后才发放，
+  // 一个号码只能挂在一个账号上，小号成本就从「换个邮箱」变成「换张卡」。
+  phone: { type: String, sparse: true, unique: true, index: true },
+  phoneVerifiedAt: { type: Date },
   wechatOpenId: { type: String, sparse: true, index: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },

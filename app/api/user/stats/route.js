@@ -69,6 +69,9 @@ export async function GET() {
       user: {
         username: user.username,
         email: user.email,
+        // 前端靠这两个字段决定要不要挂绑定提示、要不要拦下发送
+        phone: user.phone || '',
+        phoneVerified: Boolean(user.phoneVerifiedAt),
         role: user.role
       },
       stats: {

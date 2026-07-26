@@ -33,6 +33,11 @@ export async function POST(request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: '请先登录' }, { status: 401 });
+    // 未绑定手机号一律不放行。前端靠 code 分辨这一种失败并弹出绑定弹窗，
+    // 而不是把它当成普通的报错提示。
+    if (!user.phoneVerifiedAt) {
+      return NextResponse.json({ error: '请先绑定手机号后再发起任务', code: 'PHONE_REQUIRED' }, { status: 403 });
+    }
     if (user.balance <= 0) return NextResponse.json({ error: '余额不足，请联系管理员充值' }, { status: 403 });
 
     await connectToDatabase();
