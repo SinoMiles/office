@@ -1,10 +1,77 @@
+// 只保留实际投放的两个语种。此前这里还躺着 ja/ko/es/pt/fr/de 六份文案，
+// 但 SUPPORTED_LOCALES 收缩后它们已经不可达（normalizeLocale 会把它们归到 en），
+// 留着只会让人误以为多语言仍在生效。
 export const homeCopy = {
-  'zh-CN': { hero:['与你的数据','直接对话','无需记忆函数或翻找菜单，只需用自然语言描述目标，OfficeGPT 即可完成复杂运算、整理与排版。','免费体验'], workflow:['工作流革命','像聊天一样，搞定繁琐数据','将你的意图直接转化为准确的文档结果。'], steps:[['1. 上传任意办公文件','上传 Excel、Word 或 PPT，隔离环境会安全解析文档结构。'],['2. 输入自然语言指令','直接告诉 AI 要清洗、计算、整理或生成什么内容。'],['3. 实时获得完整结果','复杂操作自动执行，处理后的文档会直接显示并可下载。']], pricing:['按量计费，清晰透明','无需强制包月，用多少算多少。','免费体验版','适合首次体验 AI 办公的用户。','免费注册','最受欢迎','专业版 (Pro)','按真实用量计费','随时充值并解锁全部高级能力。','立即充值使用'], free:['注册即送 10,000 Credits','基础数据分析指令','最大 10MB 文档','社区支持'], pro:['输入、输出 Token 分项结算','无限轮次多文件对话','高速推理模型','7×24 小时客户支持'] },
-  en: { hero:['Talk directly','to your data','No formulas or complex menus. Describe your goal in natural language and OfficeGPT handles calculations, organization, and formatting.','Try for free'], workflow:['A new workflow','Handle complex data like a conversation','Turn your intent directly into accurate document results.'], steps:[['1. Upload any office file','Upload Excel, Word, or PPT files for secure parsing in an isolated environment.'],['2. Give natural-language instructions','Tell AI exactly what to clean, calculate, organize, or create.'],['3. Get complete results instantly','Complex operations run automatically and finished files are ready to view and download.']], pricing:['Clear usage-based pricing','No mandatory subscription. Pay only for what you use.','Free trial','Ideal for exploring AI-powered office work.','Register free','Most popular','Professional (Pro)','Pay for actual usage','Top up anytime and unlock every advanced capability.','Top up now'], free:['10,000 Credits on registration','Basic data analysis commands','Files up to 10 MB','Community support'], pro:['Transparent input/output Token billing','Unlimited multi-file conversations','High-speed reasoning models','24/7 customer support'] },
-  ja: { hero:['データと','直接対話','数式や複雑なメニューは不要です。自然な言葉で目的を伝えるだけで、計算・整理・書式設定を行います。','無料で試す'], workflow:['新しいワークフロー','会話するようにデータを処理','意図を正確な文書結果に変換します。'], steps:[['1. 文書をアップロード','Excel、Word、PPT を安全な分離環境で解析します。'],['2. 自然な言葉で指示','整理、計算、編集、生成したい内容を AI に伝えます。'],['3. 結果をすぐに確認','複雑な操作を自動実行し、完成ファイルを表示・ダウンロードできます。']], pricing:['明確な従量課金','定額契約なし。使用分だけお支払い。','無料体験','AI オフィスを初めて試す方に最適。','無料登録','人気プラン','プロ版','実際の使用量で課金','必要な時にチャージして全機能を利用できます。','今すぐチャージ'], free:['登録で 10,000 Credits','基本データ分析','最大 10 MB','コミュニティサポート'], pro:['入出力 Token を個別表示','無制限の複数文書対話','高速推論モデル','24時間サポート'] },
-  ko: { hero:['데이터와','직접 대화하세요','수식이나 복잡한 메뉴 없이 자연어로 목표를 설명하면 계산, 정리, 서식을 자동으로 처리합니다.','무료 체험'], workflow:['새로운 워크플로','대화하듯 복잡한 데이터 처리','의도를 정확한 문서 결과로 바꿉니다.'], steps:[['1. 오피스 파일 업로드','Excel, Word, PPT를 격리된 환경에서 안전하게 분석합니다.'],['2. 자연어로 지시','정리, 계산, 편집 또는 생성할 내용을 AI에 알려주세요.'],['3. 결과 즉시 확인','복잡한 작업을 자동 실행하고 완성 파일을 확인하고 다운로드합니다.']], pricing:['투명한 사용량 기반 요금','의무 구독 없이 사용한 만큼만 결제합니다.','무료 체험','AI 오피스를 처음 경험하기에 적합합니다.','무료 가입','가장 인기','프로 버전','실제 사용량 기준','필요할 때 충전하고 모든 고급 기능을 이용하세요.','지금 충전'], free:['가입 시 10,000 Credits','기본 데이터 분석','최대 10 MB 파일','커뮤니티 지원'], pro:['입출력 Token 별도 정산','무제한 다중 파일 대화','고속 추론 모델','24시간 고객 지원'] },
-  es: { hero:['Habla directamente','con tus datos','Sin fórmulas ni menús complejos. Describe el objetivo y OfficeGPT calcula, organiza y da formato.','Probar gratis'], workflow:['Un nuevo flujo de trabajo','Procesa datos como una conversación','Convierte tu intención en resultados documentales precisos.'], steps:[['1. Sube cualquier documento','Procesa Excel, Word o PPT de forma segura en un entorno aislado.'],['2. Escribe instrucciones naturales','Indica a la IA qué limpiar, calcular, organizar o crear.'],['3. Obtén el resultado al instante','Las operaciones se ejecutan automáticamente y el archivo queda listo para descargar.']], pricing:['Precios claros por uso','Sin suscripción obligatoria. Paga solo lo que uses.','Prueba gratuita','Ideal para descubrir la oficina con IA.','Registro gratuito','Más popular','Profesional (Pro)','Pago por uso real','Recarga cuando quieras y desbloquea todas las funciones.','Recargar ahora'], free:['10.000 Credits al registrarte','Análisis de datos básico','Archivos de hasta 10 MB','Soporte comunitario'], pro:['Token de entrada y salida transparentes','Conversaciones ilimitadas con varios archivos','Modelos de razonamiento rápidos','Soporte 24/7'] },
-  pt: { hero:['Converse diretamente','com seus dados','Sem fórmulas ou menus complexos. Descreva o objetivo e o OfficeGPT calcula, organiza e formata.','Teste grátis'], workflow:['Um novo fluxo de trabalho','Processe dados como uma conversa','Transforme sua intenção em resultados precisos.'], steps:[['1. Envie qualquer documento','Excel, Word ou PPT são analisados com segurança em ambiente isolado.'],['2. Use instruções naturais','Diga à IA o que limpar, calcular, organizar ou criar.'],['3. Receba o resultado na hora','As operações são automáticas e o arquivo fica pronto para baixar.']], pricing:['Preço claro por uso','Sem assinatura obrigatória. Pague apenas pelo uso.','Teste gratuito','Ideal para conhecer o trabalho com IA.','Cadastro grátis','Mais popular','Profissional (Pro)','Cobrança pelo uso real','Recarregue quando quiser e libere todos os recursos.','Recarregar agora'], free:['10.000 Credits no cadastro','Análise básica de dados','Arquivos de até 10 MB','Suporte da comunidade'], pro:['Token de entrada e saída transparentes','Conversas ilimitadas com vários arquivos','Modelos rápidos de raciocínio','Suporte 24 horas'] },
-  fr: { hero:['Dialoguez directement','avec vos données','Sans formules ni menus complexes. Décrivez votre objectif et OfficeGPT calcule, organise et met en forme.','Essayer gratuitement'], workflow:['Un nouveau flux de travail','Traitez les données comme une conversation','Transformez votre intention en résultats documentaires précis.'], steps:[['1. Importez un document','Excel, Word ou PPT est analysé en toute sécurité dans un environnement isolé.'],['2. Donnez des instructions naturelles','Indiquez à l’IA ce qu’elle doit nettoyer, calculer, organiser ou créer.'],['3. Obtenez le résultat immédiatement','Les opérations sont automatiques et le fichier est prêt à télécharger.']], pricing:['Tarification claire à l’usage','Aucun abonnement obligatoire. Payez uniquement votre consommation.','Essai gratuit','Idéal pour découvrir le travail bureautique avec IA.','Inscription gratuite','Le plus populaire','Professionnel (Pro)','Facturation réelle à l’usage','Rechargez à tout moment et débloquez toutes les fonctions.','Recharger'], free:['10 000 Credits à l’inscription','Analyse de données de base','Fichiers jusqu’à 10 Mo','Assistance communautaire'], pro:['Token d’entrée et sortie transparents','Conversations multi-fichiers illimitées','Modèles de raisonnement rapides','Assistance 24 h/24'] },
-  de: { hero:['Sprechen Sie direkt','mit Ihren Daten','Keine Formeln oder komplizierten Menüs. Beschreiben Sie Ihr Ziel und OfficeGPT berechnet, organisiert und formatiert.','Kostenlos testen'], workflow:['Ein neuer Workflow','Datenverarbeitung wie ein Gespräch','Verwandeln Sie Ihre Absicht in präzise Dokumentergebnisse.'], steps:[['1. Dokument hochladen','Excel, Word oder PPT wird sicher in einer isolierten Umgebung analysiert.'],['2. Natürlich formulieren','Sagen Sie der KI, was bereinigt, berechnet, organisiert oder erstellt werden soll.'],['3. Ergebnis sofort erhalten','Vorgänge laufen automatisch und die fertige Datei steht zum Download bereit.']], pricing:['Klare nutzungsbasierte Preise','Kein Pflichtabo. Sie zahlen nur für die tatsächliche Nutzung.','Kostenlos testen','Ideal zum Einstieg in KI-gestützte Büroarbeit.','Kostenlos registrieren','Am beliebtesten','Professional (Pro)','Nach tatsächlicher Nutzung','Jederzeit aufladen und alle Funktionen freischalten.','Jetzt aufladen'], free:['10.000 Credits bei Registrierung','Grundlegende Datenanalyse','Dateien bis 10 MB','Community-Support'], pro:['Transparente Ein-/Ausgabe-Token','Unbegrenzte Gespräche mit mehreren Dateien','Schnelle Reasoning-Modelle','24/7-Support'] },
+  'zh-CN': {
+    badge: '已上线 50 个文档工具 · 无需注册即可使用',
+    hero: [
+      '与你的数据',
+      '直接对话',
+      '无需记忆函数或翻找菜单，只需用自然语言描述目标，OfficeGPT 即可完成复杂运算、整理与排版。',
+      '免费开始使用',
+    ],
+    heroSecondary: '浏览全部工具',
+    stats: [
+      ['50', '文档处理工具'],
+      ['4', '能力大类'],
+      ['0 元', '确定性工具永久免费'],
+      ['即时', '处理完成后删除文件'],
+    ],
+    catalog: ['能力总览', '不只是聊天，更是一整套文档工具箱', '格式转换、表格清洗、PDF 处理开箱即用；需要判断力的活儿再交给 AI。'],
+    catalogCta: '查看全部 50 个工具',
+    categories: [
+      ['格式极速转换', 'Word、Excel、PPT 与 PDF 之间高保真互转，保留原始排版。', ['Word 转 PDF', 'PPT 转 JPG', 'PDF 提取文字']],
+      ['表格与数据', '去重、清洗、合并、拆分与公式审计，导入系统前先把数据理干净。', ['Excel 去重', 'CSV 转 Excel', '公式审计']],
+      ['PDF 工具箱', '合并拆分、加水印、添页码、AES-256 加密，一套流程走完。', ['合并 PDF', '添加水印', '密码保护']],
+      ['AI 智能处理', '合同审查、公文检查、会议纪要、述职报告 —— 中文职场的真实场景。', ['合同审查', '公文检查', '周报生成']],
+    ],
+    workflow: ['工作流革命', '像聊天一样，搞定繁琐数据', '将你的意图直接转化为准确的文档结果。'],
+    steps: [
+      ['上传任意办公文件', '上传 Excel、Word 或 PPT，隔离环境会安全解析文档结构。'],
+      ['输入自然语言指令', '直接告诉 AI 要清洗、计算、整理或生成什么内容。'],
+      ['实时获得完整结果', '复杂操作自动执行，处理后的文档会直接显示并可下载。'],
+    ],
+    pricingTeaser: [
+      '定价',
+      '确定性工具免费，AI 按真实用量结算',
+      '35 个转换与处理工具永久免费且无需注册。AI 能力按模型实际返回的 Token 用量计费，会员另享折扣与每月赠送额度。',
+      '查看完整定价',
+    ],
+  },
+  en: {
+    badge: '50 document tools live · no account required',
+    hero: [
+      'Talk directly',
+      'to your data',
+      'No formulas or complex menus. Describe your goal in natural language and OfficeGPT handles calculations, organization, and formatting.',
+      'Start for free',
+    ],
+    heroSecondary: 'Browse all tools',
+    stats: [
+      ['50', 'document tools'],
+      ['4', 'capability areas'],
+      ['Free', 'deterministic tools, forever'],
+      ['Instant', 'files deleted after processing'],
+    ],
+    catalog: ['What you get', 'More than a chatbot — a complete document toolbox', 'Conversion, spreadsheet cleanup and PDF utilities work out of the box. Hand the judgement calls to AI.'],
+    catalogCta: 'See all 50 tools',
+    categories: [
+      ['Fast conversion', 'High-fidelity conversion between Word, Excel, PowerPoint and PDF with layout preserved.', ['Word to PDF', 'PPT to JPG', 'Extract PDF text']],
+      ['Spreadsheets & data', 'Deduplicate, clean, merge, split and audit formulas before anything reaches your systems.', ['Remove duplicates', 'CSV to Excel', 'Formula audit']],
+      ['PDF toolbox', 'Merge, split, watermark, paginate and lock with AES-256 — the whole pipeline in one place.', ['Merge PDF', 'Add watermark', 'Password protect']],
+      ['AI processing', 'Contract review, meeting minutes, weekly reports and résumé work on real documents.', ['Contract review', 'Meeting minutes', 'Weekly report']],
+    ],
+    workflow: ['A new workflow', 'Handle complex data like a conversation', 'Turn your intent directly into accurate document results.'],
+    steps: [
+      ['Upload any office file', 'Upload Excel, Word, or PPT files for secure parsing in an isolated environment.'],
+      ['Give natural-language instructions', 'Tell AI exactly what to clean, calculate, organize, or create.'],
+      ['Get complete results instantly', 'Complex operations run automatically and finished files are ready to view and download.'],
+    ],
+    pricingTeaser: [
+      'Pricing',
+      'Deterministic tools are free; AI bills on real usage',
+      '35 conversion and processing tools are free forever and need no account. AI features are settled against the tokens the model actually reports, with member discounts and a monthly credit grant on top.',
+      'See full pricing',
+    ],
+  },
 };

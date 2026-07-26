@@ -1,222 +1,187 @@
 'use client';
 
-import { ArrowRight, Zap, Shield, Sparkles, BarChart3, Clock, CheckCircle2, MessageSquare, LineChart, FileText, Bot, Database, Workflow } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import { ArrowRight, ArrowUpRight, Zap, Table, FileArchive, Sparkles, ShieldCheck, Upload, MessageSquare, Download } from 'lucide-react';
 import Footer from './components/Footer';
 import FAQ from './components/FAQ';
 import { useI18n } from './i18n/I18nProvider';
 import { homeCopy } from './i18n/homeCopy';
 
+const CATEGORY_VISUALS = [
+  { icon: Zap, tint: '#f59e0b', soft: 'rgba(245, 158, 11, 0.12)', href: '/tools#tool-category-0' },
+  { icon: Table, tint: '#10b981', soft: 'rgba(16, 185, 129, 0.12)', href: '/tools#tool-category-1' },
+  { icon: FileArchive, tint: '#3b82f6', soft: 'rgba(59, 130, 246, 0.12)', href: '/tools#tool-category-2' },
+  { icon: Sparkles, tint: '#8b5cf6', soft: 'rgba(139, 92, 246, 0.12)', href: '/tools#tool-category-3' },
+];
+
+const STEP_ICONS = [Upload, MessageSquare, Download];
+
 export default function LandingPage() {
-  const router = useRouter();
   const { locale } = useI18n();
   const copy = homeCopy[locale] || homeCopy['zh-CN'];
 
   return (
     <main style={{ overflowX: 'hidden' }}>
-      {/* Hero Section */}
-      <section style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'center', 
-        padding: '120px 24px 60px 24px',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Dynamic Cool Morphing Blobs Background & Animated Grid */}
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0 }}>
-          {/* Animated Blob 1 (Blue/Purple) */}
-          <div className="blob" style={{ top: '-10%', left: '-10%', width: '600px', height: '600px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' }}></div>
-          {/* Animated Blob 2 (Green/Cyan) */}
-          <div className="blob" style={{ bottom: '-20%', right: '-10%', width: '700px', height: '700px', background: 'linear-gradient(135deg, #10b981, #0ea5e9)', animationDelay: '-4s' }}></div>
-          {/* Animated Blob 3 (Rose/Orange) */}
-          <div className="blob" style={{ top: '30%', left: '40%', width: '500px', height: '500px', background: 'linear-gradient(135deg, #f43f5e, #f59e0b)', animationDelay: '-8s', animationDuration: '25s' }}></div>
-          
-          {/* Frosted Glass Overlay to blend the colors FIRST */}
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(248, 250, 252, 0.7)', backdropFilter: 'blur(80px)', WebkitBackdropFilter: 'blur(80px)' }}></div>
+      {/* ---------------- Hero ---------------- */}
+      <section className="hero-dark" style={{ padding: '132px 0 120px' }}>
+        <div className="hero-aurora" aria-hidden="true" />
+        <div className="hero-grid" aria-hidden="true" />
+        <div className="hero-fade" aria-hidden="true" />
 
-          {/* Animated Tech Grid (Rendered ON TOP of the blur so it stays crisp) */}
-          <div style={{ 
-            position: 'absolute', 
-            inset: '-50%', 
-            backgroundImage: 'linear-gradient(rgba(16, 185, 129, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.15) 1px, transparent 1px)', 
-            backgroundSize: '50px 50px',
-            animation: 'slideGrid 3s linear infinite',
-            maskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)',
-            transform: 'perspective(1000px) rotateX(60deg)'
-          }}></div>
-        </div>
-
-        {/* 2-Column Split Layout */}
-        <div className="container" style={{ zIndex: 1, position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
-          
-          {/* Left Column: Content */}
-          <div style={{ textAlign: 'left' }}>
-            
-            <h1 style={{ fontSize: 'clamp(3rem, 5vw, 5rem)', fontWeight: 800, lineHeight: 1.1, marginBottom: '24px', letterSpacing: '-0.04em', animation: 'slideUp 0.6s ease-out' }}>
-              {copy.hero[0]} <br />
-              <span style={{ position: 'relative', display: 'inline-block' }}>
-                <span className="text-gradient">{copy.hero[1]}</span>
-                {/* Sparkle decorative element */}
-                <div style={{ position: 'absolute', top: '-10px', right: '-30px', color: '#fbbf24', animation: 'pulse 2s infinite' }}><Sparkles size={32} /></div>
+        <div className="container" style={{ position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)', gap: '64px', alignItems: 'center' }}>
+            <div style={{ animation: 'slideUp .6s ease-out' }}>
+              <span className="hero-eyebrow">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 9px', borderRadius: '999px', background: 'rgba(16,185,129,.18)', color: '#6ee7b7', fontSize: '0.72rem', fontWeight: 700 }}>
+                  <ShieldCheck size={12} /> LIVE
+                </span>
+                {copy.badge}
               </span>
-            </h1>
-            
-            <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '48px', maxWidth: '600px', lineHeight: 1.6, animation: 'slideUp 0.7s ease-out', fontWeight: 400 }}>
-              {copy.hero[2]}
-            </p>
-            
-            <div style={{ display: 'flex', gap: '20px', animation: 'slideUp 0.8s ease-out' }}>
-              <a
-                href="/api/auth/entry"
-                className="btn btn-primary" 
-                style={{ padding: '18px 40px', fontSize: '1.1rem', borderRadius: 'var(--radius-full)', boxShadow: '0 8px 30px rgba(16, 185, 129, 0.3)', textDecoration: 'none' }}
-              >
-                {copy.hero[3]} <ArrowRight size={20} />
-              </a>
-            </div>
-          </div>
 
-          {/* Right Column: 3D Floating Demo */}
-          <div style={{ position: 'relative', animation: 'slideUp 1s ease-out' }}>
-            <div style={{ 
-              animation: 'float3d 12s ease-in-out infinite', 
-              transformStyle: 'preserve-3d'
-            }}>
-              {/* Demo Window Chrome (Browser-like top bar) */}
-              <div style={{ 
-                background: 'rgba(255,255,255,0.9)', 
-                backdropFilter: 'blur(20px)',
-                borderTopLeftRadius: '24px', 
-                borderTopRightRadius: '24px', 
-                padding: '16px 24px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                border: '1px solid rgba(255,255,255,0.5)',
-                borderBottom: 'none',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-              }}>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }}></div>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#f59e0b' }}></div>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }}></div>
-                <div style={{ marginLeft: '16px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, opacity: 0.6 }}>officegpt.app/workspace</div>
+              <h1 className="hero-title">
+                {copy.hero[0]}
+                <br />
+                <span className="hero-accent">{copy.hero[1]}</span>
+              </h1>
+
+              <p className="hero-sub">{copy.hero[2]}</p>
+
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '38px' }}>
+                <a href="/api/auth/entry" className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                  {copy.hero[3]} <ArrowRight size={18} />
+                </a>
+                <Link href="/tools" className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                  {copy.heroSecondary}
+                </Link>
               </div>
-              
-              {/* Demo Image */}
-              <img 
-                src="/hero-demo.jpg" 
-                alt="OfficeGPT Dashboard Demo" 
-                style={{ 
-                  width: '100%', 
-                  borderBottomLeftRadius: '24px', 
-                  borderBottomRightRadius: '24px', 
-                  boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.4)', 
-                  display: 'block', 
-                  objectFit: 'cover' 
-                }} 
-              />
-              
-              {/* Subliminal glowing reflection under the image */}
-              <div style={{ position: 'absolute', bottom: '-40px', left: '10%', right: '10%', height: '20px', background: 'var(--primary)', filter: 'blur(30px)', opacity: 0.4, borderRadius: '50%', zIndex: -1 }}></div>
+
+              <div className="hero-stats">
+                {copy.stats.map(([value, label]) => (
+                  <div className="hero-stat" key={label}>
+                    <b>{value}</b>
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 产品实拍。原来这里是一张会持续 3D 浮动的图，观感晃眼；
+                改为静态窗口 + 深色描边，让截图本身成为主角。 */}
+            <div style={{ animation: 'slideUp .8s ease-out' }}>
+              <div className="hero-shot">
+                <div className="hero-shot-bar">
+                  <span className="hero-shot-dot" style={{ background: '#ff5f57' }} />
+                  <span className="hero-shot-dot" style={{ background: '#febc2e' }} />
+                  <span className="hero-shot-dot" style={{ background: '#28c840' }} />
+                  <span style={{ marginLeft: '12px', fontSize: '0.75rem', color: '#7f8ea8', fontFamily: 'ui-monospace, monospace' }}>officegpt.cn/dashboard</span>
+                </div>
+                <Image
+                  src="/hero-demo.jpg"
+                  alt="OfficeGPT workspace"
+                  width={1200}
+                  height={750}
+                  priority
+                  style={{ width: '100%', height: 'auto', display: 'block' }}
+                />
+              </div>
             </div>
           </div>
-          
         </div>
       </section>
 
-      {/* How it Works Section - Flow Design */}
-      <section id="features" style={{ padding: '120px 24px', background: 'white', position: 'relative', overflow: 'hidden' }}>
+      {/* ---------------- 能力总览 ---------------- */}
+      <section style={{ padding: '104px 0', background: 'var(--background)' }}>
         <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: '80px', position: 'relative', zIndex: 2 }}>
-            <div style={{ display: 'inline-block', color: 'var(--primary)', fontWeight: 700, marginBottom: '16px', padding: '8px 16px', background: 'var(--primary-light)', borderRadius: '20px', fontSize: '0.9rem' }}>{copy.workflow[0]}</div>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>{copy.workflow[1]}</h2>
-            <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto' }}>{copy.workflow[2]}</p>
+          <div style={{ maxWidth: '720px', marginBottom: '52px' }}>
+            <span className="section-eyebrow">{copy.catalog[0]}</span>
+            <h2 className="section-title">{copy.catalog[1]}</h2>
+            <p className="section-sub">{copy.catalog[2]}</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px', position: 'relative', maxWidth: '1100px', margin: '0 auto', zIndex: 2 }}>
-            
-            {/* Step 1 */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.6)', padding: '40px 32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.3s ease', cursor: 'default' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
-              <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, var(--primary) 0%, #10b981 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)', marginBottom: '24px', transform: 'rotate(-5deg)' }}>
-                <Database size={32} />
-              </div>
-              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>{copy.steps[0][0]}</h3>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>{copy.steps[0][1]}</p>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(268px, 1fr))', gap: '20px' }}>
+            {copy.categories.map(([title, desc, chips], index) => {
+              const visual = CATEGORY_VISUALS[index] || CATEGORY_VISUALS[0];
+              const Icon = visual.icon;
+              return (
+                <Link key={title} href={visual.href} className="cat-card">
+                  <span style={{ display: 'inline-flex', width: '46px', height: '46px', borderRadius: '13px', background: visual.soft, color: visual.tint, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={22} />
+                  </span>
+                  <h3 style={{ fontSize: '1.12rem', fontWeight: 700, margin: '18px 0 9px' }}>{title}</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', lineHeight: 1.7, margin: '0 0 16px' }}>{desc}</p>
+                  <div>{chips.map((chip) => <span className="cat-chip" key={chip}>{chip}</span>)}</div>
+                </Link>
+              );
+            })}
+          </div>
 
-            {/* Step 2 */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.6)', padding: '40px 32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.3s ease', cursor: 'default' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
-              <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(59,130,246,0.4)', marginBottom: '24px', transform: 'rotate(5deg)' }}>
-                <Bot size={32} />
-              </div>
-              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>{copy.steps[1][0]}</h3>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>{copy.steps[1][1]}</p>
-            </div>
-
-            {/* Step 3 */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.6)', padding: '40px 32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.3s ease', cursor: 'default' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
-              <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 10px 25px -5px rgba(139,92,246,0.4)', marginBottom: '24px', transform: 'rotate(-5deg)' }}>
-                <Workflow size={32} />
-              </div>
-              <h3 style={{ fontSize: '1.35rem', marginBottom: '16px', fontWeight: 700 }}>{copy.steps[2][0]}</h3>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '1rem' }}>{copy.steps[2][1]}</p>
-            </div>
+          <div style={{ marginTop: '36px' }}>
+            <Link href="/tools" className="btn btn-outline" style={{ padding: '12px 22px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              {copy.catalogCta} <ArrowUpRight size={17} />
+            </Link>
           </div>
         </div>
       </section>
 
-
-
-      {/* Pricing Section */}
-      <section id="pricing" style={{ padding: '120px 24px', background: 'white' }}>
+      {/* ---------------- 工作流 ---------------- */}
+      <section id="features" style={{ padding: '104px 0', background: 'var(--surface)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
         <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>{copy.pricing[0]}</h2>
-            <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto' }}>{copy.pricing[1]}</p>
+          <div style={{ maxWidth: '720px', marginBottom: '52px' }}>
+            <span className="section-eyebrow">{copy.workflow[0]}</span>
+            <h2 className="section-title">{copy.workflow[1]}</h2>
+            <p className="section-sub">{copy.workflow[2]}</p>
           </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '40px', maxWidth: '1000px', margin: '0 auto' }}>
-            
-            {/* Free Tier */}
-            <div className="pricing-card" style={{ padding: '56px 40px', border: '1px solid var(--border)', borderRadius: '32px' }}>
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 700 }}>{copy.pricing[2]}</h3>
-              <div style={{ fontSize: '3.5rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-0.04em' }}>¥ 0</div>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>{copy.pricing[3]}</p>
-              
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 48px 0', display: 'flex', flexDirection: 'column', gap: '20px', fontSize: '1.05rem' }}>
-                {copy.free.map((item, index) => <li key={item} style={{ display: 'flex', gap: '16px', alignItems: 'center', color: index === 3 ? 'var(--text-muted)' : undefined }}>{index === 3 ? <Shield size={24} /> : <CheckCircle2 size={24} color="var(--primary)" />} <span>{item}</span></li>)}
-              </ul>
-              
-              <a href="/api/auth/entry" className="btn btn-outline" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '16px', textDecoration: 'none' }}>{copy.pricing[4]}</a>
-            </div>
 
-            {/* Pro Tier (Animated Border) */}
-            <div className="animated-border">
-              <div style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%)', background: 'var(--primary)', color: 'white', padding: '6px 20px', borderRadius: 'var(--radius-full)', fontSize: '0.9rem', fontWeight: 'bold', zIndex: 10, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)' }}>{copy.pricing[5]}</div>
-              
-              <div style={{ background: 'white', padding: '56px 40px', borderRadius: '24px', height: '100%' }}>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 700 }}>{copy.pricing[6]}</h3>
-                <div style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', letterSpacing: '-0.02em', color: 'var(--primary)', marginTop: '20px' }}>{copy.pricing[7]}</div>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '1.1rem' }}>{copy.pricing[8]}</p>
-                
-                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 48px 0', display: 'flex', flexDirection: 'column', gap: '20px', fontSize: '1.05rem' }}>
-                  {copy.pro.map((item) => <li key={item} style={{ display: 'flex', gap: '16px', alignItems: 'center' }}><CheckCircle2 size={24} color="var(--primary)" /> <span>{item}</span></li>)}
-                </ul>
-                
-                <button className="btn btn-primary" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '16px', boxShadow: '0 8px 24px rgba(16,185,129,0.3)' }} onClick={() => router.push('/login')}>{copy.pricing[9]}</button>
-              </div>
-            </div>
-            
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            {copy.steps.map(([title, desc], index) => {
+              const Icon = STEP_ICONS[index] || Upload;
+              return (
+                <div className="step-card" key={title}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                    <span style={{ display: 'inline-flex', width: '44px', height: '44px', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary-hover)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon size={21} />
+                    </span>
+                    <span className="step-index">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                  <h3 style={{ fontSize: '1.12rem', fontWeight: 700, marginBottom: '10px' }}>{title}</h3>
+                  <p style={{ color: 'var(--text-muted)', lineHeight: 1.75, fontSize: '0.94rem', margin: 0 }}>{desc}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* FAQ Section */}
+      {/* ---------------- 定价引导 ----------------
+          原来首页内嵌了一份硬编码的套餐卡，和 /pricing 页读取的真实套餐
+          目录会各说各话。这里只保留导流，价格以 /pricing 为唯一口径。 */}
+      <section id="pricing" style={{ padding: '104px 0', background: 'var(--background)' }}>
+        <div className="container">
+          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '26px', padding: 'clamp(38px, 5vw, 62px)', background: 'linear-gradient(135deg, #0b1220 0%, #16233c 55%, #10362f 100%)', color: '#e8edf7' }}>
+            <div aria-hidden="true" style={{ position: 'absolute', top: '-40%', right: '-10%', width: '520px', height: '520px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,.30), transparent 65%)' }} />
+            <div style={{ position: 'relative', zIndex: 1, maxWidth: '760px' }}>
+              <span style={{ display: 'inline-block', padding: '6px 14px', borderRadius: '999px', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', fontSize: '0.8rem', fontWeight: 700, color: '#6ee7b7' }}>
+                {copy.pricingTeaser[0]}
+              </span>
+              <h2 style={{ fontSize: 'clamp(1.7rem, 3.2vw, 2.5rem)', fontWeight: 800, letterSpacing: '-0.025em', margin: '18px 0 14px' }}>
+                {copy.pricingTeaser[1]}
+              </h2>
+              <p style={{ color: '#9aa8c2', lineHeight: 1.8, margin: '0 0 30px' }}>{copy.pricingTeaser[2]}</p>
+              <div style={{ display: 'flex', gap: '13px', flexWrap: 'wrap' }}>
+                <Link href="/pricing" className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                  {copy.pricingTeaser[3]} <ArrowRight size={18} />
+                </Link>
+                <a href="/api/auth/entry" className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                  {copy.hero[3]}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <FAQ />
-
       <Footer />
     </main>
   );

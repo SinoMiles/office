@@ -515,3 +515,209 @@ h1, h2, h3, h4 {
   box-shadow: 0 20px 40px -12px rgba(16, 185, 129, 0.12);
   border-color: rgba(16, 185, 129, 0.2);
 }
+
+/* ============================================================
+   Landing hero — 深色高光版
+   原来的首页用了三个高饱和 blob + 透视网格，观感偏 2021 年的
+   glassmorphism，且饱和度过高显得廉价。这里换成深色底 + 低饱和
+   极光渐变 + 细网格，靠留白与字重建立层次，而不是靠颜色堆叠。
+   ============================================================ */
+.hero-dark {
+  position: relative;
+  isolation: isolate;
+  background: #070b16;
+  color: #e8edf7;
+  overflow: hidden;
+}
+/* 极光：两团低饱和的大范围径向渐变，缓慢呼吸，不抢内容 */
+.hero-aurora {
+  position: absolute;
+  inset: -30% -10%;
+  z-index: 0;
+  background:
+    radial-gradient(42% 46% at 22% 28%, rgba(16, 185, 129, 0.30), transparent 70%),
+    radial-gradient(38% 44% at 78% 22%, rgba(56, 128, 255, 0.26), transparent 70%),
+    radial-gradient(46% 40% at 60% 82%, rgba(124, 92, 255, 0.20), transparent 72%);
+  filter: blur(20px);
+  animation: auroraDrift 22s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to   { transform: translate3d(3%, 2%, 0) scale(1.08); }
+}
+/* 细网格：只作为质感底纹，向下淡出，不做透视旋转 */
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%);
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%);
+}
+/* 与下方浅色区域的衔接，避免硬边 */
+.hero-fade {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 180px;
+  z-index: 1;
+  background: linear-gradient(to bottom, transparent, var(--background));
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  font-size: 0.82rem;
+  color: #c7d3e8;
+}
+.hero-title {
+  font-size: clamp(2.6rem, 5.4vw, 4.4rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  margin: 24px 0 20px;
+}
+/* 高光文字：静态渐变，不做无限 shimmer —— 持续动的标题很廉价 */
+.hero-accent {
+  background: linear-gradient(100deg, #34d399 0%, #5eead4 40%, #7dd3fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero-sub {
+  font-size: clamp(1rem, 1.3vw, 1.15rem);
+  line-height: 1.75;
+  color: #9aa8c2;
+  max-width: 40rem;
+}
+.btn-hero {
+  padding: 15px 30px;
+  font-size: 1rem;
+  font-weight: 650;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.btn-hero-primary {
+  background: linear-gradient(135deg, #10b981, #0ea5e9);
+  color: #04121f;
+  box-shadow: 0 12px 34px -12px rgba(16, 185, 129, 0.75);
+}
+.btn-hero-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 42px -12px rgba(16, 185, 129, 0.85); }
+.btn-hero-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #e8edf7;
+}
+.btn-hero-ghost:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+
+/* 统计条：用细分隔线而不是卡片，克制一些 */
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 56px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.hero-stat { background: rgba(7, 11, 22, 0.72); padding: 20px 22px; }
+.hero-stat b { display: block; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: #f2f6ff; }
+.hero-stat span { font-size: 0.8rem; color: #8fa0bd; }
+
+/* 产品截图窗口 */
+.hero-shot {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 50px 90px -40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  overflow: hidden;
+}
+.hero-shot-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+.hero-shot-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+/* 工具分类卡 —— 首页此前完全没有展示 50 个工具这块最大的资产 */
+.cat-card {
+  display: block;
+  padding: 26px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.cat-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 22px 44px -22px rgba(15, 23, 42, 0.28);
+}
+.cat-chip {
+  display: inline-block;
+  padding: 5px 11px;
+  margin: 0 7px 7px 0;
+  border-radius: var(--radius-full);
+  background: var(--background);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.section-eyebrow {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.section-title {
+  font-size: clamp(1.9rem, 3.6vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 18px 0 14px;
+}
+.section-sub { font-size: 1.05rem; color: var(--text-muted); line-height: 1.75; }
+
+.step-card {
+  position: relative;
+  padding: 32px 28px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+.step-card:hover { transform: translateY(-4px); box-shadow: 0 22px 44px -24px rgba(15, 23, 42, 0.25); }
+.step-index {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-hover);
+  letter-spacing: 0.14em;
+}
+
+@media (max-width: 900px) {
+  .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-aurora { animation: none; }
+}
