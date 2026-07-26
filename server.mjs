@@ -29,16 +29,21 @@ function authorize(token) {
   }
 }
 
-function usageFromFrame(rawData) {
+// 实测这个版本的 AionCore，finish 帧的 data 只有 {"session_id":null}，
+// 完全不带 token 用量；真实用量写在会话状态文件里，由结算端点兜底读取。
+// 因此这里只负责识别「该结算了」并把 conversation_id 传过去，
+// usage 能带就带，带不了交给服务端从状态文件解析。
+function settlementTrigger(rawData) {
   try {
     const frame = JSON.parse(String(rawData));
-    const payload = frame.data;
-    if (frame.name !== 'message.stream' || payload?.type !== 'finish') return null;
-    const usage = payload.data;
-    if (!usage || typeof usage !== 'object') return null;
-    if ((usage.input_tokens || 0) + (usage.output_tokens || 0) <= 0) {
-      chatWarn('billing', 'stream_end did not expose token usage', payload);
-    }
+    const name = frame.name || frame.event;
+    const payload = frame.data || {};
+    const isStreamFinish = name === 'message.stream' && payload.type === 'finish';
+    // turn.completed 比 finish 更晚到，此时 AionCore 已经把状态文件落盘。
+    // 只挂 finish 的话经常读不到用量，任务就一直停在 reserved。
+    const isTurnDone = name === 'turn.completed';
+    if (!isStreamFinish && !isTurnDone) return null;
+    const usage = isStreamFinish && payload.data && typeof payload.data === 'object' ? payload.data : {};
     return {
       conversationId: payload.conversation_id,
       usage: {
@@ -194,7 +199,7 @@ server.on('upgrade', (request, socket, head) => {
         chatWarn('proxy:ws', `dropped inbound frame outside user scope: ${frameScope(data)?.name || 'unparsable'}`);
         return;
       }
-      if (!binary) settleUsage(identity.id, usageFromFrame(data));
+      if (!binary) settleUsage(identity.id, settlementTrigger(data));
       if (client.readyState === WebSocket.OPEN) client.send(data, { binary: false });
     });
     upstream.on('close', (code, reason) => {

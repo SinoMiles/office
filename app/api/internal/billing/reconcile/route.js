@@ -60,6 +60,13 @@ export async function POST(request) {
       } else if (['failed', 'cancelled'].includes(task.status)) {
         await releaseTaskReservation({ taskId: task._id, userId: task.userId, reason: '任务未产生可计费用量' });
         results.push({ taskId: String(task._id), action: 'released' });
+      } else if (Date.now() - new Date(task.updatedAt).getTime() > 24 * 60 * 60_000) {
+        // 用量只存在于 AionCore 的会话状态文件里，而那个文件会被清理或随
+        // storage 重建消失。一旦文件没了，这个任务永远算不出用量，却会被
+        // 每 60 秒扫一次、无限重试。超过一天仍取不到就放弃并释放预授权，
+        // 否则这类任务只会越积越多。
+        await releaseTaskReservation({ taskId: task._id, userId: task.userId, reason: '用量数据已不可用，无法结算' });
+        results.push({ taskId: String(task._id), action: 'abandoned' });
       } else {
         results.push({ taskId: String(task._id), action: 'waiting_for_usage' });
       }
