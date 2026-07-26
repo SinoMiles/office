@@ -17,10 +17,7 @@ export async function GET(req) {
           headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
         });
       }
-      // 保留原有本地开发入口，便于非嵌入式联调。
-      const mockCode = 'dev_mock_code_' + Date.now();
-      const callbackUrl = new URL(`/api/auth/wechat/callback?code=${mockCode}`, req.url);
-      return NextResponse.redirect(callbackUrl.toString());
+      return NextResponse.json({ error: '微信登录尚未配置' }, { status: 503 });
     }
 
     const callbackUrl = new URL('/api/auth/wechat/callback', req.url);

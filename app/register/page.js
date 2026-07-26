@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -8,10 +9,49 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [captcha, setCaptcha] = useState(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { t } = useI18n();
+
+  const refreshCaptcha = useCallback(async () => {
+    const response = await fetch('/api/auth/captcha', { cache: 'no-store' });
+    if (response.ok) setCaptcha(await response.json());
+    setCaptchaAnswer('');
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/auth/captcha', { cache: 'no-store' }).then((response) => response.ok ? response.json() : null).then((value) => {
+      if (active && value) setCaptcha(value);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const sendCode = async () => {
+    setError('');
+    if (!email || !captchaAnswer || !captcha?.id) return setError('请先填写邮箱和图形验证码');
+    setSendingCode(true);
+    try {
+      const response = await fetch('/api/auth/email/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, purpose: 'register', captchaId: captcha.id, captchaAnswer }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '验证码发送失败');
+      setError('验证码已发送，请检查邮箱');
+    } catch (sendError) {
+      setError(sendError.message);
+    } finally {
+      setSendingCode(false);
+      void refreshCaptcha();
+    }
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -28,7 +68,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, code: emailCode })
       });
       const data = await res.json();
       
@@ -68,6 +108,20 @@ export default function RegisterPage() {
               required 
               placeholder="name@company.com"
             />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>图形验证码</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: '10px' }}>
+              <input className="input-base" value={captchaAnswer} onChange={(event) => setCaptchaAnswer(event.target.value)} required placeholder="输入图中字符" autoComplete="off" />
+              <button type="button" onClick={() => void refreshCaptcha()} style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border)', borderRadius: '10px', background: '#f8fafc', cursor: 'pointer' }}>{captcha?.image ? <Image src={captcha.image} alt="图形验证码，点击刷新" width={132} height={42} unoptimized style={{ width: '100%', height: '42px', objectFit: 'cover', display: 'block' }} /> : '加载中'}</button>
+            </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>邮箱验证码</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
+              <input className="input-base" value={emailCode} onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required inputMode="numeric" placeholder="6 位验证码" autoComplete="one-time-code" />
+              <button type="button" className="btn btn-outline" onClick={() => void sendCode()} disabled={sendingCode}>{sendingCode ? '发送中…' : '发送验证码'}</button>
+            </div>
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>{t('auth.password')}</label>

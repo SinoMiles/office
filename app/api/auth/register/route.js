@@ -1,34 +1,46 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
-import bcrypt from 'bcryptjs';
 import { signToken } from '@/lib/auth';
-import { cookies } from 'next/headers';
 import BillingRecord from '@/models/BillingRecord';
+import { consumeEmailCode, consumeRateLimit, normalizeEmail, requestIp } from '@/lib/auth-security';
 
 export async function POST(req) {
   try {
     await connectToDatabase();
-    const { email, password } = await req.json();
+    const body = await req.json();
+    const email = normalizeEmail(body.email);
+    const password = String(body.password || '');
+    const code = String(body.code || '');
 
-    if (!email || !password) {
-      return NextResponse.json({ error: '请提供邮箱和密码' }, { status: 400 });
+    const rate = await consumeRateLimit({ scope: 'register', identifier: requestIp(req), limit: 5, windowMs: 24 * 60 * 60_000 });
+    if (!rate.allowed) return NextResponse.json({ error: '该网络今日注册次数已达上限' }, { status: 429 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128) {
+      return NextResponse.json({ error: '请输入有效邮箱，密码至少 8 位' }, { status: 400 });
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return NextResponse.json({ error: '邮箱已被注册' }, { status: 400 });
     }
+    if (!await consumeEmailCode({ email, purpose: 'register', code })) {
+      return NextResponse.json({ error: '邮箱验证码错误或已过期' }, { status: 400 });
+    }
+    const bonusRate = await consumeRateLimit({ scope: 'signup-credit-ip', identifier: requestIp(req), limit: 1, windowMs: 30 * 24 * 60 * 60_000 });
+    const signupBonus = bonusRate.allowed ? 10000 : 0;
 
     const user = await User.create({
       email,
-      password: password,
-      balance: 10000,
+      password,
+      emailVerifiedAt: new Date(),
+      balance: signupBonus,
       role: 'user'
     });
-    await BillingRecord.create({ userId: user._id, type: 'charge', amount: 10000, balanceDelta: 10000, balanceBefore: 0, balanceAfter: 10000, description: '新用户注册赠送', idempotencyKey: `signup:${user._id}` });
+    if (signupBonus) {
+      await BillingRecord.create({ userId: user._id, type: 'charge', amount: signupBonus, balanceDelta: signupBonus, balanceBefore: 0, balanceAfter: signupBonus, description: '新用户注册赠送', idempotencyKey: `signup:${user._id}` });
+    }
 
-    const token = signToken({ id: user._id, role: user.role });
+    const token = signToken({ id: user._id, role: user.role, version: user.tokenVersion });
     
     const response = NextResponse.json({ success: true, user: { email: user.email, role: user.role, balance: user.balance } });
     
@@ -44,6 +56,7 @@ export async function POST(req) {
 
     return response;
   } catch (error) {
-    return NextResponse.json({ error: '注册失败: ' + error.message }, { status: 500 });
+    console.error('Registration failed', error);
+    return NextResponse.json({ error: '注册失败，请稍后重试' }, { status: 500 });
   }
 }

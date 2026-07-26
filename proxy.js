@@ -3,7 +3,7 @@ import { LOCALE_COOKIE, LOCALE_EXPLICIT_COOKIE, normalizeLocale } from '@/app/i1
 
 const localeSegments = { 'zh-CN': 'zh-cn', en: 'en', ja: 'ja', ko: 'ko', es: 'es', pt: 'pt', fr: 'fr', de: 'de' };
 const segmentLocales = Object.fromEntries(Object.entries(localeSegments).map(([locale, segment]) => [segment, locale]));
-const publicRoots = new Set(['', 'tools', 'about', 'docs', 'privacy', 'terms', 'login', 'register']);
+const publicRoots = new Set(['', 'tools', 'about', 'docs', 'privacy', 'terms', 'login', 'register', 'forgot-password']);
 
 export function proxy(request) {
   const { pathname } = request.nextUrl;

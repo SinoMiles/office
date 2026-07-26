@@ -56,6 +56,8 @@ const TaskSchema = new mongoose.Schema({
       totalTokens: { type: Number, default: 0 },
     },
     pricingSnapshot: { type: mongoose.Schema.Types.Mixed },
+    pendingUsage: { type: mongoose.Schema.Types.Mixed },
+    pendingBalanceDelta: { type: Number },
     reservationKey: { type: String },
     settlementKey: { type: String },
     settledAt: { type: Date },

@@ -33,7 +33,7 @@ export default function LanguageSwitcher({ compact = false }) {
     const parts = window.location.pathname.split('/').filter(Boolean);
     const currentSegment = Object.values(localeSegments).includes(parts[0]?.toLowerCase()) ? parts.shift() : null;
     const publicRoot = parts[0] || '';
-    if (currentSegment || ['', 'tools', 'about', 'docs', 'privacy', 'terms', 'login', 'register'].includes(publicRoot)) {
+    if (currentSegment || ['', 'tools', 'about', 'docs', 'privacy', 'terms', 'login', 'register', 'forgot-password'].includes(publicRoot)) {
       window.location.assign(`/${localeSegments[code]}/${parts.join('/')}`.replace(/\/$/, '') || `/${localeSegments[code]}`);
     }
   };

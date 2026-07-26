@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
+import crypto from 'node:crypto';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
 import SystemSetting from '@/models/SystemSetting';
 import { signToken } from '@/lib/auth';
-import { cookies } from 'next/headers';
 import BillingRecord from '@/models/BillingRecord';
 
 export async function GET(req) {
@@ -17,32 +17,27 @@ export async function GET(req) {
     }
 
     await connectToDatabase();
-    let openid = '';
-    
-    if (code.startsWith('dev_mock_code_')) {
-      // Mock flow for local dev
-      openid = 'mock_openid_' + Math.random().toString(36).substr(2, 9);
-    } else {
-      // Real WeChat OAuth flow
-      const settings = await SystemSetting.find();
-      const wechatSetting = settings.find(s => s.key === 'wechat')?.value || {};
-      
-      const tokenUrl = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${wechatSetting.appId}&secret=${wechatSetting.appSecret}&code=${code}&grant_type=authorization_code`;
-      const tokenRes = await fetch(tokenUrl);
-      const tokenData = await tokenRes.json();
-      
-      if (tokenData.errcode) {
-        return NextResponse.json({ error: tokenData.errmsg }, { status: 400 });
-      }
-      openid = tokenData.openid;
+    const settings = await SystemSetting.find();
+    const wechatSetting = settings.find(s => s.key === 'wechat')?.value || {};
+    if (!wechatSetting.appId || !wechatSetting.appSecret) {
+      return NextResponse.json({ error: '微信登录尚未配置' }, { status: 503 });
     }
+      
+    const tokenUrl = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${wechatSetting.appId}&secret=${wechatSetting.appSecret}&code=${code}&grant_type=authorization_code`;
+    const tokenRes = await fetch(tokenUrl);
+    const tokenData = await tokenRes.json();
+      
+    if (tokenData.errcode) {
+      return NextResponse.json({ error: tokenData.errmsg }, { status: 400 });
+    }
+    const openid = tokenData.openid;
 
     // Find or create user
     let user = await User.findOne({ wechatOpenId: openid });
     if (!user) {
       user = await User.create({
         email: `wx_${openid}@officegpt.local`,
-        password: Math.random().toString(36).slice(-8), // random dummy password
+        password: crypto.randomBytes(32).toString('hex'),
         wechatOpenId: openid,
         balance: 10000,
         role: 'user'
@@ -50,7 +45,7 @@ export async function GET(req) {
       await BillingRecord.create({ userId: user._id, type: 'charge', amount: 10000, balanceDelta: 10000, balanceBefore: 0, balanceAfter: 10000, description: '新用户注册赠送', idempotencyKey: `signup:${user._id}` });
     }
 
-    const token = signToken({ id: user._id, role: user.role });
+    const token = signToken({ id: user._id, role: user.role, version: user.tokenVersion });
     const response = embedded
       ? new NextResponse(`<!doctype html><html><head><meta charset="utf-8"></head><body><script>window.top.location.replace('/dashboard');</script></body></html>`, {
           headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
