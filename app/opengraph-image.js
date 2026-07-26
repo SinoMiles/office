@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { BRAND_MARK_URI } from '@/app/brand-mark-uri';
 
 export const alt = 'OfficeGPT - AI 智能办公套件与文档处理工具';
 export const size = { width: 1200, height: 630 };
@@ -24,7 +25,8 @@ export default function Image() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginBottom: '34px' }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>✦</div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- satori 只认 img，不走 next/image */}
+          <img src={BRAND_MARK_URI} width={64} height={64} alt="" />
           <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: -0.5 }}>OfficeGPT</div>
         </div>
         <div style={{ fontSize: 68, fontWeight: 800, lineHeight: 1.18, maxWidth: 980, letterSpacing: -1.5 }}>

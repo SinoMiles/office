@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import BrandMark from '@/app/components/BrandMark';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '../i18n/I18nProvider';
@@ -90,7 +91,7 @@ export default function RegisterPage() {
       <div className="glass-card" style={{ padding: '48px', width: '100%', maxWidth: '400px', background: 'white' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{ color: 'var(--primary)' }}>✦</span> OfficeGPT
+            <BrandMark size={26} /> OfficeGPT
           </div>
           <p style={{ color: 'var(--text-muted)' }}>{t('auth.registerIntro')}</p>
         </div>

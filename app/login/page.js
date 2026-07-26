@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import BrandMark from '@/app/components/BrandMark';
 import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
 import { useI18n } from '../i18n/I18nProvider';
@@ -46,7 +47,7 @@ export default function LoginPage() {
       <section className={styles.card}>
         <div className={styles.formPanel}>
           <div className={styles.brand}>
-            <div className={styles.logo}><span>✦</span> OfficeGPT</div>
+            <div className={styles.logo}><BrandMark size={26} /> OfficeGPT</div>
             <p>{t('auth.welcome')}</p>
           </div>
 

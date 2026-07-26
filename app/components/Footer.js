@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import BrandMark from '@/app/components/BrandMark';
 import Link from 'next/link';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -10,7 +11,7 @@ export default function Footer() {
       <div className="container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '48px', marginBottom: '80px', maxWidth: '1200px', margin: '0 auto 80px auto' }}>
         <div style={{ maxWidth: '300px' }}>
           <div style={{ fontSize: '1.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: 'white', marginBottom: '24px' }}>
-            <span style={{ color: 'var(--primary)' }}>✦</span>
+            <BrandMark size={30} />
             OfficeGPT
           </div>
           <p style={{ lineHeight: 1.6, fontSize: '0.95rem' }}>{t('footer.summary')}</p>

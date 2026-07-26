@@ -1,5 +1,6 @@
 'use client';
 import { usePathname } from 'next/navigation';
+import BrandMark from '@/app/components/BrandMark';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PanelLeftClose } from 'lucide-react';
@@ -51,8 +52,8 @@ export default function TopNav({ isLoggedIn }) {
     if (dashboardSidebarCollapsed) {
       return (
         <nav style={{ width: '72px', height: '70px', position: 'sticky', top: 0, zIndex: 50, background: '#f9f9f9', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'width 0.25s ease' }}>
-          <button onClick={() => setSidebarCollapsed(false)} title={t('nav.expand')} aria-label={t('nav.expand')} style={{ width: '42px', height: '42px', border: 'none', borderRadius: '12px', padding: 0, background: 'transparent', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.5rem', fontWeight: 800 }}>
-            ✦
+          <button onClick={() => setSidebarCollapsed(false)} title={t('nav.expand')} aria-label={t('nav.expand')} style={{ width: '42px', height: '42px', border: 'none', borderRadius: '12px', padding: 0, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <BrandMark size={28} />
           </button>
         </nav>
       );
@@ -61,7 +62,7 @@ export default function TopNav({ isLoggedIn }) {
       <nav style={{ padding: '0 24px', position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(0,0,0,0.05)', height: '70px', display: 'flex', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <button onClick={() => { window.location.href = homePath; }} style={{ fontSize: '1.25rem', fontWeight: 800, border: 'none', padding: 0, background: 'transparent', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', cursor: 'pointer' }} title="OfficeGPT 首页">
-            <span style={{ color: 'var(--primary)', fontSize: '1.4rem' }}>✦</span> OfficeGPT
+            <BrandMark size={26} /> OfficeGPT
           </button>
         </div>
         <div style={{ marginLeft: 'auto' }}><LanguageSwitcher compact /></div>
@@ -86,7 +87,7 @@ export default function TopNav({ isLoggedIn }) {
         {/* Left: Logo */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Link href={homePath} className="nav-brand" style={{ fontSize: '1.35rem', fontWeight: 800, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px' }}>
-            <span style={{ color: 'var(--primary)', fontSize: '1.5rem' }}>✦</span> OfficeGPT
+            <BrandMark size={28} /> OfficeGPT
           </Link>
         </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import BrandMark from '@/app/components/BrandMark';
 import { BarChart3, Users, Settings, Receipt } from 'lucide-react';
 import Link from 'next/link';
 
@@ -25,9 +26,7 @@ export default function AdminSidebar({ user }) {
       boxShadow: '4px 0 24px rgba(0,0,0,0.02)'
     }}>
       <div style={{ padding: '32px 24px', fontSize: '1.4rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-          ✦
-        </div>
+        <BrandMark size={36} radius={10} />
         OfficeGPT <span style={{ fontSize: '0.75rem', background: 'var(--primary-light)', padding: '4px 8px', borderRadius: '12px', color: 'var(--primary)', fontWeight: '600' }}>Admin</span>
       </div>
       
