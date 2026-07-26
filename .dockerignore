@@ -1,0 +1,11 @@
+.git
+.next
+.runtime
+node_modules
+storage
+uploads
+.env
+.env.production
+npm-debug.log*
+Dockerfile
+docker-compose.yml

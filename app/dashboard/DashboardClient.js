@@ -53,7 +53,6 @@ export default function DashboardClient() {
   const copy = dashboardCopy(locale);
   const extra = dashboardExtra(locale);
   const suggestionCopy = dashboardSuggestions(locale);
-  const debugInstanceRef = useRef('dashboard-pending');
   const [activeTab, setActiveTab] = useState(() => dashboardTabFromPath(pathname));
   const [data, setData] = useState({ records: [], balance: 0 });
   const [stats, setStats] = useState({ totalFiles: 0, totalConsumed: 0, savedTimeHours: 0, recentTasks: [] });
@@ -90,7 +89,6 @@ export default function DashboardClient() {
   const navigateToTab = (tab) => {
     const routes = { workspace: '/dashboard', overview: '/dashboard/overview', billing: '/dashboard/billing' };
     const nextPath = routes[tab];
-    console.info('[DashboardDebug] navigation click', { instance: debugInstanceRef.current, from: window.location.pathname, to: nextPath, tab });
     if (nextPath && nextPath !== window.location.pathname) {
       setActiveTab(tab);
       router.push(nextPath, { scroll: false });
@@ -98,56 +96,13 @@ export default function DashboardClient() {
   };
 
   useEffect(() => {
-    const instance = `dashboard-${Math.random().toString(36).slice(2, 8)}`;
-    debugInstanceRef.current = instance;
-    console.info('[DashboardRoute] mounted', {
-      instance,
-      browserPathname: window.location.pathname,
-      nextPathname: pathname,
-      href: window.location.href,
-      historyState: window.history.state,
-      at: performance.now(),
-    });
-    return () => console.warn('[DashboardDebug] unmounted', { instance, pathname: window.location.pathname, at: performance.now() });
-  }, [pathname]);
-
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return undefined;
-    const originalPushState = window.history.pushState;
-    const originalReplaceState = window.history.replaceState;
-    const instrument = (method, original) => function instrumentedHistory(state, unused, url) {
-      const before = window.location.href;
-      const result = original.call(this, state, unused, url);
-      console.groupCollapsed(`[DashboardRoute] history.${method}: ${before} -> ${window.location.href}`);
-      console.info({ instance: debugInstanceRef.current, state, url, nextPathname: pathname });
-      console.trace('[DashboardRoute] URL mutation stack');
-      console.groupEnd();
-      return result;
-    };
-    window.history.pushState = instrument('pushState', originalPushState);
-    window.history.replaceState = instrument('replaceState', originalReplaceState);
-    return () => {
-      window.history.pushState = originalPushState;
-      window.history.replaceState = originalReplaceState;
-    };
-  }, [pathname]);
-
-  useEffect(() => {
     const tab = dashboardTabFromPath(pathname);
     setActiveTab(tab);
-    console.info('[DashboardRoute] pathname changed', {
-      instance: debugInstanceRef.current,
-      nextPathname: pathname,
-      browserPathname: window.location.pathname,
-      tab,
-      at: performance.now(),
-    });
   }, [pathname]);
 
   useEffect(() => {
     const syncHistoryTab = () => {
       const tab = dashboardTabFromPath(window.location.pathname);
-      console.info('[DashboardDebug] history navigation', { instance: debugInstanceRef.current, pathname: window.location.pathname, tab, at: performance.now() });
       setActiveTab(tab);
     };
     window.addEventListener('popstate', syncHistoryTab, true);
@@ -519,7 +474,6 @@ export default function DashboardClient() {
   }, []);
 
   const fetchData = async () => {
-    console.info('[DashboardDebug] fetchData started', { instance: debugInstanceRef.current, pathname: window.location.pathname, at: performance.now() });
     try {
       const [billingRes, statsRes] = await Promise.all([
         fetch('/api/user/billing'),
@@ -546,7 +500,6 @@ export default function DashboardClient() {
     } catch (e) {
       console.error(e);
     } finally {
-      console.info('[DashboardDebug] fetchData finished', { instance: debugInstanceRef.current, pathname: window.location.pathname, at: performance.now() });
       setLoading(false);
     }
   };
@@ -779,12 +732,6 @@ export default function DashboardClient() {
 
   const loadHistoryTask = useCallback(async (task, { navigate = true } = {}) => {
     setActiveTaskId(task._id);
-    console.info('[DashboardRoute] load history task', {
-      taskId: task._id,
-      navigate,
-      browserPathname: window.location.pathname,
-      nextPathname: pathname,
-    });
     if (navigate && window.location.pathname !== '/dashboard') {
       setActiveTab('workspace');
       router.push('/dashboard', { scroll: false });
@@ -814,30 +761,17 @@ export default function DashboardClient() {
     setActiveArtifact(null);
     setShowRightPanel(false);
     setSidebarCollapsed(false);
-  }, [loadConversation, pathname, router]);
+  }, [loadConversation, router]);
 
   useEffect(() => {
     // Only restore a chat while the workspace route is active. Restoring it from
     // /dashboard/billing or /dashboard/overview would rewrite the current URL.
     const browserPathname = window.location.pathname;
     const browserTab = dashboardTabFromPath(browserPathname);
-    console.info('[DashboardRoute] history restore check', {
-      instance: debugInstanceRef.current,
-      browserPathname,
-      nextPathname: pathname,
-      browserTab,
-      loading,
-      alreadyRestored: historyRestoredRef.current,
-      recentTaskCount: stats.recentTasks?.length || 0,
-    });
-    if (browserTab !== 'workspace') {
-      console.info('[DashboardRoute] history restore skipped: non-workspace route', { browserPathname });
-      return;
-    }
+    if (browserTab !== 'workspace') return;
     if (loading || historyRestoredRef.current || !stats.recentTasks?.length) return;
     historyRestoredRef.current = true;
     const savedTaskId = window.localStorage.getItem('officeweb-active-task-id');
-    console.info('[DashboardRoute] restoring saved conversation', { savedTaskId, browserPathname });
     if (!savedTaskId) return;
     const savedTask = stats.recentTasks.find((task) => task._id === savedTaskId);
     if (savedTask) void loadHistoryTask(savedTask, { navigate: false });
@@ -866,6 +800,7 @@ export default function DashboardClient() {
     const currentPrompt = prompt;
     const currentFiles = files;
     const parentTaskId = activeTaskId;
+    const requestStartedAt = Date.now();
     
     // Optimistically add user message and an empty AI loading message
     const newMessages = [
@@ -883,16 +818,19 @@ export default function DashboardClient() {
       // AionCore starts streaming as soon as /api/process returns. Ensure the
       // realtime channel is ready first so no start/content/finish event is lost.
       await waitUntilConnected();
+      console.info('[OfficeWeb:Generation] realtime ready', { elapsedMs: Date.now() - requestStartedAt });
 
       const formData = new FormData();
       for (const currentFile of currentFiles) formData.append('files', currentFile);
       formData.append('prompt', currentPrompt);
       if (parentTaskId) formData.append('taskId', parentTaskId);
 
+      console.info('[OfficeWeb:Generation] process request started', { fileCount: currentFiles.length, continuation: Boolean(parentTaskId) });
       const response = await fetch('/api/process', {
         method: 'POST',
         body: formData,
       });
+      console.info('[OfficeWeb:Generation] process response received', { status: response.status, elapsedMs: Date.now() - requestStartedAt });
 
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
@@ -917,6 +855,7 @@ export default function DashboardClient() {
       fetchData(); // Update billing
 
     } catch (err) {
+      console.error('[OfficeWeb:Generation] process failed', { message: err.message, elapsedMs: Date.now() - requestStartedAt });
       generationObservedRef.current = false;
       setProcessLoading(false);
       toast.error('处理失败：' + err.message);
@@ -1577,7 +1516,7 @@ export default function DashboardClient() {
                   )})}
                 </tbody>
               </table></div>
-              <div style={{ padding: '9px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexShrink: 0, background: 'white' }}>
+              <div style={{ padding: '9px 14px', borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)', alignItems: 'center', gap: '16px', flexShrink: 0, background: 'white' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{t('dashboard.count', { count: billingPagination.total.toLocaleString(locale) })}</span>
                 <nav aria-label="账单分页" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <button type="button" className="btn btn-outline" style={{ padding: '7px 10px' }} disabled={billingLoading || billingPagination.page <= 1} onClick={() => void fetchBillingPage(billingPagination.page - 1)}>{t('dashboard.previous')}</button>
@@ -1586,6 +1525,7 @@ export default function DashboardClient() {
                   ) : <span key={item} style={{ width: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>…</span>)}
                   <button type="button" className="btn btn-outline" style={{ padding: '7px 10px' }} disabled={billingLoading || billingPagination.page >= billingPagination.totalPages} onClick={() => void fetchBillingPage(billingPagination.page + 1)}>{t('dashboard.next')}</button>
                 </nav>
+                <span aria-hidden="true" />
               </div>
             </div>
           </div>

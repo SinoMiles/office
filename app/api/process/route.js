@@ -23,12 +23,20 @@ const AIONCORE_URL = getAioncoreBaseUrl();
 export async function POST(request) {
   let task;
   let billingUserId;
+  const requestId = crypto.randomUUID().slice(0, 8);
+  const startedAt = Date.now();
+  let currentStage = 'authenticate';
+  const logStage = (stage, details) => {
+    currentStage = stage;
+    chatLog('generation', `${requestId} ${stage} +${Date.now() - startedAt}ms`, details);
+  };
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: '请先登录' }, { status: 401 });
     if (user.balance <= 0) return NextResponse.json({ error: '余额不足，请联系管理员充值' }, { status: 403 });
 
     await connectToDatabase();
+    logStage('database.connected');
     const formData = await request.formData();
     const prompt = String(formData.get('prompt') || '').trim();
     const productLocale = request.headers.get('accept-language')?.split(',')[0]?.trim() || 'zh-CN';
@@ -39,7 +47,7 @@ export async function POST(request) {
     if (!prompt) return NextResponse.json({ error: '请输入处理需求' }, { status: 400 });
     if (files.length > MAX_UPLOAD_FILES) return NextResponse.json({ error: `每次最多上传 ${MAX_UPLOAD_FILES} 个文件` }, { status: 400 });
     if (files.reduce((total, item) => total + Number(item.size || 0), 0) > MAX_TOTAL_UPLOAD_BYTES) return NextResponse.json({ error: '文件总大小不能超过 100MB' }, { status: 400 });
-    chatLog('process', 'request accepted', { parentTaskId: parentTaskId || undefined, fileCount: files.length });
+    logStage(`request.parsed files=${files.length} continuation=${Boolean(parentTaskId)}`);
     const parentTask = parentTaskId
       ? await Task.findOne({ _id: parentTaskId, userId: user._id })
       : null;
@@ -48,6 +56,7 @@ export async function POST(request) {
     }
 
     const settings = await SystemSetting.find({ key: { $in: ['llm', 'billing'] } }).lean();
+    logStage('settings.loaded');
     const billing = settings.find((item) => item.key === 'billing')?.value || {};
     billingUserId = user._id;
 
@@ -55,7 +64,7 @@ export async function POST(request) {
     let aionModelPayload = null;
     try {
       const providersRes = await fetch(`${AIONCORE_URL}/api/providers`);
-      chatLog('process', `providers response ${providersRes.status}`);
+      logStage(`providers.response status=${providersRes.status}`);
       if (providersRes.ok) {
         const providersJson = await providersRes.json();
         if (providersJson.success && Array.isArray(providersJson.data)) {
@@ -85,12 +94,13 @@ export async function POST(request) {
       const convRes = await fetch(`${AIONCORE_URL}/api/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000),
       });
       if (!convRes.ok) throw new Error('创建 OfficeGPT 会话失败');
       const convJson = await convRes.json();
       aionConversationId = convJson.data?.id || crypto.randomUUID();
-      chatLog('process', `conversation created ${aionConversationId}`, { conversation_id: aionConversationId });
+      logStage('conversation.created', { conversation_id: aionConversationId });
     } else {
       // Existing task chains may predate the OfficeWeb response policy. Keep
       // the instruction in conversation context instead of polluting user text.
@@ -98,11 +108,14 @@ export async function POST(request) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ extra: buildConversationExtra({ product_locale: productLocale }), merge_extra: true }),
+        signal: AbortSignal.timeout(10000),
       });
-      chatLog('process', `conversation policy response ${policyRes.status}`, { conversation_id: aionConversationId });
+      logStage(`conversation.policy status=${policyRes.status}`, { conversation_id: aionConversationId });
     }
 
-    const runtimeRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`);
+    const runtimeRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
+      signal: AbortSignal.timeout(10000),
+    });
     if (runtimeRes.ok) {
       const runtimePayload = await runtimeRes.json();
       if (runtimePayload.data?.runtime?.can_send_message === false) {
@@ -111,6 +124,7 @@ export async function POST(request) {
         throw conflict;
       }
     }
+    logStage(`conversation.runtime status=${runtimeRes.status}`, { conversation_id: aionConversationId });
 
     task = await Task.create({
       userId: user._id,
@@ -120,7 +134,7 @@ export async function POST(request) {
       status: 'processing',
       runtime: { state: 'running', updatedAt: new Date() },
     });
-    chatLog('process', `task created ${task._id}`, { conversation_id: aionConversationId });
+    logStage(`task.created id=${task._id}`, { conversation_id: aionConversationId });
 
     const reservedBilling = await reserveTaskCredits({
       taskId: task._id,
@@ -129,6 +143,7 @@ export async function POST(request) {
       membershipLevel: user.membershipLevel,
       billingSettings: billing,
     });
+    logStage('billing.reserved', { conversation_id: aionConversationId });
 
     let filename = parentTask?.filename || '';
     const uploadedAttachments = [];
@@ -144,6 +159,7 @@ export async function POST(request) {
       const aioncoreRes = await fetch(`${AIONCORE_URL}/api/fs/upload`, {
         method: 'POST',
         body: uploadData,
+        signal: AbortSignal.timeout(60000),
       });
       if (!aioncoreRes.ok) throw new Error(`上传附件失败：${file.name}`);
       const resJson = await aioncoreRes.json();
@@ -156,13 +172,16 @@ export async function POST(request) {
         { $set: { filename, originalFile: uploadedAttachments[0].filePath, attachments: uploadedAttachments } }
       );
     }
+    logStage(`attachments.ready count=${uploadedAttachments.length}`, { conversation_id: aionConversationId });
 
     // Return successfully so frontend can spawn WebSocket connection
     // Mirror AionUi WebUI: start the workspace Office watcher before generation
     // so newly created pptx/docx/xlsx files cannot race ahead of fileAdded.
     let aionWorkspace = '';
     try {
-      const conversationRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`);
+      const conversationRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
+        signal: AbortSignal.timeout(5000),
+      });
       if (conversationRes.ok) {
         const conversationPayload = await conversationRes.json();
         aionWorkspace = conversationPayload.data?.extra?.workspace || conversationPayload.data?.workspace || '';
@@ -170,16 +189,21 @@ export async function POST(request) {
       if (aionWorkspace) {
         task.workspace = aionWorkspace;
         await task.save();
-        const watchRes = await fetch(`${AIONCORE_URL}/api/fs/office-watch/start`, {
+        void fetch(`${AIONCORE_URL}/api/fs/office-watch/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ workspace: aionWorkspace }),
+          signal: AbortSignal.timeout(5000),
+        }).then((watchRes) => {
+          chatLog('preview', `workspace watcher start response ${watchRes.status}`, { conversation_id: aionConversationId });
+        }).catch((error) => {
+          chatError('preview', 'workspace watcher did not start in time', error);
         });
-        chatLog('preview', `workspace watcher start response ${watchRes.status}`, { conversation_id: aionConversationId });
       }
     } catch (error) {
       chatError('preview', 'failed to start workspace Office watcher', error);
     }
+    logStage(`workspace.ready available=${Boolean(aionWorkspace)}`, { conversation_id: aionConversationId });
 
     // Tell AionCore to start generating
     const aiRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}/messages`, {
@@ -188,9 +212,10 @@ export async function POST(request) {
       body: JSON.stringify({
         content: prompt,
         files: uploadedAttachments.map((attachment) => attachment.filePath),
-      })
+      }),
+      signal: AbortSignal.timeout(20000),
     });
-    chatLog('process', `message start response ${aiRes.status}`, { conversation_id: aionConversationId });
+    logStage(`message.response status=${aiRes.status}`, { conversation_id: aionConversationId });
 
     if (!aiRes.ok) {
       const errText = await aiRes.text();
@@ -203,6 +228,7 @@ export async function POST(request) {
       throw new Error('OfficeGPT 暂时无法启动生成，请稍后重试');
     }
 
+    logStage('request.completed', { conversation_id: aionConversationId });
     return NextResponse.json({
       success: true,
       taskId: String(task._id),
@@ -212,7 +238,7 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    chatError('process', 'task initiation failed', error);
+    chatError('generation', `${requestId} failed at ${currentStage} +${Date.now() - startedAt}ms`, error);
     const userMessage = publicErrorMessage(error);
     if (task?._id && billingUserId) {
       await releaseTaskReservation({ taskId: task._id, userId: billingUserId, reason: '任务启动失败，退回预授权额度' }).catch((releaseError) => {

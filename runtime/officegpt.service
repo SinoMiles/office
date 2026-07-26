@@ -1,0 +1,36 @@
+[Unit]
+Description=OfficeGPT web and managed inference service
+After=network-online.target mongod.service
+Wants=network-online.target
+Requires=mongod.service
+
+[Service]
+Type=simple
+User=officegpt
+Group=officegpt
+WorkingDirectory=/opt/officegpt/current
+EnvironmentFile=/opt/officegpt/shared/.env.production
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=NEXT_HOSTNAME=officegoai.com
+Environment=PORT=3100
+Environment=SITE_URL=https://officegoai.com
+Environment=MONGODB_URI=mongodb://127.0.0.1:27017/officecli_saas?replicaSet=rs0
+Environment=STORAGE_DIR=/opt/officegpt/shared/storage
+Environment=AIONCORE_VERSION=v0.1.52
+Environment=AIONCORE_MANAGED=1
+Environment=AIONCORE_PORT=9123
+Environment=AIONCORE_URL=http://127.0.0.1:9123
+Environment=AIONCORE_DATA_DIR=/opt/officegpt/shared/aioncore-data
+Environment=AIONCORE_WORK_DIR=/opt/officegpt/shared/workspaces
+Environment=AIONCORE_LOG_DIR=/opt/officegpt/shared/aioncore-logs
+Environment=UPLOAD_DIR=/opt/officegpt/shared/uploads
+ExecStart=/usr/bin/node scripts/run-server.mjs production
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

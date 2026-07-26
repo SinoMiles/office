@@ -2,12 +2,15 @@
   "name": "web-app",
   "version": "0.1.0",
   "private": true,
-  "aioncoreVersion": "v0.1.48",
+  "aioncoreVersion": "v0.1.52",
   "scripts": {
     "prepare:aioncore": "node scripts/prepare-aioncore.mjs",
-    "dev": "NODE_ENV=development node server.mjs",
+    "infra:up": "docker compose up -d mongo gotenberg",
+    "infra:down": "docker compose stop mongo gotenberg",
+    "dev": "node scripts/run-server.mjs development",
     "build": "next build",
-    "start": "NODE_ENV=production node server.mjs",
+    "start": "node scripts/run-server.mjs production",
+    "dev:docker": "docker compose --profile container-web up -d --build web",
     "lint": "eslint",
     "test": "node --test test/*.test.mjs"
   },

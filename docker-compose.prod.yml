@@ -1,0 +1,51 @@
+name: officegpt
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3000"
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      MONGODB_URI: mongodb://mongo:27017/officegpt
+      GOTENBERG_URL: http://gotenberg:3000
+      STORAGE_DIR: /app/storage
+      AIONCORE_DATA_DIR: /app/storage/aioncore-data
+      AIONCORE_WORK_DIR: /app/storage/workspaces
+      AIONCORE_LOG_DIR: /app/storage/aioncore-logs
+    volumes:
+      - officegpt_storage:/app/storage
+      - officegpt_uploads:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      gotenberg:
+        condition: service_started
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - officegpt_mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command: ["gotenberg", "--api-port=3000"]
+
+volumes:
+  officegpt_storage:
+  officegpt_uploads:
+  officegpt_mongo:

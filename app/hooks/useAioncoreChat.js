@@ -28,6 +28,7 @@ export function useAioncoreChat() {
   const pendingOfficeFilesRef = useRef([]);
   const officeOpenTimersRef = useRef(new Map());
   const confirmationsInFlightRef = useRef(new Set());
+  const generationTraceRef = useRef({ conversationId: null, startedAt: 0, firstEventSeen: false });
 
   const approvePermission = useCallback((payload) => {
     if (process.env.NEXT_PUBLIC_AIONCORE_AUTO_APPROVE === 'false') return;
@@ -96,7 +97,9 @@ export function useAioncoreChat() {
     const next = reduceRuntime(previous, name, payload);
     if (next === previous) return;
     runtimeRef.current = next;
-    chatLog('runtime', `${name}: ${previous.state}/${previous.isProcessing} -> ${next.state}/${next.isProcessing}`, payload);
+    if (previous.isProcessing !== next.isProcessing) {
+      chatLog('generation', `runtime ${previous.state}/${previous.isProcessing} -> ${next.state}/${next.isProcessing}`, payload);
+    }
     setRuntime(next);
   }, []);
 
@@ -107,7 +110,6 @@ export function useAioncoreChat() {
     const queued = queueRef.current.splice(0);
     try {
       if (!queued.length) return;
-      chatLog('messages', `merging ${queued.length} stream event(s)`);
       const previous = messagesRef.current;
       const next = queued.reduce(mergeStreamMessages, previous);
       if (next !== previous) {
@@ -164,6 +166,14 @@ export function useAioncoreChat() {
       }),
       client.on('message.stream', (payload) => {
         if (!belongsToActiveConversation(payload)) return;
+        const trace = generationTraceRef.current;
+        if (!trace.firstEventSeen && payload?.conversation_id === trace.conversationId) {
+          trace.firstEventSeen = true;
+          chatLog('generation', `first stream event after ${Date.now() - trace.startedAt}ms`, payload);
+        }
+        if (['finish', 'error', 'cancelled'].includes(payload?.type)) {
+          chatLog('generation', `terminal stream event after ${trace.startedAt ? Date.now() - trace.startedAt : 0}ms`, payload);
+        }
         applyRuntimeEvent('message.stream', payload);
         if (payload?.type === 'permission' || payload?.type === 'acp_permission') {
           approvePermission(payload);
@@ -229,7 +239,8 @@ export function useAioncoreChat() {
       return;
     }
     const files = Array.isArray(attachedFiles) ? attachedFiles : attachedFiles ? [attachedFiles] : [];
-    chatLog('conversation', `optimistic send to ${activeId}`, { conversation_id: activeId, attachmentCount: files.length });
+    generationTraceRef.current = { conversationId: activeId, startedAt: Date.now(), firstEventSeen: false };
+    chatLog('generation', `client bound files=${files.length}`, { conversation_id: activeId });
     conversationIdRef.current = activeId;
     applyRuntimeEvent('local.send', {});
     const nextMessages = [

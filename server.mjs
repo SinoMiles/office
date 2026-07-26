@@ -9,8 +9,9 @@ import { chatError, chatLog, chatWarn } from './lib/aioncore/logger.js';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOST || '0.0.0.0';
+const nextHostname = process.env.NEXT_HOSTNAME || hostname;
 const port = Number(process.env.PORT || 3000);
-const app = next({ dev, hostname, port });
+const app = next({ dev, hostname: nextHostname, port });
 const handle = app.getRequestHandler();
 const proxyServer = new WebSocketServer({ noServer: true });
 

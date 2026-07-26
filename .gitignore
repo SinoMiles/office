@@ -32,6 +32,8 @@
 *.p12
 *.pfx
 /secrets/
+/runtime/*.log
+/runtime/*.pid
 
 # debug
 npm-debug.log*
