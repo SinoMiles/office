@@ -12,14 +12,28 @@ export default function TopNav({ isLoggedIn }) {
   const isDashboard = pathname?.startsWith('/dashboard');
   const isAdmin = pathname?.startsWith('/admin');
   const [dashboardSidebarCollapsed, setDashboardSidebarCollapsed] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const { locale, t } = useI18n();
   const homePath = localizedPath(locale, '/');
+
+  // 浏览器地址栏里带语言前缀（/zh-cn、/en），而链接写的是不带前缀的路径。
+  // 之前直接拿 pathname === '/tools' 比较，永远不成立，选中态从来没亮过。
+  const routePath = (pathname || '/').replace(/^\/(zh-cn|en)(?=\/|$)/, '') || '/';
+  const isHome = routePath === '/';
 
   useEffect(() => {
     const handleState = (event) => setDashboardSidebarCollapsed(Boolean(event.detail?.collapsed));
     window.addEventListener('office-sidebar-state', handleState);
     window.dispatchEvent(new CustomEvent('office-sidebar-query'));
     return () => window.removeEventListener('office-sidebar-state', handleState);
+  }, []);
+
+  // 置顶时导航是透明的，滚动后才变成磨砂玻璃。passive 避免阻塞滚动。
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 16);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   const setSidebarCollapsed = (collapsed) => {
@@ -58,21 +72,27 @@ export default function TopNav({ isLoggedIn }) {
     );
   }
 
-  // 官网与普通页面的高级导航
+  // 官网与普通页面的高级导航。
+  // 首页整屏顶部是深色 Hero，导航因此常驻深色主题：置顶全透明浮在 Hero 上，
+  // 滚动后转深色磨砂（若切成白玻璃，会在深色 Hero 上闪出一条白条）。
+  // 其余页面底色是浅的，用常规的白色磨砂玻璃。
+  const overHero = isHome && !scrolled;
+  const navClass = `site-nav${isHome ? ' on-dark' : ''}${overHero ? '' : ' is-glass'}`;
+
   return (
-    <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255, 255, 255, 0.75)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,0,0,0.04)', height: '76px', display: 'flex', alignItems: 'center' }}>
+    <nav className={navClass}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', width: '100%', padding: '0 24px', gap: '48px' }}>
-        
+
         {/* Left: Logo */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Link href={homePath} style={{ fontSize: '1.35rem', fontWeight: 800, textDecoration: 'none', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px', transition: 'opacity 0.2s' }} onMouseOver={e=>e.currentTarget.style.opacity='0.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+          <Link href={homePath} className="nav-brand" style={{ fontSize: '1.35rem', fontWeight: 800, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.5px' }}>
             <span style={{ color: 'var(--primary)', fontSize: '1.5rem' }}>✦</span> OfficeGPT
           </Link>
         </div>
 
         {/* Center: Menu */}
         <div style={{ display: 'flex', gap: '8px', fontSize: '0.95rem', fontWeight: 600 }}>
-          <Link href="/tools" className="premium-nav-link" style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: pathname === '/tools' ? 'var(--primary)' : 'var(--text-main)', background: pathname === '/tools' ? 'var(--primary-light)' : 'transparent', transition: 'all 0.2s' }}>
+          <Link href="/tools" className="premium-nav-link" style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', ...(routePath === '/tools' ? { color: 'var(--primary)', background: overHero ? 'rgba(110,231,183,.14)' : 'var(--primary-light)' } : null) }}>
             {t('nav.documents')}
             <span style={{ 
               position: 'absolute', 
@@ -92,9 +112,9 @@ export default function TopNav({ isLoggedIn }) {
               FREE
             </span>
           </Link>
-          <Link href="/pricing" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: pathname === '/pricing' ? 'var(--primary)' : 'var(--text-main)', background: pathname === '/pricing' ? 'var(--primary-light)' : 'transparent', transition: 'all 0.2s' }}>{t('nav.pricing')}</Link>
-          <Link href="/#features" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>{t('nav.features')}</Link>
-          <Link href="/#faq" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-main)', transition: 'all 0.2s' }}>{t('nav.solutions')}</Link>
+          <Link href="/pricing" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', ...(routePath === '/pricing' ? { color: 'var(--primary)', background: overHero ? 'rgba(110,231,183,.14)' : 'var(--primary-light)' } : null) }}>{t('nav.pricing')}</Link>
+          <Link href="/#features" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none' }}>{t('nav.features')}</Link>
+          <Link href="/#faq" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none' }}>{t('nav.solutions')}</Link>
         </div>
 
         {/* Right: Actions */}
@@ -102,18 +122,14 @@ export default function TopNav({ isLoggedIn }) {
           <LanguageSwitcher />
           {!isLoggedIn ? (
             <>
-              <Link href="/login" style={{ textDecoration: 'none', color: 'var(--text-main)', fontWeight: 600, fontSize: '0.95rem', padding: '8px 16px', transition: 'color 0.2s' }} onMouseOver={e=>e.currentTarget.style.color='var(--primary)'} onMouseOut={e=>e.currentTarget.style.color='var(--text-main)'}>{t('nav.login')}</Link>
+              <Link href="/login" className="nav-login" style={{ textDecoration: 'none', fontWeight: 600, fontSize: '0.95rem', padding: '8px 16px' }}>{t('nav.login')}</Link>
             </>
           ) : null}
         </div>
         
       </div>
-      <style dangerouslySetInnerHTML={{__html: `
-        .premium-nav-link:hover {
-          background: rgba(0,0,0,0.04) !important;
-          color: var(--primary) !important;
-        }
-      `}} />
+      {/* hover 样式已移到 globals.css 的 .premium-nav-link，
+          那里能跟着导航的深浅两种状态切换配色 */}
     </nav>
   );
 }

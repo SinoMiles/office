@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, Zap, Table, FileArchive, Sparkles, ShieldCheck, Upload, MessageSquare, Download } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Zap, Table, FileArchive, Sparkles, Upload, MessageSquare, Download } from 'lucide-react';
 import Footer from './components/Footer';
 import FAQ from './components/FAQ';
+import HeroShowcase from './components/HeroShowcase';
 import { useI18n } from './i18n/I18nProvider';
 import { homeCopy } from './i18n/homeCopy';
 
@@ -22,69 +22,44 @@ export default function LandingPage() {
   const copy = homeCopy[locale] || homeCopy['zh-CN'];
 
   return (
-    <main style={{ overflowX: 'hidden' }}>
+    // 上移一个导航高度，让深色 Hero 延伸到透明导航的背后。不这样做的话，
+    // sticky 导航会占据自己独立的 76px 条带，背后是 body 的浅色渐变 ——
+    // 导航上的浅色文字就完全看不见了（Hero 的上内边距已补回这 76px）。
+    <main style={{ overflowX: 'hidden', marginTop: '-76px' }}>
       {/* ---------------- Hero ---------------- */}
-      <section className="hero-dark" style={{ padding: '132px 0 120px' }}>
+      <section className="hero-dark" style={{ padding: '168px 0 92px' }}>
         <div className="hero-aurora" aria-hidden="true" />
         <div className="hero-grid" aria-hidden="true" />
         <div className="hero-fade" aria-hidden="true" />
 
         <div className="container" style={{ position: 'relative', zIndex: 2 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)', gap: '64px', alignItems: 'center' }}>
-            <div style={{ animation: 'slideUp .6s ease-out' }}>
-              <span className="hero-eyebrow">
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 9px', borderRadius: '999px', background: 'rgba(16,185,129,.18)', color: '#6ee7b7', fontSize: '0.72rem', fontWeight: 700 }}>
-                  <ShieldCheck size={12} /> LIVE
-                </span>
-                {copy.badge}
-              </span>
+          {/* 文案居中收窄成一栏，演示窗口在下方整宽铺开 —— 演示是这一屏的主角，
+              横向切分会同时压缩标题与窗口，两边都不讨好。 */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="hero-lede" style={{ animation: 'slideUp .6s ease-out' }}>
 
+              {/* 一行标题，不再换行、不带副标题 —— 首屏留给演示窗口。
+                  join 只有英文需要（词之间要空格），中文为空串。 */}
               <h1 className="hero-title">
-                {copy.hero[0]}
-                <br />
-                <span className="hero-accent">{copy.hero[1]}</span>
+                {copy.hero.lead}{copy.hero.join}
+                <span className="hero-accent">{copy.hero.accent}</span>
               </h1>
 
-              <p className="hero-sub">{copy.hero[2]}</p>
-
-              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '38px' }}>
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '30px', justifyContent: 'center' }}>
                 <a href="/api/auth/entry" className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
-                  {copy.hero[3]} <ArrowRight size={18} />
+                  {copy.hero.cta} <ArrowRight size={18} />
                 </a>
                 <Link href="/tools" className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
                   {copy.heroSecondary}
                 </Link>
               </div>
-
-              <div className="hero-stats">
-                {copy.stats.map(([value, label]) => (
-                  <div className="hero-stat" key={label}>
-                    <b>{value}</b>
-                    <span>{label}</span>
-                  </div>
-                ))}
-              </div>
             </div>
 
-            {/* 产品实拍。原来这里是一张会持续 3D 浮动的图，观感晃眼；
-                改为静态窗口 + 深色描边，让截图本身成为主角。 */}
-            <div style={{ animation: 'slideUp .8s ease-out' }}>
-              <div className="hero-shot">
-                <div className="hero-shot-bar">
-                  <span className="hero-shot-dot" style={{ background: '#ff5f57' }} />
-                  <span className="hero-shot-dot" style={{ background: '#febc2e' }} />
-                  <span className="hero-shot-dot" style={{ background: '#28c840' }} />
-                  <span style={{ marginLeft: '12px', fontSize: '0.75rem', color: '#7f8ea8', fontFamily: 'ui-monospace, monospace' }}>officegpt.cn/dashboard</span>
-                </div>
-                <Image
-                  src="/hero-demo.jpg"
-                  alt="OfficeGPT workspace"
-                  width={1200}
-                  height={750}
-                  priority
-                  style={{ width: '100%', height: 'auto', display: 'block' }}
-                />
-              </div>
+            {/* 这里原本是一张 1024×1024 的方形示意图 —— 一眼假，也没说明产品做什么。
+                换成用 DOM+CSS 绘制的循环演示：输入一句自然语言指令，
+                Excel / Word / PPT 依次给出结果。无图片资源，任意分辨率都清晰。 */}
+            <div style={{ width: '100%', marginTop: '46px', animation: 'slideUp .8s ease-out' }}>
+              <HeroShowcase items={copy.showcase} doneLabel={copy.showcaseDone} steps={copy.showcaseSteps} />
             </div>
           </div>
         </div>
@@ -173,7 +148,7 @@ export default function LandingPage() {
                   {copy.pricingTeaser[3]} <ArrowRight size={18} />
                 </Link>
                 <a href="/api/auth/entry" className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
-                  {copy.hero[3]}
+                  {copy.hero.cta}
                 </a>
               </div>
             </div>

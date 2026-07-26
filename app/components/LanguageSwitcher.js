@@ -45,6 +45,8 @@ export default function LanguageSwitcher({ compact = false }) {
         aria-label={t('language.select')}
         aria-haspopup="menu"
         aria-expanded={open}
+        // 供顶部导航在透明态下覆盖配色使用（见 globals.css 的 .site-nav.is-over-hero）
+        className="language-switcher-trigger"
         onClick={() => setOpen((value) => !value)}
         style={{
           height: 38,

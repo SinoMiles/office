@@ -58,7 +58,13 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Inter 只加载了 latin 子集，不含任何汉字。此前这串字体栈里也没有
+     中文字体，浏览器只能回退到系统默认字形 —— Windows 上常常落到宋体，
+     大字号显示时笔画细、结构旧，页面因此显得廉价。这里显式声明各平台
+     的现代黑体，拉丁字符仍走 Inter。 */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC",
+    "Hiragino Sans GB", sans-serif;
   background-color: var(--background);
   color: var(--text-main);
   line-height: 1.5;
@@ -558,6 +564,10 @@ h1, h2, h3, h4 {
   -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%);
 }
 /* 与下方浅色区域的衔接，避免硬边 */
+/* 首屏容器比全站的 1200px 更宽：演示窗口是这一屏的主角，
+   受通用容器限制会显得局促。仅作用于 Hero，其余区块保持原有节奏。 */
+.hero-dark .container { max-width: 1360px; }
+
 .hero-fade {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -566,37 +576,24 @@ h1, h2, h3, h4 {
   background: linear-gradient(to bottom, transparent, var(--background));
 }
 
-.hero-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px 7px 8px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
-  font-size: 0.82rem;
-  color: #c7d3e8;
-}
+/* 文案改为居中单栏后，宽度不再受右侧窗口挤压，标题可以再大一档 */
+.hero-lede { text-align: center; max-width: 62rem; }
+
 .hero-title {
-  font-size: clamp(2.6rem, 5.4vw, 4.4rem);
+  font-size: clamp(2.8rem, 5.8vw, 4.8rem);
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: -0.035em;
-  margin: 24px 0 20px;
+  margin: 0;
 }
-/* 高光文字：静态渐变，不做无限 shimmer —— 持续动的标题很廉价 */
+/* 高光文字：静态渐变，不做无限 shimmer —— 持续动的标题很廉价。
+   同样避免三段彩虹渐变：色相跨度一大就显得花。这里只在青绿之间做
+   一次窄幅过渡，远看近乎纯色，只在字面上留一点光泽。 */
 .hero-accent {
-  background: linear-gradient(100deg, #34d399 0%, #5eead4 40%, #7dd3fc 100%);
+  background: linear-gradient(96deg, #34d399 0%, #6ee7d0 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-}
-.hero-sub {
-  font-size: clamp(1rem, 1.3vw, 1.15rem);
-  line-height: 1.75;
-  color: #9aa8c2;
-  max-width: 40rem;
 }
 .btn-hero {
   padding: 15px 30px;
@@ -618,21 +615,6 @@ h1, h2, h3, h4 {
   color: #e8edf7;
 }
 .btn-hero-ghost:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
-
-/* 统计条：用细分隔线而不是卡片，克制一些 */
-.hero-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  margin-top: 56px;
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 18px;
-  overflow: hidden;
-}
-.hero-stat { background: rgba(7, 11, 22, 0.72); padding: 20px 22px; }
-.hero-stat b { display: block; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: #f2f6ff; }
-.hero-stat span { font-size: 0.8rem; color: #8fa0bd; }
 
 /* 产品截图窗口 */
 .hero-shot {
@@ -714,10 +696,394 @@ h1, h2, h3, h4 {
   letter-spacing: 0.14em;
 }
 
-@media (max-width: 900px) {
-  .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (prefers-reduced-motion: reduce) {
+  .hero-aurora { animation: none; }
+}
+
+/* ============================================================
+   中文排版修正
+   负字距是拉丁字母的技巧：靠收紧字间空隙让大标题更紧凑。汉字是等宽
+   密排的方块字，本来就没有多余空隙，再套 -0.035em 只会让笔画互相
+   挤压，字号越大越难看。行高同理 —— 1.08 对拉丁字母合适，对中文
+   会显得压抑。这里按 <html lang> 区分处理。
+   ============================================================ */
+html[lang="zh-CN"] .hero-title,
+html[lang="zh-CN"] .section-title {
+  letter-spacing: normal;
+}
+html[lang="zh-CN"] .hero-title { line-height: 1.24; }
+html[lang="zh-CN"] .section-title { line-height: 1.34; }
+/* 中文正文加一点点字距反而更透气 */
+html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
+
+/* Hero 截图：素材是 1024×1024 的方图，直接塞进窗口框一眼就是假的。
+   固定 16:10 视窗并 cover 裁切，才有真实产品截图的比例。 */
+.hero-shot-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: #0b1220;
+}
+.hero-shot-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+/* 顶部一道细高光，模拟屏幕玻璃反射 —— 廉价感往往来自"完全没有材质" */
+.hero-shot::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  z-index: 2;
+}
+.hero-shot { position: relative; }
+
+
+/* ============================================================
+   Hero 文档演示
+   全部用 DOM + CSS 绘制，不依赖任何图片素材，因此在任意分辨率与
+   缩放下都保持清晰；动画只用 transform/opacity/height，避免重排。
+   外壳刻意做满（工具条、侧栏、公式栏、行列标号、状态栏）——
+   专业感来自这些软件本该有的部件，而不是更多装饰。
+   ============================================================ */
+.showcase {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0d1424;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: 0 54px 96px -46px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  font-size: 15.5px;
+}
+.showcase::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 0; height: 1px; z-index: 3;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+}
+
+/* ---- 标题栏 ---- */
+.showcase-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 17px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.showcase-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.showcase-file {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: 10px; font-size: 0.78em; color: #b3c0d6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.showcase-status {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.72em; color: #7c8aa5;
+}
+.showcase-status.is-done { color: #34d399; }
+.showcase-spinner {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #34d399;
+  animation: showcaseSpin 0.7s linear infinite;
+}
+@keyframes showcaseSpin { to { transform: rotate(360deg); } }
+
+/* ---- 工具条 ---- */
+.showcase-toolbar {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.022);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tool-tab { padding: 4px 10px; border-radius: 6px; font-size: 0.72em; color: #8697b2; }
+.tool-tab.is-on { background: rgba(255, 255, 255, 0.08); color: #e2e9f6; }
+.tool-sep { width: 1px; height: 15px; background: rgba(255, 255, 255, 0.1); margin: 0 3px; }
+.tool-pill { height: 8px; border-radius: 3px; background: rgba(255, 255, 255, 0.13); }
+.tool-grow { flex: 1; }
+.tool-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid; font-size: 0.68em; font-weight: 700;
+}
+
+/* ---- 主体：侧栏 + 内容 ---- */
+.showcase-body { display: grid; grid-template-columns: 208px minmax(0, 1fr); }
+.showcase-rail {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 15px 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.018);
+}
+.rail-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 6px;
+  font-size: 0.72em; color: #8697b2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rail-item.is-on { background: rgba(255, 255, 255, 0.07); color: #e2e9f6; }
+.rail-item i { width: 5px; height: 5px; border-radius: 50%; flex: none; }
+.rail-spacer { flex: 1; min-height: 14px; }
+
+/* 三步处理进度 —— 让正在干活这件事可见 */
+.rail-steps {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 9px 8px 2px; border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.rail-step {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.68em; color: #5f6f8a; transition: color 0.3s ease;
+}
+.rail-step i {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: rgba(255, 255, 255, 0.16);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.rail-step.is-active { color: #cbd5e1; }
+.rail-step.is-active i { background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16); }
+.rail-step.is-done { color: #7f93b0; }
+.rail-step.is-done i { background: #34d399; }
+
+.showcase-main { display: flex; flex-direction: column; min-width: 0; }
+
+/* ---- 公式栏 / 属性栏 ---- */
+.showcase-formula {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+}
+.formula-cell {
+  min-width: 32px; padding: 2px 7px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07); color: #a9b8d0;
+  font-family: ui-monospace, monospace; font-size: 0.7em; text-align: center;
+}
+.formula-text {
+  font-family: ui-monospace, monospace; font-size: 0.72em; color: #7f8ea8;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.showcase-stage {
+  position: relative;
+  aspect-ratio: 16 / 6.4;
+  padding: 22px;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(56, 128, 255, 0.09), transparent 60%), #0d1424;
+}
+.showcase-doc { height: 100%; animation: showcaseIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes showcaseIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- Excel ---- */
+.doc-sheet { display: flex; flex-direction: column; height: 100%; gap: 4px; }
+.sheet-cols, .sheet-head, .sheet-row {
+  display: grid; grid-template-columns: 26px 1fr 1.25fr 0.85fr;
+  gap: 6px; align-items: center;
+}
+.sheet-cols { padding: 0 9px 3px; font-size: 0.66em; color: #5f6f8a; text-align: center; }
+.sheet-head, .sheet-row { padding: 8px 11px; border-radius: 7px; font-size: 0.76em; }
+.sheet-rownum { color: #5f6f8a; font-size: 0.88em; text-align: center; font-family: ui-monospace, monospace; }
+.sheet-head { background: rgba(255, 255, 255, 0.07); color: #93a3bd; font-weight: 600; }
+.sheet-row {
+  background: rgba(255, 255, 255, 0.032);
+  border: 1px solid transparent; color: #d7e0f0;
+  animation: rowIn 0.42s ease-out both;
+}
+.sheet-row .num { font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace; }
+.sheet-row .up { color: #34d399; }
+.sheet-row .down { color: #fb7185; }
+.sheet-row.is-flagged {
+  background: rgba(251, 113, 133, 0.14);
+  border-color: rgba(251, 113, 133, 0.45);
+  box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.08);
+}
+.sheet-chart {
+  margin-top: auto; display: flex; align-items: flex-end; gap: 7px;
+  height: 26%; padding: 0 4px;
+}
+.sheet-chart span {
+  flex: 1; border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #34d399, rgba(52, 211, 153, 0.24));
+  transition: height 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- Word ---- */
+.doc-text { height: 100%; display: flex; flex-direction: column; gap: 9px; }
+.text-ruler { display: flex; align-items: flex-end; height: 10px; padding: 0 6px; opacity: 0.5; }
+.text-ruler i { flex: 1; height: 3px; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+.text-ruler i.is-major { height: 7px; border-left-color: rgba(255, 255, 255, 0.4); }
+.text-page {
+  flex: 1; background: rgba(255, 255, 255, 0.038);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 9px; padding: 24px 28px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.text-title {
+  width: 46%; height: 14px; border-radius: 4px;
+  background: linear-gradient(90deg, #7dd3fc, #3b82f6); margin-bottom: 5px;
+}
+.text-line { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); animation: rowIn 0.42s ease-out both; }
+.text-line.is-revised {
+  background: rgba(59, 130, 246, 0.22);
+  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  transition: background 0.45s ease, box-shadow 0.45s ease;
+}
+.text-line.is-revised.is-on {
+  background: linear-gradient(90deg, rgba(125, 211, 252, 0.85), rgba(59, 130, 246, 0.55));
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+/* ---- PPT ---- */
+.doc-slide-wrap { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 14px; height: 100%; }
+.slide-strip { display: flex; flex-direction: column; gap: 7px; }
+.slide-thumb {
+  position: relative; flex: 1; border-radius: 5px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slide-thumb b { position: absolute; top: 3px; left: 5px; font-size: 0.6em; color: #5f6f8a; font-weight: 600; }
+.slide-thumb.is-on { border-color: rgba(249, 115, 22, 0.6); box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.16); }
+.doc-slide {
+  height: 100%; background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px; padding: 22px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.slide-title { width: 54%; height: 14px; border-radius: 4px; background: linear-gradient(90deg, #fdba74, #f97316); }
+.slide-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.slide-bullets { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.slide-bullets span { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.16); animation: rowIn 0.42s ease-out both; }
+.slide-bullets span:nth-child(1) { width: 100%; }
+.slide-bullets span:nth-child(2) { width: 82%; }
+.slide-bullets span:nth-child(3) { width: 64%; }
+.slide-chart { display: flex; align-items: flex-end; gap: 8px; }
+.slide-chart span {
+  flex: 1; border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #fb923c, rgba(251, 146, 60, 0.22));
+  transition: height 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- 状态栏 ---- */
+.showcase-statusbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.022);
+  font-size: 0.68em; color: #6d7d97;
+}
+.statusbar-right { font-family: ui-monospace, monospace; }
+
+/* ---- 指令输入条 ---- */
+.showcase-prompt {
+  display: flex; align-items: center; gap: 10px;
+  padding: 15px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.84em; color: #cbd5e1;
+  min-height: 54px;
+}
+.showcase-typed { line-height: 1.5; }
+.showcase-caret {
+  display: inline-block; width: 2px; height: 1em;
+  margin-left: 2px; vertical-align: -2px; background: #34d399;
+  animation: showcaseCaret 1s steps(1) infinite;
+}
+@keyframes showcaseCaret { 50% { opacity: 0; } }
+
+/* 窄屏收起侧栏与幻灯片缩略图，避免挤成一团 */
+@media (max-width: 1080px) {
+  .showcase-body { grid-template-columns: minmax(0, 1fr); }
+  .showcase-rail { display: none; }
+  .doc-slide-wrap { grid-template-columns: minmax(0, 1fr); }
+  .slide-strip { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-aurora { animation: none; }
+  .showcase-doc, .sheet-row, .text-line, .slide-bullets span,
+  .showcase-spinner, .showcase-caret { animation: none; }
+}
+
+/* ============================================================
+   顶部导航：玻璃拟态，且随页面底色自适应
+   首页 Hero 是深色、其余页面是浅色，同一条导航必须两边都能看清。
+   置顶时完全透明（浮在深色首屏之上，文字转浅色），一旦滚动就切成
+   磨砂玻璃并换回深色文字。颜色通过 CSS 变量下发，子元素只引用变量，
+   避免每个链接各写一套配色。
+   ============================================================ */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  --nav-fg: var(--text-main);
+  --nav-dim: var(--text-muted);
+  --nav-hover: rgba(15, 23, 42, 0.05);
+}
+
+/* 磨砂玻璃态。saturate 让底下的色彩透上来一点，避免糊成一片死白 */
+.site-nav.is-glass {
+  background: rgba(255, 255, 255, 0.62);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom-color: rgba(15, 23, 42, 0.07);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 10px 30px -26px rgba(15, 23, 42, 0.6);
+}
+
+/* 首页专用的深色主题。首页顶部是深色 Hero，滚动后下方才是浅色区域，
+   若滚动时切成白色玻璃，会在深色 Hero 上闪出一条白条。因此首页导航
+   始终保持深色系：置顶全透明，滚动后转为深色磨砂。 */
+.site-nav.on-dark {
+  --nav-fg: #eaf0fa;
+  --nav-dim: #a3b3ce;
+  --nav-hover: rgba(255, 255, 255, 0.1);
+}
+.site-nav.on-dark.is-glass {
+  background: rgba(10, 15, 28, 0.72);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  backdrop-filter: saturate(160%) blur(20px);
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 12px 32px -26px rgba(0, 0, 0, 0.9);
+}
+
+.nav-brand { color: var(--nav-fg); transition: color 0.3s ease, opacity 0.2s ease; }
+.nav-brand:hover { opacity: 0.82; }
+
+.premium-nav-link {
+  color: var(--nav-fg);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.premium-nav-link:hover {
+  background: var(--nav-hover) !important;
+  color: var(--primary) !important;
+}
+.site-nav.on-dark .premium-nav-link:hover { color: #6ee7b7 !important; }
+
+.nav-login { color: var(--nav-fg); transition: color 0.2s ease; }
+.nav-login:hover { color: var(--primary); }
+.site-nav.on-dark .nav-login:hover { color: #6ee7b7; }
+
+/* 语言切换器是独立组件，用的是内联样式；透明态下那颗白色药丸会很突兀，
+   这里用 !important 覆盖成半透明深色，滚动后自动恢复原样。 */
+.site-nav.on-dark .language-switcher-trigger {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #eaf0fa !important;
+}
+.site-nav.on-dark .language-switcher-trigger svg { color: #a3b3ce !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .site-nav { transition: none; }
 }

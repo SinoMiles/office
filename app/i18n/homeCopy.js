@@ -3,20 +3,39 @@
 // 留着只会让人误以为多语言仍在生效。
 export const homeCopy = {
   'zh-CN': {
-    badge: '已上线 50 个文档工具 · 无需注册即可使用',
-    hero: [
-      '与你的数据',
-      '直接对话',
-      '无需记忆函数或翻找菜单，只需用自然语言描述目标，OfficeGPT 即可完成复杂运算、整理与排版。',
-      '免费开始使用',
-    ],
+    // 标题合成一行显示，副标题已移除 —— 首屏尽可能多地留给演示窗口。
+    // join 控制两段之间是否需要空格：中文不需要，英文需要。
+    hero: { lead: '与你的数据', accent: '直接对话', join: '', cta: '免费开始使用' },
     heroSecondary: '浏览全部工具',
-    stats: [
-      ['50', '文档处理工具'],
-      ['4', '能力大类'],
-      ['0 元', '确定性工具永久免费'],
-      ['即时', '处理完成后删除文件'],
+    // Hero 里的循环演示：一句自然语言指令，对应一种文档产出。
+    showcase: [
+      {
+        file: '销售汇总.xlsx', kind: 'Excel',
+        prompt: '把这份销售表按区域汇总，并标出异常值',
+        rail: ['明细数据', '区域汇总', '同比图表'],
+        formula: '=SUMIFS(销售额, 区域, A2)',
+        status: '4 行 · 3 列 · 已汇总',
+        tabs: ['Sheet1', '汇总', '图表'],
+      },
+      {
+        file: '合作协议.docx', kind: 'Word',
+        prompt: '帮我把这份合同润色成正式商务语气',
+        rail: ['一、合作范围', '二、费用与结算', '三、违约责任'],
+        formula: '正文 · 宋体 小四 · 1.5 倍行距',
+        status: '1,284 字 · 已润色 6 处',
+        tabs: ['修订', '批注', '审阅'],
+      },
+      {
+        file: '年度述职.pptx', kind: 'PPT',
+        prompt: '根据这份年度数据生成述职 PPT 大纲',
+        rail: ['封面', '成果回顾', '数据分析', '明年规划'],
+        formula: '幻灯片 2 / 12 · 16:9',
+        status: '12 页 · 大纲已生成',
+        tabs: ['大纲', '备注', '母版'],
+      },
     ],
+    showcaseDone: '已完成',
+    showcaseSteps: ['解析文档', '理解指令', '生成结果'],
     catalog: ['能力总览', '不只是聊天，更是一整套文档工具箱', '格式转换、表格清洗、PDF 处理开箱即用；需要判断力的活儿再交给 AI。'],
     catalogCta: '查看全部 50 个工具',
     categories: [
@@ -39,20 +58,36 @@ export const homeCopy = {
     ],
   },
   en: {
-    badge: '50 document tools live · no account required',
-    hero: [
-      'Talk directly',
-      'to your data',
-      'No formulas or complex menus. Describe your goal in natural language and OfficeGPT handles calculations, organization, and formatting.',
-      'Start for free',
-    ],
+    hero: { lead: 'Talk directly', accent: 'to your data', join: ' ', cta: 'Start for free' },
     heroSecondary: 'Browse all tools',
-    stats: [
-      ['50', 'document tools'],
-      ['4', 'capability areas'],
-      ['Free', 'deterministic tools, forever'],
-      ['Instant', 'files deleted after processing'],
+    showcase: [
+      {
+        file: 'sales-summary.xlsx', kind: 'Excel',
+        prompt: 'Summarise this sheet by region and flag the outliers',
+        rail: ['Raw data', 'By region', 'YoY chart'],
+        formula: '=SUMIFS(Revenue, Region, A2)',
+        status: '4 rows · 3 cols · summarised',
+        tabs: ['Sheet1', 'Summary', 'Chart'],
+      },
+      {
+        file: 'agreement.docx', kind: 'Word',
+        prompt: 'Rewrite this contract in a formal business tone',
+        rail: ['1. Scope of work', '2. Fees and billing', '3. Liability'],
+        formula: 'Body · 12pt · 1.5 line spacing',
+        status: '1,284 words · 6 revisions',
+        tabs: ['Track', 'Comments', 'Review'],
+      },
+      {
+        file: 'year-review.pptx', kind: 'PPT',
+        prompt: 'Turn this year of data into a review deck outline',
+        rail: ['Cover', 'Highlights', 'Analysis', 'Next year'],
+        formula: 'Slide 2 / 12 · 16:9',
+        status: '12 slides · outline ready',
+        tabs: ['Outline', 'Notes', 'Master'],
+      },
     ],
+    showcaseDone: 'Done',
+    showcaseSteps: ['Parse document', 'Understand intent', 'Generate result'],
     catalog: ['What you get', 'More than a chatbot — a complete document toolbox', 'Conversion, spreadsheet cleanup and PDF utilities work out of the box. Hand the judgement calls to AI.'],
     catalogCta: 'See all 50 tools',
     categories: [
