@@ -2,12 +2,15 @@ import { NextResponse } from 'next/server';
 import { processOpenXml, supportsOpenXmlAction } from '@/lib/tools/adapters/openxml-adapter';
 import { processSheet, supportsSheetAction } from '@/lib/tools/adapters/sheetjs-adapter';
 import { processText, supportsTextAction } from '@/lib/tools/adapters/text-adapter';
+import { guardToolRequest } from '@/lib/tools/guard';
 
 export const runtime = 'nodejs';
 
 export async function POST(request) {
   try {
     const formData = await request.formData();
+    const blocked = await guardToolRequest(request, formData);
+    if (blocked) return blocked;
     const action = String(formData.get('action') || '');
     const files = formData.getAll('files');
     const file = files[0];
