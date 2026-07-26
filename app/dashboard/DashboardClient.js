@@ -165,7 +165,6 @@ export default function DashboardClient() {
   const [renameValue, setRenameValue] = useState('');
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ isOpen: false, taskId: null });
   const menuRef = useRef(null);
-  const historyRestoredRef = useRef(false);
   const cancellingRef = useRef(false);
   const generationObservedRef = useRef(false);
 
@@ -699,9 +698,6 @@ export default function DashboardClient() {
           recentTasks: prev.recentTasks.filter(t => t._id !== id)
         }));
         if (activeTaskId === id) setActiveTaskId(null);
-        if (window.localStorage.getItem('officeweb-active-task-id') === id) {
-          window.localStorage.removeItem('officeweb-active-task-id');
-        }
         setOpenMenuId(null);
       } else {
         throw new Error('Failed');
@@ -826,7 +822,6 @@ export default function DashboardClient() {
     setSidebarCollapsed(false);
     setActiveArtifact(null);
     setPreviewTabs([]);
-    window.localStorage.removeItem('officeweb-active-task-id');
   };
 
   const loadHistoryTask = useCallback(async (task, { navigate = true } = {}) => {
@@ -854,28 +849,12 @@ export default function DashboardClient() {
     ]);
     const historyMessages = payload?.messages?.length ? payload.messages : persistedMessages;
     setMessages(attachArtifactsToMessages(historyMessages, conversation));
-    window.localStorage.setItem('officeweb-active-task-id', task._id);
     if (task.aionConversationId) loadConversation(task.aionConversationId, task._id, '', { loadHistory: false });
     setPreviewTabs([]);
     setActiveArtifact(null);
     setShowRightPanel(false);
     setSidebarCollapsed(false);
   }, [loadConversation, router]);
-
-  useEffect(() => {
-    // Only restore a chat while the workspace route is active. Restoring it from
-    // /dashboard/billing or /dashboard/overview would rewrite the current URL.
-    const browserPathname = window.location.pathname;
-    const browserTab = dashboardTabFromPath(browserPathname);
-    if (browserTab !== 'workspace') return;
-    if (loading || historyRestoredRef.current || !stats.recentTasks?.length) return;
-    historyRestoredRef.current = true;
-    const savedTaskId = window.localStorage.getItem('officeweb-active-task-id');
-    if (!savedTaskId) return;
-    const savedTask = stats.recentTasks.find((task) => task._id === savedTaskId);
-    if (savedTask) void loadHistoryTask(savedTask, { navigate: false });
-    else window.localStorage.removeItem('officeweb-active-task-id');
-  }, [loadHistoryTask, loading, pathname, stats.recentTasks]);
 
   const handleCancel = async () => {
     if (!activeTaskId) return;
@@ -939,7 +918,6 @@ export default function DashboardClient() {
       const resData = await response.json();
       
       setActiveTaskId(resData.taskId);
-      window.localStorage.setItem('officeweb-active-task-id', resData.taskId);
       // Wait for React to apply activeTaskId before sending message,
       // or we can just pass the aionConversationId directly to sendMessage if we update the hook.
       // But loadConversation will be triggered by useEffect when activeTaskId changes.
