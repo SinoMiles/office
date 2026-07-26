@@ -99,6 +99,13 @@ function tickSubscriptions() {
   callInternal('/api/internal/subscriptions/tick', 'subscription ticker');
 }
 
+// AionCore 把 provider 存在自己的 SQLite 里，storage 一旦重建就会丢，
+// 而配置的真源在 Mongo。启动时重放一次，避免部署后聊天静默失效
+// （AionCore 会报 Provider '' not found，前端只表现为一直「思考中」）。
+function syncAioncoreProvider() {
+  callInternal('/api/internal/aioncore/sync-provider', 'provider sync');
+}
+
 await startAioncore();
 await app.prepare();
 const server = createServer((request, response) => handle(request, response));
@@ -123,6 +130,15 @@ server.on('upgrade', (request, socket, head) => {
     const upstream = new WebSocket(upstreamUrl);
     const pending = [];
     const ownershipCache = new Map();
+    // 归属一旦成立就不会被撤销，可以长时间缓存。
+    // 否定结果则一律不缓存：/api/process 是先向 AionCore 建会话、再写 Task 行的，
+    // AionCore 在建会话瞬间就广播 conversation.listChanged，那一刻 Task 尚不存在。
+    // 一旦把这个 false 缓存下来，本轮对话随后的 message.stream 与 turn.completed
+    // 会被一并误杀，前端于是永远停在「思考中」。整轮对话往往在一秒内结束，
+    // 任何非零的否定 TTL 都可能覆盖掉它，所以这里只缓存肯定结果。
+    // 代价是每个尚未归属的会话每帧多一次带索引的 exists 查询；一旦首次命中归属，
+    // 后续帧全部走缓存，查询次数是有界的。
+    const OWNED_TTL_MS = 5 * 60_000;
     const owns = async (kind, value) => {
       if (!value) return false;
       const key = `${kind}:${value}`;
@@ -135,7 +151,7 @@ server.on('upgrade', (request, socket, head) => {
         ? { userId: identity.id, aionConversationId: value }
         : { userId: identity.id, workspace: value };
       const owned = Boolean(await Task.exists(query));
-      ownershipCache.set(key, { owned, expiresAt: Date.now() + 30_000 });
+      if (owned) ownershipCache.set(key, { owned, expiresAt: Date.now() + OWNED_TTL_MS });
       return owned;
     };
     const frameScope = (raw) => {
@@ -172,7 +188,12 @@ server.on('upgrade', (request, socket, head) => {
       for (const [data, binary] of pending.splice(0)) upstream.send(data, { binary });
     });
     upstream.on('message', async (data, binary) => {
-      if (binary || !await authorizedFrame(data)) return;
+      if (binary) return;
+      if (!await authorizedFrame(data)) {
+        // 以前这里是静默 return，一旦误杀就完全无从排查 —— 前端只会一直转圈。
+        chatWarn('proxy:ws', `dropped inbound frame outside user scope: ${frameScope(data)?.name || 'unparsable'}`);
+        return;
+      }
       if (!binary) settleUsage(identity.id, usageFromFrame(data));
       if (client.readyState === WebSocket.OPEN) client.send(data, { binary: false });
     });
@@ -196,6 +217,7 @@ const billingReconcileTimer = setInterval(reconcileBilling, 60_000);
 setTimeout(reconcileBilling, 5_000);
 const subscriptionTickTimer = setInterval(tickSubscriptions, 10 * 60_000);
 setTimeout(tickSubscriptions, 20_000);
+setTimeout(syncAioncoreProvider, 8_000);
 
 let shuttingDown = false;
 async function shutdown(signal) {
