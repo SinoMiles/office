@@ -1235,7 +1235,10 @@ export default function DashboardClient() {
             <div style={{ flex: showRightPanel ? '0 0 42%' : 1, width: showRightPanel ? '42%' : 'auto', minWidth: showRightPanel ? '360px' : 0, maxWidth: showRightPanel ? '42%' : '100%', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: 'flex-basis 0.25s ease', position: 'relative' }}>
             
             {/* Chat Area */}
-            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding .2s ease' }}>
+            {/* minHeight:0 不能少 —— flex 列容器的子项默认 min-height:auto，
+                会阻止它收缩到内容高度以下，overflowY:auto 因此形同虚设，
+                溢出被推给祖先元素，表现为聊天区外面又套了一层滚动条。 */}
+            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding .2s ease' }}>
               {messages.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '0 20px' }}>
                   <Sparkles size={48} color="var(--primary)" style={{ marginBottom: '24px', opacity: 0.8 }} />
@@ -1280,7 +1283,11 @@ export default function DashboardClient() {
                       if (element) conversationTurnRefs.current.set(turnIndex, element);
                       else conversationTurnRefs.current.delete(turnIndex);
                     }}
-                    style={{ flex: '0 0 auto', minWidth: 0, maxWidth: 'min(800px, 100%)', overflowX: 'hidden', overflowY: 'visible', position: 'relative', display: 'block', margin: '0 auto', width: '100%', padding: '12px 0', borderRadius: '16px', scrollMarginTop: '20px' }}
+                    // overflow-x 必须用 clip 而不是 hidden：按 CSS 规范，一轴为 hidden
+                    // 时另一轴的 visible 会被强制计算成 auto，于是每条消息都变成独立
+                    // 滚动容器 —— 聊天区因此多出一个滚动条，且流式输出时内容高度反复
+                    // 跨越阈值，滚动条不断出现消失形成闪烁。clip 不会触发这个降级。
+                    style={{ flex: '0 0 auto', minWidth: 0, maxWidth: 'min(800px, 100%)', overflowX: 'clip', overflowY: 'visible', position: 'relative', display: 'block', margin: '0 auto', width: '100%', padding: '12px 0', borderRadius: '16px', scrollMarginTop: '20px' }}
                   >
                     {msg.role === 'ai' ? (
                       <div style={{ position: 'absolute', top: '12px', left: 0, width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1292,7 +1299,7 @@ export default function DashboardClient() {
                       </div>
                     )}
                     
-                    <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', overflowX: 'hidden', overflowY: 'visible', paddingTop: '6px' }}>
+                    <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', overflowX: 'clip', overflowY: 'visible', paddingTop: '6px' }}>
                       <div style={{ minHeight: '36px', display: 'flex', alignItems: 'center', fontWeight: 600, margin: '0 0 8px 52px', color: 'var(--text-main)' }}>
                         {msg.role === 'ai' ? 'OfficeGPT' : extra.you}
                       </div>

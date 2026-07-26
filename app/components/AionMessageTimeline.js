@@ -49,7 +49,9 @@ function TextBlock({ content, error }) {
 export default function AionMessageTimeline({ message }) {
   const { locale } = useI18n(); const copy = dashboardExtra(locale);
   return (
-    <div style={{ minWidth: 0, maxWidth: '100%', display: 'flex', flexDirection: 'column', overflowX: 'hidden', overflowY: 'visible' }}>
+    // clip 而非 hidden：hidden 会让另一轴的 visible 被强制降级为 auto，
+    // 使这个容器多出一个纵向滚动条（流式输出时还会闪烁）。
+    <div style={{ minWidth: 0, maxWidth: '100%', display: 'flex', flexDirection: 'column', overflowX: 'clip', overflowY: 'visible' }}>
       {(message.blocks || []).map((block, index) => {
         if (block.type === 'thinking') return <ThinkingBlock key={`${block.id}-${index}`} block={block} />;
         if (block.type === 'tools') return null;
