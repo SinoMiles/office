@@ -566,7 +566,7 @@ h1, h2, h3, h4 {
 /* 与下方浅色区域的衔接，避免硬边 */
 /* 首屏容器比全站的 1200px 更宽：演示窗口是这一屏的主角，
    受通用容器限制会显得局促。仅作用于 Hero，其余区块保持原有节奏。 */
-.hero-dark .container { max-width: 1360px; }
+.hero-dark .container { max-width: 1420px; }
 
 .hero-fade {
   position: absolute;
@@ -758,7 +758,7 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
   background: #0d1424;
   border: 1px solid rgba(255, 255, 255, 0.11);
   box-shadow: 0 54px 96px -46px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  font-size: 15.5px;
+  font-size: 17px;
 }
 .showcase::before {
   content: '';
@@ -810,7 +810,6 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 }
 
 /* ---- 主体：侧栏 + 内容 ---- */
-.showcase-body { display: grid; grid-template-columns: 208px minmax(0, 1fr); }
 .showcase-rail {
   display: flex; flex-direction: column; gap: 3px;
   padding: 15px 12px;
@@ -825,28 +824,9 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 }
 .rail-item.is-on { background: rgba(255, 255, 255, 0.07); color: #e2e9f6; }
 .rail-item i { width: 5px; height: 5px; border-radius: 50%; flex: none; }
-.rail-spacer { flex: 1; min-height: 14px; }
 
-/* 三步处理进度 —— 让正在干活这件事可见 */
-.rail-steps {
-  display: flex; flex-direction: column; gap: 7px;
-  padding: 9px 8px 2px; border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-.rail-step {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 0.68em; color: #5f6f8a; transition: color 0.3s ease;
-}
-.rail-step i {
-  width: 6px; height: 6px; border-radius: 50%; flex: none;
-  background: rgba(255, 255, 255, 0.16);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-.rail-step.is-active { color: #cbd5e1; }
-.rail-step.is-active i { background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16); }
-.rail-step.is-done { color: #7f93b0; }
-.rail-step.is-done i { background: #34d399; }
 
-.showcase-main { display: flex; flex-direction: column; min-width: 0; }
+.showcase-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 /* ---- 公式栏 / 属性栏 ---- */
 .showcase-formula {
@@ -960,34 +940,17 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 }
 .statusbar-right { font-family: ui-monospace, monospace; }
 
-/* ---- 指令输入条 ---- */
-.showcase-prompt {
-  display: flex; align-items: center; gap: 10px;
-  padding: 15px 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.035);
-  font-size: 0.84em; color: #cbd5e1;
-  min-height: 54px;
-}
-.showcase-typed { line-height: 1.5; }
-.showcase-caret {
-  display: inline-block; width: 2px; height: 1em;
-  margin-left: 2px; vertical-align: -2px; background: #34d399;
-  animation: showcaseCaret 1s steps(1) infinite;
-}
 @keyframes showcaseCaret { 50% { opacity: 0; } }
 
 /* 窄屏收起侧栏与幻灯片缩略图，避免挤成一团 */
 @media (max-width: 1080px) {
-  .showcase-body { grid-template-columns: minmax(0, 1fr); }
-  .showcase-rail { display: none; }
   .doc-slide-wrap { grid-template-columns: minmax(0, 1fr); }
   .slide-strip { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .showcase-doc, .sheet-row, .text-para, .slide-bullets li,
-  .showcase-spinner, .showcase-caret { animation: none; }
+  .showcase-spinner { animation: none; }
 }
 
 /* ============================================================
@@ -1166,4 +1129,171 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 .slide-thumb.is-on i { background: rgba(251, 146, 60, 0.55); }
 
 /* 三步进度里完成项换成勾，尺寸与圆点对齐 */
-.rail-step svg { flex: none; color: #34d399; }
+
+/* ============================================================
+   Hero 演示：左聊天 / 右预览
+   与真实工作台同构 —— 首页看到的就是登录后会用到的界面。
+   ============================================================ */
+.showcase-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.6fr) minmax(0, 1fr);
+  /* 必须是固定高度而不是 min-height：三个文档的内容长度不同，聊天记录还会
+     累积，用下限的话窗口会随内容忽高忽低，每次切换整页都跟着跳。
+     高度锁死后，超出的部分由内部各自裁切。 */
+  height: 560px;
+}
+
+/* ---- 左：聊天面板 ---- */
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.016);
+  min-width: 0;
+}
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  /* 记录累积到超出时从顶部裁掉，配合 justify-content:flex-end
+     形成「聊天窗滚上去了」的效果，而不是把窗口撑高。 */
+  padding: 16px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+  overflow: hidden;
+}
+.chat-turn { display: flex; flex-direction: column; gap: 9px; animation: chatIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* 上一轮对话保留但压暗，形成「对话在累积」的观感 */
+.chat-turn.is-past { opacity: 0.4; }
+@keyframes chatIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.chat-bubble {
+  max-width: 94%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 0.72em;
+  line-height: 1.7;
+  margin: 0;
+}
+.chat-bubble.is-user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(14, 165, 233, 0.16));
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  color: #dbeee6;
+  border-bottom-right-radius: 4px;
+}
+.chat-bubble.is-ai {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #b6c4da;
+  border-bottom-left-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.chat-reply { margin: 0; }
+
+/* 处理步骤 */
+.chat-steps { display: flex; flex-direction: column; gap: 6px; }
+.chat-step {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.94em; color: #64748b;
+  transition: color 0.3s ease;
+}
+.chat-step i {
+  width: 11px; height: 11px; border-radius: 50%; flex: none;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.chat-step.is-active { color: #cbd5e1; }
+.chat-step.is-active i {
+  border-color: #34d399;
+  border-top-color: transparent;
+  animation: showcaseSpin 0.75s linear infinite;
+}
+.chat-step.is-done { color: #8ba0bd; }
+.chat-step svg { flex: none; color: #34d399; }
+
+/* 产出文件卡片 */
+.chat-file {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 10px; border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.92em; color: #cbd5e1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.chat-file b {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  color: #34d399; font-weight: 600; font-family: inherit;
+}
+.chat-file.is-fresh { animation: chatIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 0.12s; }
+
+/* 输入框 */
+.chat-input {
+  display: flex; align-items: center; gap: 9px;
+  margin: 0 14px 14px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(52, 211, 153, 0.34);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.07);
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
+  min-height: 44px;
+}
+/* 发送后回到静默态，边框收回 */
+.chat-input.is-idle {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+.chat-input-text {
+  flex: 1; min-width: 0;
+  font-size: 0.72em; line-height: 1.6; color: #dbe4f3;
+}
+.chat-input-text em { color: #5f6f8a; font-style: normal; }
+.chat-caret {
+  display: inline-block; width: 2px; height: 1em;
+  margin-left: 2px; vertical-align: -2px; background: #34d399;
+  animation: showcaseCaret 1s steps(1) infinite;
+}
+.chat-send {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px; flex: none;
+  background: rgba(255, 255, 255, 0.07); color: #64748b;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+.chat-send.is-ready { background: #34d399; color: #06281c; }
+
+/* ---- 右：文档面板 ---- */
+.doc-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.doc-inner { flex: 1; display: grid; grid-template-columns: 164px minmax(0, 1fr); min-height: 0; }
+.doc-pane .showcase-rail { border-right: 1px solid rgba(255, 255, 255, 0.06); }
+.doc-pane .showcase-stage { aspect-ratio: auto; flex: 1; min-height: 0; overflow: hidden; }
+
+@media (max-width: 1080px) {
+  .showcase-split { grid-template-columns: minmax(0, 1fr); }
+  .chat-pane { border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+  .chat-log { min-height: 190px; }
+  .doc-inner { grid-template-columns: minmax(0, 1fr); }
+  .doc-pane .showcase-rail { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-turn, .chat-file.is-fresh { animation: none; }
+  .chat-step.is-active i { animation: none; }
+}
+
+/* 笔记本常见的 900px 以下视口，窗口按档收一级；同样是固定值，
+   不会因内容变化而跳动。 */
+@media (max-height: 900px) {
+  .showcase-split { height: 470px; }
+}
+@media (max-height: 760px) {
+  .showcase-split { height: 410px; }
+}

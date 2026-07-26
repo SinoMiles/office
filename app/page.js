@@ -27,7 +27,7 @@ export default function LandingPage() {
     // 导航上的浅色文字就完全看不见了（Hero 的上内边距已补回这 76px）。
     <main style={{ overflowX: 'hidden', marginTop: '-76px' }}>
       {/* ---------------- Hero ---------------- */}
-      <section className="hero-dark" style={{ padding: '168px 0 92px' }}>
+      <section className="hero-dark" style={{ padding: '126px 0 88px' }}>
         <div className="hero-aurora" aria-hidden="true" />
         <div className="hero-grid" aria-hidden="true" />
         <div className="hero-fade" aria-hidden="true" />
@@ -45,7 +45,7 @@ export default function LandingPage() {
                 <span className="hero-accent">{copy.hero.accent}</span>
               </h1>
 
-              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '30px', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '26px', justifyContent: 'center' }}>
                 <a href="/api/auth/entry" className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
                   {copy.hero.cta} <ArrowRight size={18} />
                 </a>
@@ -58,8 +58,8 @@ export default function LandingPage() {
             {/* 这里原本是一张 1024×1024 的方形示意图 —— 一眼假，也没说明产品做什么。
                 换成用 DOM+CSS 绘制的循环演示：输入一句自然语言指令，
                 Excel / Word / PPT 依次给出结果。无图片资源，任意分辨率都清晰。 */}
-            <div style={{ width: '100%', marginTop: '46px', animation: 'slideUp .8s ease-out' }}>
-              <HeroShowcase items={copy.showcase} doneLabel={copy.showcaseDone} steps={copy.showcaseSteps} />
+            <div style={{ width: '100%', marginTop: '36px', animation: 'slideUp .8s ease-out' }}>
+              <HeroShowcase items={copy.showcase} doneLabel={copy.showcaseDone} steps={copy.showcaseSteps} chat={copy.showcaseChat} />
             </div>
           </div>
         </div>

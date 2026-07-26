@@ -15,6 +15,8 @@ export const homeCopy = {
         rail: ['明细数据', '区域汇总', '同比图表'],
         formula: '=SUMIFS(销售额, 区域, A2)',
         status: '6 行 · 4 列 · 已汇总',
+        reply: '已按区域汇总 5 个大区，并标出同比为负的华北。占比列为新增计算列。',
+        result: '销售汇总_已处理.xlsx',
         tabs: ['Sheet1', '汇总', '图表'],
         sheet: {
           columns: ['区域', '销售额', '同比', '占比'],
@@ -34,6 +36,8 @@ export const homeCopy = {
         rail: ['一、合作范围', '二、费用与结算', '三、违约责任'],
         formula: '正文 · 宋体 小四 · 1.5 倍行距',
         status: '1,284 字 · 已润色 6 处',
+        reply: '共润色 6 处。付款条款原表述含糊，已明确期限、账户与违约金计算方式。',
+        result: '合作协议_修订版.docx',
         tabs: ['修订', '批注', '审阅'],
         text: {
           title: '二、费用与结算',
@@ -52,6 +56,8 @@ export const homeCopy = {
         rail: ['封面', '成果回顾', '数据分析', '明年规划'],
         formula: '幻灯片 2 / 12 · 16:9',
         status: '12 页 · 大纲已生成',
+        reply: '已生成 12 页大纲，含成果回顾、数据分析与明年规划三个部分。',
+        result: '年度述职_大纲.pptx',
         tabs: ['大纲', '备注', '母版'],
         slide: {
           title: '2026 年度成果回顾',
@@ -61,6 +67,7 @@ export const homeCopy = {
       },
     ],
     showcaseDone: '已完成',
+    showcaseChat: { placeholder: '描述你想让 AI 做什么…', thinking: '正在处理', download: '下载' },
     showcaseSteps: ['解析文档', '理解指令', '生成结果'],
     catalog: ['能力总览', '不只是聊天，更是一整套文档工具箱', '格式转换、表格清洗、PDF 处理开箱即用；需要判断力的活儿再交给 AI。'],
     catalogCta: '查看全部 50 个工具',
@@ -93,6 +100,8 @@ export const homeCopy = {
         rail: ['Raw data', 'By region', 'YoY chart'],
         formula: '=SUMIFS(Revenue, Region, A2)',
         status: '6 rows · 4 cols · summarised',
+        reply: 'Summarised five regions and flagged North, the only negative YoY. Share is a new calculated column.',
+        result: 'sales-summary_processed.xlsx',
         tabs: ['Sheet1', 'Summary', 'Chart'],
         sheet: {
           columns: ['Region', 'Revenue', 'YoY', 'Share'],
@@ -112,6 +121,8 @@ export const homeCopy = {
         rail: ['1. Scope of work', '2. Fees and billing', '3. Liability'],
         formula: 'Body · 12pt · 1.5 line spacing',
         status: '1,284 words · 6 revisions',
+        reply: 'Six revisions. The payment clause was vague, so the window, account and penalty basis are now explicit.',
+        result: 'agreement_revised.docx',
         tabs: ['Track', 'Comments', 'Review'],
         text: {
           title: '2. Fees and billing',
@@ -130,6 +141,8 @@ export const homeCopy = {
         rail: ['Cover', 'Highlights', 'Analysis', 'Next year'],
         formula: 'Slide 2 / 12 · 16:9',
         status: '12 slides · outline ready',
+        reply: 'Built a 12-slide outline covering results, analysis and next year plans.',
+        result: 'year-review_outline.pptx',
         tabs: ['Outline', 'Notes', 'Master'],
         slide: {
           title: '2026 results in review',
@@ -139,6 +152,7 @@ export const homeCopy = {
       },
     ],
     showcaseDone: 'Done',
+    showcaseChat: { placeholder: 'Describe what you want AI to do…', thinking: 'Working', download: 'Download' },
     showcaseSteps: ['Parse document', 'Understand intent', 'Generate result'],
     catalog: ['What you get', 'More than a chatbot — a complete document toolbox', 'Conversion, spreadsheet cleanup and PDF utilities work out of the box. Hand the judgement calls to AI.'],
     catalogCta: 'See all 50 tools',
