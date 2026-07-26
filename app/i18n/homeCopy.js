@@ -14,8 +14,19 @@ export const homeCopy = {
         prompt: '把这份销售表按区域汇总，并标出异常值',
         rail: ['明细数据', '区域汇总', '同比图表'],
         formula: '=SUMIFS(销售额, 区域, A2)',
-        status: '4 行 · 3 列 · 已汇总',
+        status: '6 行 · 4 列 · 已汇总',
         tabs: ['Sheet1', '汇总', '图表'],
+        sheet: {
+          columns: ['区域', '销售额', '同比', '占比'],
+          rows: [
+            ['华东', '1,284,900', '+12.4%', '31.2%'],
+            ['华南', '968,320', '+8.1%', '23.5%'],
+            ['华北', '742,150', '−3.6%', '18.0%'],
+            ['西南', '531,780', '+21.7%', '12.9%'],
+            ['华中', '605,410', '+5.2%', '14.4%'],
+          ],
+          flagged: 2,
+        },
       },
       {
         file: '合作协议.docx', kind: 'Word',
@@ -24,6 +35,16 @@ export const homeCopy = {
         formula: '正文 · 宋体 小四 · 1.5 倍行距',
         status: '1,284 字 · 已润色 6 处',
         tabs: ['修订', '批注', '审阅'],
+        text: {
+          title: '二、费用与结算',
+          before: '2.1 甲方需要在收到发票之后尽快把钱付给乙方，具体时间双方再商量。',
+          after: '2.1 甲方应于收到乙方开具的合规发票之日起十五（15）个工作日内，将当期服务费用足额支付至乙方指定账户。',
+          rest: [
+            '2.2 逾期支付的，每逾期一日，甲方应按未付金额的万分之五向乙方支付违约金。',
+            '2.3 双方确认，本条款所述费用均为含税金额，税费由乙方依法承担。',
+          ],
+          comment: 'AI 建议：明确付款期限与违约计算方式',
+        },
       },
       {
         file: '年度述职.pptx', kind: 'PPT',
@@ -32,6 +53,11 @@ export const homeCopy = {
         formula: '幻灯片 2 / 12 · 16:9',
         status: '12 页 · 大纲已生成',
         tabs: ['大纲', '备注', '母版'],
+        slide: {
+          title: '2026 年度成果回顾',
+          bullets: ['全年营收 4,132 万元，同比增长 12.4%', '新签客户 218 家，续约率提升至 91%', '交付周期由 14 天压缩至 8 天'],
+          chart: [['Q1', 40], ['Q2', 66], ['Q3', 52], ['Q4', 88]],
+        },
       },
     ],
     showcaseDone: '已完成',
@@ -66,8 +92,19 @@ export const homeCopy = {
         prompt: 'Summarise this sheet by region and flag the outliers',
         rail: ['Raw data', 'By region', 'YoY chart'],
         formula: '=SUMIFS(Revenue, Region, A2)',
-        status: '4 rows · 3 cols · summarised',
+        status: '6 rows · 4 cols · summarised',
         tabs: ['Sheet1', 'Summary', 'Chart'],
+        sheet: {
+          columns: ['Region', 'Revenue', 'YoY', 'Share'],
+          rows: [
+            ['East', '1,284,900', '+12.4%', '31.2%'],
+            ['South', '968,320', '+8.1%', '23.5%'],
+            ['North', '742,150', '−3.6%', '18.0%'],
+            ['Southwest', '531,780', '+21.7%', '12.9%'],
+            ['Central', '605,410', '+5.2%', '14.4%'],
+          ],
+          flagged: 2,
+        },
       },
       {
         file: 'agreement.docx', kind: 'Word',
@@ -76,6 +113,16 @@ export const homeCopy = {
         formula: 'Body · 12pt · 1.5 line spacing',
         status: '1,284 words · 6 revisions',
         tabs: ['Track', 'Comments', 'Review'],
+        text: {
+          title: '2. Fees and billing',
+          before: '2.1 Client should pay the invoice as soon as they can after receiving it, timing to be discussed.',
+          after: '2.1 Client shall remit the applicable service fees in full to the account nominated by Supplier within fifteen (15) business days of receiving a valid invoice.',
+          rest: [
+            '2.2 Late payments accrue a penalty of 0.05% of the outstanding amount per day of delay.',
+            '2.3 All fees stated herein are inclusive of tax, which Supplier bears as required by law.',
+          ],
+          comment: 'AI suggestion: fix the payment window and penalty basis',
+        },
       },
       {
         file: 'year-review.pptx', kind: 'PPT',
@@ -84,6 +131,11 @@ export const homeCopy = {
         formula: 'Slide 2 / 12 · 16:9',
         status: '12 slides · outline ready',
         tabs: ['Outline', 'Notes', 'Master'],
+        slide: {
+          title: '2026 results in review',
+          bullets: ['Revenue of 41.32M, up 12.4% year on year', '218 new accounts, renewal rate now 91%', 'Delivery cycle cut from 14 days to 8'],
+          chart: [['Q1', 40], ['Q2', 66], ['Q3', 52], ['Q4', 88]],
+        },
       },
     ],
     showcaseDone: 'Done',

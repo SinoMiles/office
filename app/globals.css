@@ -802,7 +802,6 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 .tool-tab { padding: 4px 10px; border-radius: 6px; font-size: 0.72em; color: #8697b2; }
 .tool-tab.is-on { background: rgba(255, 255, 255, 0.08); color: #e2e9f6; }
 .tool-sep { width: 1px; height: 15px; background: rgba(255, 255, 255, 0.1); margin: 0 3px; }
-.tool-pill { height: 8px; border-radius: 3px; background: rgba(255, 255, 255, 0.13); }
 .tool-grow { flex: 1; }
 .tool-chip {
   display: inline-flex; align-items: center; gap: 4px;
@@ -885,7 +884,7 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 /* ---- Excel ---- */
 .doc-sheet { display: flex; flex-direction: column; height: 100%; gap: 4px; }
 .sheet-cols, .sheet-head, .sheet-row {
-  display: grid; grid-template-columns: 26px 1fr 1.25fr 0.85fr;
+  display: grid;
   gap: 6px; align-items: center;
 }
 .sheet-cols { padding: 0 9px 3px; font-size: 0.66em; color: #5f6f8a; text-align: center; }
@@ -926,20 +925,6 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
   border-radius: 9px; padding: 24px 28px;
   display: flex; flex-direction: column; gap: 12px;
 }
-.text-title {
-  width: 46%; height: 14px; border-radius: 4px;
-  background: linear-gradient(90deg, #7dd3fc, #3b82f6); margin-bottom: 5px;
-}
-.text-line { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); animation: rowIn 0.42s ease-out both; }
-.text-line.is-revised {
-  background: rgba(59, 130, 246, 0.22);
-  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-  transition: background 0.45s ease, box-shadow 0.45s ease;
-}
-.text-line.is-revised.is-on {
-  background: linear-gradient(90deg, rgba(125, 211, 252, 0.85), rgba(59, 130, 246, 0.55));
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
-}
 
 /* ---- PPT ---- */
 .doc-slide-wrap { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 14px; height: 100%; }
@@ -957,13 +942,7 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
   border-radius: 9px; padding: 22px;
   display: flex; flex-direction: column; gap: 18px;
 }
-.slide-title { width: 54%; height: 14px; border-radius: 4px; background: linear-gradient(90deg, #fdba74, #f97316); }
 .slide-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.slide-bullets { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
-.slide-bullets span { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.16); animation: rowIn 0.42s ease-out both; }
-.slide-bullets span:nth-child(1) { width: 100%; }
-.slide-bullets span:nth-child(2) { width: 82%; }
-.slide-bullets span:nth-child(3) { width: 64%; }
 .slide-chart { display: flex; align-items: flex-end; gap: 8px; }
 .slide-chart span {
   flex: 1; border-radius: 4px 4px 2px 2px;
@@ -1007,7 +986,7 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .showcase-doc, .sheet-row, .text-line, .slide-bullets span,
+  .showcase-doc, .sheet-row, .text-para, .slide-bullets li,
   .showcase-spinner, .showcase-caret { animation: none; }
 }
 
@@ -1087,3 +1066,104 @@ html[lang="zh-CN"] .section-sub { letter-spacing: 0.01em; }
 @media (prefers-reduced-motion: reduce) {
   .site-nav { transition: none; }
 }
+
+/* ---- 工具条按钮：真实图标，替代原来的灰色占位方块 ---- */
+.tool-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 5px;
+  color: #8697b2; transition: background 0.2s ease, color 0.2s ease;
+}
+.tool-btn.is-on { background: rgba(255, 255, 255, 0.09); color: #dbe4f3; }
+
+/* ---- Excel：选中单元格、填充柄、图表网格 ---- */
+.sheet-cols span.is-on { color: #cbd5e1; background: rgba(255, 255, 255, 0.07); border-radius: 4px; }
+.sheet-row { position: relative; }
+.sheet-row.is-selected {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.22);
+}
+/* 右下角填充柄 —— 表格软件里最有辨识度的一个细节 */
+.sheet-handle {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 6px; height: 6px; border-radius: 1px;
+  background: #38bdf8; border: 1px solid #0d1424;
+}
+.sheet-chart { position: relative; }
+.sheet-chart-grid, .slide-chart-grid {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
+  pointer-events: none;
+}
+.sheet-chart-grid i, .slide-chart-grid i { height: 1px; background: rgba(255, 255, 255, 0.06); }
+
+/* ---- Word：真实文字 + 修订对照 + 批注 ---- */
+.text-page { position: relative; }
+.text-heading {
+  font-size: 0.86em; font-weight: 700; color: #dbe4f3;
+  margin: 0 0 4px; letter-spacing: 0.01em;
+}
+.text-para {
+  font-size: 0.72em; line-height: 1.85; color: #93a3bd; margin: 0;
+  animation: rowIn 0.42s ease-out both;
+}
+/* 润色前：结果落地时划掉并淡出 */
+.text-para.is-before {
+  color: #6b7c96; text-decoration: line-through;
+  text-decoration-color: rgba(251, 113, 133, 0.7);
+  transition: opacity 0.5s ease, max-height 0.5s ease, margin 0.5s ease;
+  max-height: 60px; overflow: hidden;
+}
+.text-para.is-before.is-out { opacity: 0; max-height: 0; margin-bottom: -6px; }
+/* 润色后：高亮浮现 */
+.text-para.is-after {
+  color: #cfe0f5; opacity: 0; max-height: 0; overflow: hidden;
+  padding: 0 8px; border-radius: 5px;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.16), rgba(59, 130, 246, 0.04));
+  border-left: 2px solid rgba(96, 165, 250, 0.8);
+  transition: opacity 0.5s ease 0.15s, max-height 0.5s ease 0.15s, padding 0.5s ease 0.15s;
+}
+.text-para.is-after.is-in { opacity: 1; max-height: 90px; padding: 7px 9px; }
+/* 右侧批注气泡 */
+.text-comment {
+  position: absolute; right: 12px; bottom: 12px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 8px;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(96, 165, 250, 0.34);
+  color: #a8c8f0; font-size: 0.64em;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.4s ease 0.3s, transform 0.4s ease 0.3s;
+}
+.text-comment.is-in { opacity: 1; transform: none; }
+
+/* ---- PPT：真实标题与要点、带轴标签的图表 ---- */
+.slide-heading {
+  font-size: 0.92em; font-weight: 700; color: #f1e3d4; margin: 0;
+  letter-spacing: 0.01em;
+}
+.slide-bullets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; justify-content: center; }
+.slide-bullets li {
+  position: relative; padding-left: 15px;
+  font-size: 0.71em; line-height: 1.65; color: #b9c6da;
+  animation: rowIn 0.42s ease-out both;
+}
+.slide-bullets li::before {
+  content: ''; position: absolute; left: 0; top: 0.58em;
+  width: 5px; height: 5px; border-radius: 50%; background: #fb923c;
+}
+.slide-chart { position: relative; padding-bottom: 16px; }
+.slide-chart span { position: relative; }
+.slide-chart span b {
+  position: absolute; left: 0; right: 0; bottom: -15px;
+  text-align: center; font-size: 0.58em; font-weight: 600; color: #7f8ea8;
+}
+/* 幻灯片缩略图里也放两根线，避免是空白方块 */
+.slide-thumb i {
+  position: absolute; left: 5px; height: 2px; border-radius: 1px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.slide-thumb i:nth-of-type(1) { top: 16px; width: 26px; }
+.slide-thumb i:nth-of-type(2) { top: 22px; width: 18px; }
+.slide-thumb.is-on i { background: rgba(251, 146, 60, 0.55); }
+
+/* 三步进度里完成项换成勾，尺寸与圆点对齐 */
+.rail-step svg { flex: none; color: #34d399; }

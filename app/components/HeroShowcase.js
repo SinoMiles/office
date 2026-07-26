@@ -1,28 +1,41 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Table, FileText, Presentation, Check, CornerDownLeft, Sparkles } from 'lucide-react';
+import {
+  Table, FileText, Presentation, Check, CornerDownLeft, Sparkles,
+  Bold, Italic, Underline, AlignLeft, List, Link2,
+  Filter, ArrowUpDown, Percent, BarChart3, Sigma,
+  Type, Image as ImageIcon, Shapes, LayoutGrid, Play,
+  Database, PieChart, Hash, MessageSquareQuote, Layers,
+} from 'lucide-react';
 
 // Hero 里原本放的是一张 1024×1024 的方形示意图 —— 一眼假，也没有传达产品做什么。
 // 这里换成真实感的循环演示：打字输入一句自然语言指令，对应的
-// Excel / Word / PPT 结果随之生成，并配上真实办公软件应有的完整外壳
-// （侧栏、工具条、公式栏、行列标号、状态栏）。
+// Excel / Word / PPT 结果随之生成，并配上真实办公软件应有的完整外壳。
 //
+// 关键取舍：文档内容用真实文字与真实数据，而不是灰色占位条 —— 占位条
+// 无论排得多整齐都像线框图，一眼就能看出不是产品截图。
 // 全部用 DOM + CSS 绘制，没有图片资源，任意分辨率与缩放下都清晰。
 
 const KIND_ICONS = [Table, FileText, Presentation];
 const KIND_TINTS = ['#22c55e', '#3b82f6', '#f97316'];
-const COLUMNS = ['A', 'B', 'C'];
+const COLUMN_LETTERS = ['A', 'B', 'C', 'D'];
 
-const SHEET_ROWS = [
-  ['华东', '1,284,900', '+12.4%'],
-  ['华南', '968,320', '+8.1%'],
-  ['华北', '742,150', '−3.6%'],
-  ['西南', '531,780', '+21.7%'],
+// 每种文档的工具条图标，对应各自软件真正会出现的功能
+const TOOLBAR_ICONS = [
+  [Sigma, Percent, Filter, ArrowUpDown, BarChart3],
+  [Bold, Italic, Underline, AlignLeft, List, Link2],
+  [Type, ImageIcon, Shapes, LayoutGrid, Play],
+];
+// 左侧导航项的图标
+const RAIL_ICONS = [
+  [Database, Layers, PieChart],
+  [Hash, Hash, Hash],
+  [LayoutGrid, LayoutGrid, LayoutGrid, LayoutGrid],
 ];
 
-const TYPE_MS = 40;
-const HOLD_MS = 3000;
+const TYPE_MS = 34;
+const HOLD_MS = 3400;
 
 export default function HeroShowcase({ items, doneLabel, steps }) {
   const [index, setIndex] = useState(0);
@@ -58,9 +71,9 @@ export default function HeroShowcase({ items, doneLabel, steps }) {
   const onCurrent = progress.index === index;
   const typed = onCurrent ? active.prompt.slice(0, progress.chars) : '';
   const settled = onCurrent && progress.settled;
-  // 三步处理进度：打字时推进前两步，结果落地时全部完成。
   const ratio = active.prompt.length ? progress.chars / active.prompt.length : 0;
   const activeStep = settled ? 3 : Math.min(2, Math.floor(ratio * 3));
+  const railIcons = RAIL_ICONS[index] || RAIL_ICONS[0];
 
   return (
     <div className="showcase">
@@ -77,13 +90,16 @@ export default function HeroShowcase({ items, doneLabel, steps }) {
         </span>
       </div>
 
-      {/* 工具条：分段的假控件，只提供“这是一个专业软件”的质感 */}
       <div className="showcase-toolbar">
         {active.tabs.map((tab, tabIndex) => (
           <span className={`tool-tab${tabIndex === 0 ? ' is-on' : ''}`} key={tab}>{tab}</span>
         ))}
         <span className="tool-sep" />
-        {[16, 26, 16, 20].map((width, wIndex) => <span className="tool-pill" key={`${width}-${wIndex}`} style={{ width }} />)}
+        {(TOOLBAR_ICONS[index] || TOOLBAR_ICONS[0]).map((ToolIcon, iconIndex) => (
+          <span className={`tool-btn${iconIndex === 0 ? ' is-on' : ''}`} key={iconIndex}>
+            <ToolIcon size={13} />
+          </span>
+        ))}
         <span className="tool-grow" />
         <span className="tool-chip" style={{ color: tint, borderColor: `${tint}55`, background: `${tint}18` }}>
           <Sparkles size={11} /> AI
@@ -91,26 +107,28 @@ export default function HeroShowcase({ items, doneLabel, steps }) {
       </div>
 
       <div className="showcase-body">
-        {/* 左侧导航：随文档类型切换内容 */}
         <aside className="showcase-rail">
-          {active.rail.map((label, railIndex) => (
-            <span className={`rail-item${railIndex === 1 ? ' is-on' : ''}`} key={label}>
-              <i style={{ background: railIndex === 1 ? tint : 'rgba(255,255,255,.22)' }} />
-              {label}
-            </span>
-          ))}
+          {active.rail.map((label, railIndex) => {
+            const RailIcon = railIcons[railIndex] || railIcons[0];
+            return (
+              <span className={`rail-item${railIndex === 1 ? ' is-on' : ''}`} key={label}>
+                <RailIcon size={13} color={railIndex === 1 ? tint : undefined} />
+                {label}
+              </span>
+            );
+          })}
           <span className="rail-spacer" />
           <div className="rail-steps">
             {steps.map((step, stepIndex) => (
               <span className={`rail-step${stepIndex < activeStep ? ' is-done' : ''}${stepIndex === activeStep ? ' is-active' : ''}`} key={step}>
-                <i />{step}
+                {stepIndex < activeStep ? <Check size={11} /> : <i />}
+                {step}
               </span>
             ))}
           </div>
         </aside>
 
         <div className="showcase-main">
-          {/* 公式栏 / 属性栏 */}
           <div className="showcase-formula">
             <span className="formula-cell">{index === 0 ? 'B2' : 'fx'}</span>
             <span className="formula-text">{active.formula}</span>
@@ -118,9 +136,9 @@ export default function HeroShowcase({ items, doneLabel, steps }) {
 
           <div className="showcase-stage">
             <div className="showcase-doc" key={index}>
-              {index === 0 ? <SheetDoc settled={settled} /> : null}
-              {index === 1 ? <TextDoc settled={settled} /> : null}
-              {index === 2 ? <SlideDoc settled={settled} /> : null}
+              {index === 0 ? <SheetDoc data={active.sheet} settled={settled} /> : null}
+              {index === 1 ? <TextDoc data={active.text} settled={settled} /> : null}
+              {index === 2 ? <SlideDoc data={active.slide} settled={settled} /> : null}
             </div>
           </div>
         </div>
@@ -142,79 +160,105 @@ export default function HeroShowcase({ items, doneLabel, steps }) {
   );
 }
 
-function SheetDoc({ settled }) {
+function SheetDoc({ data, settled }) {
+  const columns = data?.columns || [];
+  const rows = data?.rows || [];
+  const flagged = data?.flagged ?? -1;
+  const template = `30px repeat(${columns.length}, minmax(0, 1fr))`;
   return (
     <div className="doc-sheet">
-      <div className="sheet-cols">
-        <span className="sheet-corner" />
-        {COLUMNS.map((column) => <span key={column}>{column}</span>)}
+      <div className="sheet-cols" style={{ gridTemplateColumns: template }}>
+        <span />
+        {columns.map((_, columnIndex) => (
+          <span className={columnIndex === 1 ? 'is-on' : ''} key={COLUMN_LETTERS[columnIndex]}>{COLUMN_LETTERS[columnIndex]}</span>
+        ))}
       </div>
-      <div className="sheet-head">
+      <div className="sheet-head" style={{ gridTemplateColumns: template }}>
         <span className="sheet-rownum">1</span>
-        {['区域', '销售额', '同比'].map((label) => <span key={label}>{label}</span>)}
+        {columns.map((label) => <span key={label}>{label}</span>)}
       </div>
-      {SHEET_ROWS.map((row, rowIndex) => (
+      {rows.map((row, rowIndex) => (
         <div
-          className={`sheet-row${settled && rowIndex === 2 ? ' is-flagged' : ''}`}
+          className={`sheet-row${settled && rowIndex === flagged ? ' is-flagged' : ''}${rowIndex === 0 ? ' is-selected' : ''}`}
           key={row[0]}
-          style={{ animationDelay: `${180 + rowIndex * 100}ms` }}
+          style={{ gridTemplateColumns: template, animationDelay: `${150 + rowIndex * 90}ms` }}
         >
           <span className="sheet-rownum">{rowIndex + 2}</span>
-          <span>{row[0]}</span>
-          <span className="num">{row[1]}</span>
-          <span className={row[2].startsWith('−') ? 'num down' : 'num up'}>{row[2]}</span>
+          {row.map((cell, cellIndex) => (
+            <span
+              key={cell}
+              className={cellIndex === 0 ? '' : `num${cell.startsWith('−') ? ' down' : cell.startsWith('+') ? ' up' : ''}`}
+            >
+              {cell}
+            </span>
+          ))}
+          {rowIndex === 0 ? <i className="sheet-handle" /> : null}
         </div>
       ))}
       <div className="sheet-chart">
-        {[62, 48, 34, 78].map((height, chartIndex) => (
-          <span key={height} style={{ height: settled ? `${height}%` : '6%', transitionDelay: `${chartIndex * 90}ms` }} />
+        <div className="sheet-chart-grid">{[0, 1, 2].map((line) => <i key={line} />)}</div>
+        {rows.slice(0, 4).map((row, chartIndex) => (
+          <span
+            key={row[0]}
+            style={{ height: settled ? `${[62, 48, 34, 78][chartIndex]}%` : '5%', transitionDelay: `${chartIndex * 85}ms` }}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function TextDoc({ settled }) {
+function TextDoc({ data, settled }) {
   return (
     <div className="doc-text">
       <div className="text-ruler">
-        {Array.from({ length: 24 }, (_, tick) => <i key={tick} className={tick % 4 === 0 ? 'is-major' : ''} />)}
+        {Array.from({ length: 26 }, (_, tick) => <i key={tick} className={tick % 4 === 0 ? 'is-major' : ''} />)}
       </div>
       <div className="text-page">
-        <div className="text-title" />
-        {[96, 88, 72].map((width, lineIndex) => (
-          <div className="text-line" key={width} style={{ width: `${width}%`, animationDelay: `${180 + lineIndex * 100}ms` }} />
+        <h4 className="text-heading">{data?.title}</h4>
+        {/* 润色前后同处一页：结果落地时旧句删除线淡出、新句高亮浮现，
+            这是「AI 改了什么」最直观的表达 */}
+        <p className={`text-para is-before${settled ? ' is-out' : ''}`}>{data?.before}</p>
+        <p className={`text-para is-after${settled ? ' is-in' : ''}`}>{data?.after}</p>
+        {(data?.rest || []).map((line, lineIndex) => (
+          <p className="text-para" key={line} style={{ animationDelay: `${220 + lineIndex * 110}ms` }}>{line}</p>
         ))}
-        <div className={`text-line is-revised${settled ? ' is-on' : ''}`} style={{ width: '84%' }} />
-        {[92, 64].map((width, lineIndex) => (
-          <div className="text-line" key={`b${width}`} style={{ width: `${width}%`, animationDelay: `${520 + lineIndex * 100}ms` }} />
-        ))}
+        <span className={`text-comment${settled ? ' is-in' : ''}`}>
+          <MessageSquareQuote size={12} />
+          {data?.comment}
+        </span>
       </div>
     </div>
   );
 }
 
-function SlideDoc({ settled }) {
+function SlideDoc({ data, settled }) {
+  const chart = data?.chart || [];
   return (
     <div className="doc-slide-wrap">
       <div className="slide-strip">
         {[0, 1, 2, 3].map((slideIndex) => (
           <span className={`slide-thumb${slideIndex === 1 ? ' is-on' : ''}`} key={slideIndex}>
             <b>{slideIndex + 1}</b>
+            <i />
+            <i />
           </span>
         ))}
       </div>
       <div className="doc-slide">
-        <div className="slide-title" />
+        <h4 className="slide-heading">{data?.title}</h4>
         <div className="slide-body">
-          <div className="slide-bullets">
-            {[0, 1, 2].map((bulletIndex) => (
-              <span key={bulletIndex} style={{ animationDelay: `${240 + bulletIndex * 120}ms` }} />
+          <ul className="slide-bullets">
+            {(data?.bullets || []).map((bullet, bulletIndex) => (
+              <li key={bullet} style={{ animationDelay: `${200 + bulletIndex * 110}ms` }}>{bullet}</li>
             ))}
-          </div>
+          </ul>
           <div className="slide-chart">
-            {[40, 66, 52, 88].map((height, chartIndex) => (
-              <span key={height} style={{ height: settled ? `${height}%` : '8%', transitionDelay: `${chartIndex * 90}ms` }} />
+            <div className="slide-chart-grid">{[0, 1, 2].map((line) => <i key={line} />)}</div>
+            {chart.map(([label, height], chartIndex) => (
+              <span key={label} style={{ height: settled ? `${height}%` : '6%', transitionDelay: `${chartIndex * 85}ms` }}>
+                <b>{label}</b>
+              </span>
             ))}
           </div>
         </div>
