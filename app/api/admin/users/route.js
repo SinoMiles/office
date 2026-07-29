@@ -30,6 +30,9 @@ export async function POST(req) {
     if (!email || !password) {
       return NextResponse.json({ error: '邮箱和密码是必填项' }, { status: 400 });
     }
+    if (membershipLevel && !['FREE', 'PRO'].includes(membershipLevel)) {
+      return NextResponse.json({ error: '会员等级只支持 FREE 或 PRO' }, { status: 400 });
+    }
 
     await connectToDatabase();
     

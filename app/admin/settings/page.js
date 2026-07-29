@@ -8,6 +8,7 @@ const TABS = [
   ['wechat', '微信登录'],
   ['billing', '计费策略'],
   ['wechatPay', '微信支付'],
+  ['referral', '邀请奖励'],
   ['recharge', '充值码'],
 ];
 
@@ -37,17 +38,14 @@ export default function AdminSettingsPage() {
         const storedBilling = data.settings.find((item) => item.key === 'billing')?.value || {};
         setSettings({
           billing: {
-            creditsPerCny: storedBilling.creditsPerCny ?? 100,
-            reservationInputTokens: storedBilling.reservationInputTokens ?? 16000,
-            reservationOutputTokens: storedBilling.reservationOutputTokens ?? 8192,
-            discountRates: { FREE: 1, PRO: 0.8, ENTERPRISE: 0.5, ...storedBilling.discountRates },
-            models: {
-              ...storedBilling.models,
-              'deepseek-v4-flash': { inputCreditsPer1K: 2, outputCreditsPer1K: 8, cachedInputCreditsPer1K: 0.5, ...storedBilling.models?.['deepseek-v4-flash'] },
-            },
+            priceMultiplier: storedBilling.priceMultiplier ?? 8,
           },
           llm: data.settings.find((item) => item.key === 'llm')?.value || { apiKey: '', model: 'deepseek-v4-flash' },
           wechat: data.settings.find((item) => item.key === 'wechat')?.value || { appId: '', appSecret: '' },
+          referral: {
+            enabled: true, inviterCredits: 5000, inviteeCredits: 2000, maxRewardedInvites: 20,
+            ...(data.settings.find((item) => item.key === 'referral')?.value || {}),
+          },
         });
       } catch (error) {
         toast.error(error.message || '读取设置失败');
@@ -138,40 +136,31 @@ export default function AdminSettingsPage() {
       {activeTab === 'billing' && (
         <section className="premium-stat-card">
           <h2 style={{ ...headingStyle, marginBottom: '16px' }}><span style={{ color: 'var(--primary)', marginRight: '8px' }}>✦</span>计费策略</h2>
-          <div style={{ padding: '13px 16px', marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', border: '1px solid #a7f3d0', borderRadius: '12px', background: '#f0fdf8' }}>
-            <div><div style={{ color: '#047857', fontWeight: 750 }}>按实际 Token 直接结算</div><div style={{ marginTop: '3px', color: '#527066', fontSize: '.78rem' }}>任务完成后一次性扣款，不产生预授权扣款和余额退回流水。</div></div>
-            <span style={{ flexShrink: 0, padding: '5px 9px', borderRadius: '999px', background: '#d1fae5', color: '#047857', fontSize: '.72rem', fontWeight: 750 }}>已启用</span>
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
             <div style={billingGroupStyle}>
-              <h3 style={billingGroupTitleStyle}>Token 单价</h3>
-              <p style={billingGroupDescriptionStyle}>模型：deepseek-v4-flash，单位为每 1,000 Tokens 消耗的 Credits。</p>
-              <div style={{ display: 'grid', gap: '14px' }}>
-                {[['inputCreditsPer1K', '输入 Tokens'], ['outputCreditsPer1K', '输出 Tokens'], ['cachedInputCreditsPer1K', '缓存输入 Tokens']].map(([key, label]) => <label key={key} style={labelStyle}>{label}<div style={{ position: 'relative' }}><input type="number" min="0" step="0.001" className="input-base" style={{ width: '100%', paddingRight: '92px' }} value={settings.billing.models['deepseek-v4-flash'][key]} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, models: { ...current.billing.models, 'deepseek-v4-flash': { ...current.billing.models['deepseek-v4-flash'], [key]: Number(event.target.value) } } } }))} /><span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '.72rem' }}>Credits / 1K</span></div></label>)}
-              </div>
+              <h3 style={billingGroupTitleStyle}>统一销售倍率</h3>
+              <p style={billingGroupDescriptionStyle}>最终费用 = DeepSeek 官方成本 × 销售倍率。所有用户使用同一倍率，修改后只影响新创建的任务。</p>
+              <label style={labelStyle}>销售倍率<div style={{ position: 'relative' }}><input type="number" min="1" max="100" step="0.5" className="input-base" style={{ width: '100%', paddingRight: '48px' }} value={settings.billing.priceMultiplier} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, priceMultiplier: Number(event.target.value) } }))} /><span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '.75rem' }}>倍</span></div></label>
             </div>
 
             <div style={billingGroupStyle}>
-              <h3 style={billingGroupTitleStyle}>会员计费倍率</h3>
-              <p style={billingGroupDescriptionStyle}>最终费用 = Token 原价 × 会员倍率。1 表示原价，0.8 表示八折。</p>
-              <div style={{ display: 'grid', gap: '14px' }}>
-                {[['FREE', '免费用户'], ['PRO', '专业版'], ['ENTERPRISE', '企业版']].map(([level, label]) => <label key={level} style={labelStyle}>{label}<div style={{ position: 'relative' }}><input type="number" min="0" max="1" step="0.05" className="input-base" style={{ width: '100%', paddingRight: '58px' }} value={settings.billing.discountRates[level]} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, discountRates: { ...current.billing.discountRates, [level]: Number(event.target.value) } } }))} /><span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '.72rem' }}>× 原价</span></div></label>)}
-              </div>
-            </div>
-
-            <div style={billingGroupStyle}>
-              <h3 style={billingGroupTitleStyle}>充值换算</h3>
-              <p style={billingGroupDescriptionStyle}>用于微信支付充值时，将人民币金额换算为到账 Credits。</p>
-              <label style={labelStyle}>每 ¥1 到账 Credits<div style={{ position: 'relative' }}><input type="number" min="1" step="1" className="input-base" style={{ width: '100%', paddingRight: '88px' }} value={settings.billing.creditsPerCny} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, creditsPerCny: Number(event.target.value) } }))} /><span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '.72rem' }}>Credits / ¥1</span></div></label>
-            </div>
-
-            <div style={billingGroupStyle}>
-              <h3 style={billingGroupTitleStyle}>任务额度校验</h3>
-              <p style={billingGroupDescriptionStyle}>仅用于开始任务前估算最低余额，不会冻结或扣除余额；最终仍按实际 Token 结算。</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
-                <label style={labelStyle}>估算输入 Tokens<input type="number" min="0" step="1000" className="input-base" value={settings.billing.reservationInputTokens} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, reservationInputTokens: Number(event.target.value) } }))} /></label>
-                <label style={labelStyle}>估算输出 Tokens<input type="number" min="0" step="1000" className="input-base" value={settings.billing.reservationOutputTokens} onChange={(event) => setSettings((current) => ({ ...current, billing: { ...current.billing, reservationOutputTokens: Number(event.target.value) } }))} /></label>
+              <h3 style={billingGroupTitleStyle}>DeepSeek V4 Flash 成本基准</h3>
+              <p style={billingGroupDescriptionStyle}>供应商成本由代码版本维护，后台不可修改。固定换算：¥1 = 1,000 Credits。</p>
+              <div style={{ display: 'grid', gap: '10px', color: 'var(--text-muted)', fontSize: '.86rem' }}>
+                {[
+                  ['缓存未命中输入', 1],
+                  ['缓存命中输入', 0.02],
+                  ['输出', 2],
+                ].map(([label, cost]) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                    <span>{label}</span>
+                    <span><b style={{ color: 'var(--text-main)' }}>成本 ¥{cost}</b> → 售价 ¥{(cost * settings.billing.priceMultiplier).toFixed(2)} / 百万 Tokens</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: '4px', paddingTop: '10px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>预计 Token 毛利率</span>
+                  <b style={{ color: '#047857' }}>{settings.billing.priceMultiplier > 0 ? ((1 - 1 / settings.billing.priceMultiplier) * 100).toFixed(1) : '0.0'}%</b>
+                </div>
               </div>
             </div>
           </div>
@@ -185,6 +174,32 @@ export default function AdminSettingsPage() {
           <div style={{ display: 'inline-flex', padding: '6px 10px', borderRadius: '999px', background: wechatPayStatus.configured ? '#d1fae5' : '#fee2e2', color: wechatPayStatus.configured ? '#047857' : '#b91c1c', fontWeight: 700 }}>{wechatPayStatus.configured ? '配置完整，可以收款' : '配置未完成'}</div>
           <p style={{ marginTop: '14px', color: 'var(--text-muted)', lineHeight: 1.7 }}>支付密钥、商户私钥和微信平台公钥只从服务器环境变量读取，不会发送到浏览器，也无需在此保存。</p>
           {!wechatPayStatus.configured ? <div style={{ marginTop: '12px', padding: '12px', borderRadius: '9px', background: '#fff7f7', color: '#b91c1c', lineHeight: 1.6 }}>缺少：{wechatPayStatus.missing.join('、')}</div> : <div style={{ marginTop: '12px', color: 'var(--text-muted)', wordBreak: 'break-all' }}>回调地址：{wechatPayStatus.notifyUrl}</div>}
+        </section>
+      )}
+
+      {activeTab === 'referral' && (
+        <section className="premium-stat-card">
+          <h2 style={headingStyle}><span style={{ color: 'var(--primary)', marginRight: '8px' }}>✦</span>邀请奖励</h2>
+          <div style={{ padding: '13px 16px', marginBottom: '18px', border: '1px solid #bfdbfe', borderRadius: '12px', background: '#f0f7ff' }}>
+            <div style={{ color: '#1d4ed8', fontWeight: 750 }}>奖励在被邀请人绑定手机号时才发放</div>
+            <div style={{ marginTop: '3px', color: '#4b6b96', fontSize: '.78rem', lineHeight: 1.65 }}>
+              注册只需要一个邮箱，成本近乎为零。把奖励押在手机号上，刷邀请就得为每个小号准备一张真实的手机卡。
+            </div>
+          </div>
+          <div style={{ display: 'grid', gap: '20px', maxWidth: '680px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 500 }}>
+              <input type="checkbox" checked={settings.referral.enabled !== false} onChange={(event) => setSettings((current) => ({ ...current, referral: { ...current.referral, enabled: event.target.checked } }))} />
+              启用邀请机制（关闭后工作台不再显示邀请入口，已产生的奖励不受影响）
+            </label>
+            <label style={labelStyle}>邀请人每成功邀请一位获得（Credits）<input type="number" min="0" className="input-base" value={settings.referral.inviterCredits} onChange={(event) => setSettings((current) => ({ ...current, referral: { ...current.referral, inviterCredits: event.target.value } }))} /></label>
+            <label style={labelStyle}>被邀请人额外获得（Credits）<input type="number" min="0" className="input-base" value={settings.referral.inviteeCredits} onChange={(event) => setSettings((current) => ({ ...current, referral: { ...current.referral, inviteeCredits: event.target.value } }))} /></label>
+            <label style={labelStyle}>
+              单个用户最多可获奖励的邀请数
+              <input type="number" min="0" className="input-base" value={settings.referral.maxRewardedInvites} onChange={(event) => setSettings((current) => ({ ...current, referral: { ...current.referral, maxRewardedInvites: event.target.value } }))} />
+              <span style={{ color: 'var(--text-muted)', fontSize: '.78rem' }}>填 0 表示不限。邀请是拉新手段，不设上限就会变成可以无限刷的额度来源。</span>
+            </label>
+            <div>{saveButton('referral')}</div>
+          </div>
         </section>
       )}
 

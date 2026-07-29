@@ -9,6 +9,12 @@ const UserSchema = new mongoose.Schema({
   phone: { type: String, sparse: true, unique: true, index: true },
   phoneVerifiedAt: { type: Date },
   wechatOpenId: { type: String, sparse: true, index: true },
+  // 邀请码在首次被查看时惰性生成，不在注册时就占号 —— 大多数账号从不分享。
+  inviteCode: { type: String, sparse: true, unique: true, index: true },
+  invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+  invitedAt: { type: Date },
+  // 奖励发放的时点，同时也是「这条邀请已经兑现过」的幂等标记
+  referralRewardedAt: { type: Date },
   password: { type: String, required: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   balance: { type: Number, default: 0 },

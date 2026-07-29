@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getPlan, listPlans, nextPeriodEnd, normalizePlanSettings, quotePlan } from '../lib/billing/plans.js';
 
-test('ships PRO and ENTERPRISE plans with sane defaults', () => {
+test('ships only the PRO plan with sane defaults', () => {
   const plans = listPlans({});
-  assert.deepEqual(plans.map((plan) => plan.id), ['PRO', 'ENTERPRISE']);
-  assert.equal(getPlan({}, 'PRO').monthlyFen, 2900);
-  assert.equal(getPlan({}, 'ENTERPRISE').monthlyCredits, 50000);
+  assert.deepEqual(plans.map((plan) => plan.id), ['PRO']);
+  assert.equal(getPlan({}, 'PRO').monthlyFen, 1900);
+  assert.equal(getPlan({}, 'ENTERPRISE'), null);
   assert.equal(getPlan({}, 'NOPE'), null);
 });
 
@@ -19,25 +19,25 @@ test('rejects plans whose membership level cannot be stored on the user', () => 
   assert.equal(overridden.PRO.membershipLevel, 'PRO');
 });
 
-test('disabled plans disappear from the catalog but keep their config', () => {
-  const settings = { plans: { ENTERPRISE: { enabled: false } } };
+test('legacy enterprise configuration never returns to the sales catalog', () => {
+  const settings = { plans: { ENTERPRISE: { membershipLevel: 'ENTERPRISE', enabled: true, monthlyFen: 1 } } };
   assert.deepEqual(listPlans(settings).map((plan) => plan.id), ['PRO']);
   assert.equal(getPlan(settings, 'ENTERPRISE'), null);
 });
 
 test('longer periods apply their discount and grant the full period credits', () => {
   const monthly = quotePlan({}, 'PRO', 1);
-  assert.equal(monthly.amountFen, 2900);
-  assert.equal(monthly.grantCredits, 3000);
+  assert.equal(monthly.amountFen, 1900);
+  assert.equal(monthly.grantCredits, 30000);
   assert.equal(monthly.savedFen, 0);
 
   const yearly = quotePlan({}, 'PRO', 12);
-  // 2900 * 12 * 0.85 = 29580
-  assert.equal(yearly.amountFen, 29580);
-  assert.equal(yearly.listAmountFen, 34800);
-  assert.equal(yearly.savedFen, 5220);
+  // 1900 * 12 * 0.85 = 19380
+  assert.equal(yearly.amountFen, 19380);
+  assert.equal(yearly.listAmountFen, 22800);
+  assert.equal(yearly.savedFen, 3420);
   // 折扣只作用于价格，赠送额度按整周期足额发放
-  assert.equal(yearly.grantCredits, 36000);
+  assert.equal(yearly.grantCredits, 360000);
 });
 
 test('unknown plan or period yields no quote instead of a bogus order', () => {
@@ -70,5 +70,5 @@ test('month-end subscriptions do not overflow into the following month', () => {
 test('period catalog can be overridden and is returned in ascending order', () => {
   const { periods } = normalizePlanSettings({ periods: [{ months: 6, label: '半年付', rate: 0.9 }, { months: 1, label: '月付', rate: 1 }] });
   assert.deepEqual(periods.map((period) => period.months), [1, 6]);
-  assert.equal(quotePlan({ periods: [{ months: 6, label: '半年付', rate: 0.9 }] }, 'PRO', 6).amountFen, 15660);
+  assert.equal(quotePlan({ periods: [{ months: 6, label: '半年付', rate: 0.9 }] }, 'PRO', 6).amountFen, 10260);
 });

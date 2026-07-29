@@ -91,7 +91,7 @@ export default function LandingPage() {
             })}
           </div>
 
-          <div style={{ marginTop: '36px' }}>
+          <div style={{ marginTop: '36px', display: 'flex', justifyContent: 'center' }}>
             <Link href="/tools" className="btn btn-outline" style={{ padding: '12px 22px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               {copy.catalogCta} <ArrowUpRight size={17} />
             </Link>

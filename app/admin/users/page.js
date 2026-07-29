@@ -269,7 +269,6 @@ export default function AdminUsersPage() {
                   <select className="input-base" value={formData.membershipLevel} onChange={e => setFormData({...formData, membershipLevel: e.target.value})}>
                     <option value="FREE">FREE</option>
                     <option value="PRO">PRO</option>
-                    <option value="ENTERPRISE">ENTERPRISE</option>
                   </select>
                 </div>
               </div>

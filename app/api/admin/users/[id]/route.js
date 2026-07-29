@@ -16,6 +16,9 @@ export async function PUT(req, { params }) {
     if (!updateData.email) {
       return NextResponse.json({ error: '邮箱是必填项' }, { status: 400 });
     }
+    if (updateData.membershipLevel && !['FREE', 'PRO'].includes(updateData.membershipLevel)) {
+      return NextResponse.json({ error: '会员等级只支持 FREE 或 PRO' }, { status: 400 });
+    }
 
     await connectToDatabase();
     const user = await User.findById(id);

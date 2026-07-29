@@ -14,16 +14,15 @@ export const dynamic = 'force-dynamic';
 const COPY = {
   'zh-CN': {
     title: 'OfficeGPT 价格与会员套餐',
-    description: '按 Token 实际用量计费，免费额度可直接使用。专业版与企业版提供折扣与每月赠送额度，支持月付、季付和年付。',
+    description: '按 Token 实际用量计费，免费额度可直接使用。专业版提供每月赠送额度与更高任务并发，支持月付、季付和年付。',
     heading: '简单透明的定价',
-    sub: '所有确定性文档工具永久免费。AI 能力按实际 Token 用量结算，会员享受折扣与每月赠送额度。',
+    sub: '所有确定性文档工具永久免费。AI 能力按实际 Token 用量结算，专业版提供每月赠送额度与更高任务并发。',
     free: '免费版',
     freePrice: '¥0',
     freeDesc: '无需注册即可使用全部 35 个文档转换与处理工具',
     freeItems: ['35 个文档工具全部可用', 'Word / Excel / PPT / PDF 互转', '按需充值使用 AI 能力', '文件处理后即时删除'],
     perMonth: '/月起',
     monthlyCredits: '每月赠送额度',
-    discount: 'Token 折扣',
     cta: '立即订阅',
     freeCta: '免费开始使用',
     faqTitle: '常见问题',
@@ -32,23 +31,22 @@ const COPY = {
     faqs: [
       ['文档转换工具需要付费吗？', '不需要。Word 转 PDF、PDF 拆分合并、Excel 清洗等 35 个确定性工具永久免费，且无需注册即可使用。'],
       ['Credits 会过期吗？', '不会。充值和赠送的 Credits 长期有效，账户余额不设有效期。'],
-      ['会员到期后余额还在吗？', '在。会员到期只影响折扣倍率和每月赠送，已有的 Credits 余额不受影响，可以继续使用。'],
+      ['会员到期后余额还在吗？', '在。会员到期只影响每月赠送和会员权益，已有的 Credits 余额不受影响，可以继续使用。'],
       ['可以退款吗？', '可以。请联系客服说明订单号，我们会按微信支付原路退回，已发放的 Credits 会按退款比例扣回。'],
       ['支持哪些支付方式？', '目前支持微信支付扫码。企业客户如需对公转账或发票，请联系我们。'],
     ],
   },
   en: {
     title: 'OfficeGPT Pricing and Membership Plans',
-    description: 'Pay only for the tokens you actually use. All 35 document tools are free forever. Pro and Enterprise plans add discounted token rates and monthly credit grants.',
+    description: 'Pay only for the tokens you actually use. All 35 document tools are free forever. Pro adds a monthly credit grant and higher task concurrency.',
     heading: 'Straightforward pricing',
-    sub: 'Every deterministic document tool is free forever. AI features are billed on actual token usage, and members get discounted rates plus a monthly credit grant.',
+    sub: 'Every deterministic document tool is free forever. AI features are billed on actual token usage, while Pro adds monthly credits and higher task concurrency.',
     free: 'Free',
     freePrice: '¥0',
     freeDesc: 'Use all 35 document conversion and processing tools without an account',
     freeItems: ['All 35 document tools', 'Word / Excel / PPT / PDF conversion', 'Top up to use AI features', 'Files deleted right after processing'],
     perMonth: '/month from',
     monthlyCredits: 'Monthly credits',
-    discount: 'Token discount',
     cta: 'Subscribe',
     freeCta: 'Start for free',
     faqTitle: 'Frequently asked questions',
@@ -57,9 +55,9 @@ const COPY = {
     faqs: [
       ['Do the document tools cost anything?', 'No. Word to PDF, PDF split and merge, Excel cleanup and the other 32 deterministic tools are free forever, and no account is required.'],
       ['Do Credits expire?', 'No. Both purchased and granted Credits stay in your balance indefinitely.'],
-      ['What happens to my balance when a plan expires?', 'It stays. Expiry only removes the discount rate and monthly grant; your existing Credits remain usable.'],
+      ['What happens to my balance when a plan expires?', 'It stays. Expiry only removes the monthly grant and membership benefits; your existing Credits remain usable.'],
       ['Can I get a refund?', 'Yes. Contact support with your order number and we will refund through WeChat Pay. Granted Credits are clawed back in proportion to the refund.'],
-      ['Which payment methods are supported?', 'WeChat Pay QR code today. Enterprise customers needing bank transfer or invoicing should contact us.'],
+      ['Which payment methods are supported?', 'WeChat Pay QR code today. Business customers needing bank transfer or invoicing should contact us.'],
     ],
   },
 };
@@ -97,7 +95,6 @@ export default async function PricingPage() {
   const { periods } = normalizePlanSettings(planSettings);
   const plans = listPlans(planSettings).map((plan) => ({
     ...plan,
-    discountRate: billing.discountRates[plan.membershipLevel] ?? 1,
     quotes: periods.map((period) => quotePlan(planSettings, plan.id, period.months)).filter(Boolean),
   }));
 
@@ -175,7 +172,6 @@ export default async function PricingPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '14px', fontSize: '0.82rem', color: 'var(--text-muted)', minHeight: '44px', alignItems: 'center' }}>
                   <span>{copy.monthlyCredits} <b style={{ color: '#059669' }}>{plan.monthlyCredits.toLocaleString(locale)}</b></span>
-                  <span>{copy.discount} <b style={{ color: 'var(--primary)' }}>{(plan.discountRate * 10).toFixed(1)}</b></span>
                 </div>
                 <ul style={{ listStyle: 'none', padding: 0, margin: '18px 0 20px', display: 'grid', gap: '10px', flex: 1 }}>
                   {plan.highlights.map((item) => (

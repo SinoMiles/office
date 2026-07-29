@@ -20,7 +20,7 @@ export async function GET() {
     '',
     `- [Home](${base}/en): overview of the product and its capabilities`,
     `- [All tools](${base}/en/tools): browse every document tool by category`,
-    `- [Pricing](${base}/en/pricing): free tier, Pro and Enterprise plans, and how credits are calculated`,
+    `- [Pricing](${base}/en/pricing): free tier, Pro plan, and how credits are calculated`,
     `- [Docs](${base}/en/docs): guides and how-tos`,
     `- [About](${base}/en/about): who operates the service`,
     '',

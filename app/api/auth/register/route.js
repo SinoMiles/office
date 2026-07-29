@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
 import { signToken } from '@/lib/auth';
 import { consumeEmailCode, consumeRateLimit, normalizeEmail, requestIp } from '@/lib/auth-security';
+import { normalizeInviteCode } from '@/lib/referral';
 
 export async function POST(req) {
   try {
@@ -28,12 +29,18 @@ export async function POST(req) {
     // 赠送额度不在这里发了 —— 注册只要一个邮箱，成本近乎为零，按 IP 限流
     // 也挡不住换网络的小号。改到 /api/auth/phone/bind，绑定手机号后才发放，
     // 幂等键按号码走，一个号码只能领一次。
+    // 邀请关系在这里落库，奖励要等被邀请人绑定手机号才结算 ——
+    // 注册只要一个邮箱，把奖励放在这一步等于重新打开薅羊毛的口子。
+    const inviteCode = normalizeInviteCode(body.inviteCode);
+    const inviter = inviteCode ? await User.findOne({ inviteCode }).select('_id').lean() : null;
+
     const user = await User.create({
       email,
       password,
       emailVerifiedAt: new Date(),
       balance: 0,
-      role: 'user'
+      role: 'user',
+      ...(inviter ? { invitedBy: inviter._id, invitedAt: new Date() } : {}),
     });
 
     const token = signToken({ id: user._id, role: user.role, version: user.tokenVersion });

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { LayoutDashboard, CreditCard, LogOut, FileSpreadsheet, Activity, Clock, FileText, FileType2, ImageIcon, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Gift, LogOut, FileSpreadsheet, Activity, Clock, FileText, FileType2, ImageIcon, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
@@ -13,11 +13,13 @@ import GenericFilePreview from '@/app/components/GenericFilePreview';
 import ChatMarkdown from '@/app/components/ChatMarkdown';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
 import PhoneBindDialog from '@/app/components/PhoneBindDialog';
+import ReferralCard from '@/app/components/ReferralCard';
 import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
 import { useI18n } from '@/app/i18n/I18nProvider';
-import { dashboardCopy, dashboardExtra, dashboardSuggestions } from '@/app/i18n/dashboardCopy';
+import { dashboardCopy, dashboardExtra, dashboardOverviewCopy, dashboardSuggestions } from '@/app/i18n/dashboardCopy';
 
 function dashboardTabFromPath(pathname) {
+  if (pathname?.endsWith('/referral')) return 'referral';
   if (pathname?.endsWith('/billing')) return 'billing';
   if (pathname?.endsWith('/overview')) return 'overview';
   return 'workspace';
@@ -80,14 +82,15 @@ export default function DashboardClient() {
   const { locale, t } = useI18n();
   const copy = dashboardCopy(locale);
   const extra = dashboardExtra(locale);
+  const overviewCopy = dashboardOverviewCopy(locale);
   const suggestionCopy = dashboardSuggestions(locale);
   const [activeTab, setActiveTab] = useState(() => dashboardTabFromPath(pathname));
   const [data, setData] = useState({ records: [], balance: 0 });
-  const [stats, setStats] = useState({ totalFiles: 0, totalConsumed: 0, savedTimeHours: 0, recentTasks: [] });
+  const [stats, setStats] = useState({ totalFiles: 0, totalConversations: 0, totalConsumed: 0, totalTokens: 0, savedTimeHours: 0, completionRate: 0, statusCounts: {}, dailyActivity: [], artifactTypes: {}, averageTaskSeconds: 0, currentMonthTasks: 0, previousMonthTasks: 0, currentMonthCredits: 0, previousMonthCredits: 0, recentTasks: [] });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [activeDrawer, setActiveDrawer] = useState(null); // 'profile' | 'settings' | 'upgrade' | null
+  const [activeDrawer, setActiveDrawer] = useState(null); // 'profile' | 'settings' | 'membership' | 'recharge' | null
   const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
@@ -124,7 +127,7 @@ export default function DashboardClient() {
   }, [activeArtifactGeneric, activeArtifactId, activeArtifactUrl]);
 
   const navigateToTab = (tab) => {
-    const routes = { workspace: '/dashboard', overview: '/dashboard/overview', billing: '/dashboard/billing' };
+    const routes = { workspace: '/dashboard', overview: '/dashboard/overview', billing: '/dashboard/billing', referral: '/dashboard/referral' };
     const nextPath = routes[tab];
     if (nextPath && nextPath !== window.location.pathname) {
       setActiveTab(tab);
@@ -245,15 +248,19 @@ export default function DashboardClient() {
 
   const openArtifact = useCallback((artifact) => {
     if (!artifact) return;
-    setPreviewTabs((current) => current.some((item) => item.id === artifact.id)
-      ? current.map((item) => item.id === artifact.id ? { ...item, ...artifact } : item)
-      : [...current, artifact]);
-    setActiveArtifact(artifact);
+    // 同一个文件可能从消息卡片、生成事件和文件工作区以不同 artifact id
+    // 抵达前端。预览标签按「任务 + 文件名」归一，避免同一文件重复打开。
+    const identity = `${artifact.taskId || activeTaskId || ''}:${String(artifact.filename || '').trim().toLowerCase()}`;
+    const canonical = { ...artifact, id: `preview:${identity}` };
+    setPreviewTabs((current) => current.some((item) => item.id === canonical.id)
+      ? current.map((item) => item.id === canonical.id ? { ...item, ...canonical } : item)
+      : [...current, canonical]);
+    setActiveArtifact(canonical);
     setPreviewError('');
     setRightPanelMode('preview');
     setShowRightPanel(true);
     setSidebarCollapsed(true);
-  }, []);
+  }, [activeTaskId]);
 
   // 把任务的附件转成预览面板认识的产物描述。
   // 聊天气泡里的文件按钮一直写着 onClick={() => openArtifact(msg.attachments[index])}，
@@ -642,9 +649,9 @@ export default function DashboardClient() {
     if (payload?.success) setSubscription(payload.subscription);
   }, []);
 
-  // 套餐目录只在打开升级弹窗时拉取，避免拖慢工作台首屏。
+  // 套餐目录只在打开会员弹窗时拉取，避免拖慢工作台首屏。
   useEffect(() => {
-    if (activeDrawer !== 'upgrade' || plans.length) return;
+    if (activeDrawer !== 'membership' || plans.length) return;
     void (async () => {
       const response = await fetch('/api/billing/plans');
       const payload = await response.json().catch(() => ({}));
@@ -654,9 +661,9 @@ export default function DashboardClient() {
     })();
   }, [activeDrawer, plans.length]);
 
-  // 订阅状态在账单页和升级弹窗都要展示。
+  // 订阅状态在账单页、会员弹窗和左下角会员信息中展示。
   useEffect(() => {
-    if (activeTab !== 'billing' && activeDrawer !== 'upgrade') return;
+    if (activeTab !== 'billing' && activeDrawer !== 'membership') return;
     void refreshSubscription();
   }, [activeTab, activeDrawer, refreshSubscription]);
 
@@ -721,6 +728,17 @@ export default function DashboardClient() {
     }, 2500);
     return () => window.clearInterval(poll);
   }, [wechatPayment?.id, wechatPayment?.status, refreshSubscription]);
+
+  const handlePaymentComplete = async () => {
+    const purpose = wechatPayment?.purpose;
+    try {
+      await fetchData();
+      if (purpose === 'subscription') await refreshSubscription();
+    } finally {
+      setWechatPayment(null);
+      setActiveDrawer(null);
+    }
+  };
 
   const handleRenameTask = async (e, id) => {
     e.stopPropagation();
@@ -1055,6 +1073,8 @@ export default function DashboardClient() {
 
   if (loading) return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>{copy.loading}</div>;
 
+  const isProMember = Boolean(subscription || user?.membershipLevel === 'PRO');
+
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 73px)', background: 'var(--background)', overflow: 'hidden' }}>
       
@@ -1065,6 +1085,7 @@ export default function DashboardClient() {
             <button onClick={startNewChat} title={t('dashboard.newChat')} style={{ width: '42px', height: '42px', borderRadius: '12px', border: '1px solid var(--border)', background: 'white', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={20} /></button>
             <button onClick={() => navigateToTab('overview')} title={t('dashboard.overview')} style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'overview' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'overview' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LayoutDashboard size={19} /></button>
             <button onClick={() => navigateToTab('billing')} title={t('dashboard.billing')} style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'billing' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'billing' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CreditCard size={19} /></button>
+            <button onClick={() => navigateToTab('referral')} title={t('dashboard.referral')} style={{ width: '42px', height: '42px', borderRadius: '10px', border: 'none', background: activeTab === 'referral' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'referral' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Gift size={19} /></button>
             <div style={{ flex: 1 }} />
             <button onClick={() => setShowUserMenu(!showUserMenu)} title={user?.username || '用户'} style={{ width: '42px', height: '42px', borderRadius: '50%', border: 'none', background: 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>{user?.username?.[0]?.toUpperCase() || 'U'}</button>
           </div>
@@ -1088,6 +1109,9 @@ export default function DashboardClient() {
           </button>
           <button onClick={() => navigateToTab('billing')} className="admin-nav-link" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderRadius: 'var(--radius-md)', color: activeTab === 'billing' ? 'var(--primary)' : 'var(--text-main)', background: activeTab === 'billing' ? 'var(--primary-light)' : 'transparent', textDecoration: 'none', fontWeight: 500, border: 'none', cursor: 'pointer', textAlign: 'left' }}>
             <CreditCard size={18} /> {t('dashboard.billing')}
+          </button>
+          <button onClick={() => navigateToTab('referral')} className="admin-nav-link" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderRadius: 'var(--radius-md)', color: activeTab === 'referral' ? 'var(--primary)' : 'var(--text-main)', background: activeTab === 'referral' ? 'var(--primary-light)' : 'transparent', textDecoration: 'none', fontWeight: 500, border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+            <Gift size={18} /> {t('dashboard.referral')}
           </button>
         </nav>
         
@@ -1225,18 +1249,21 @@ export default function DashboardClient() {
               <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--background)' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{copy.currentPlan}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
-                  <Crown size={16} color="#d97706" /> {copy.freeUser}
+                  <Crown size={16} color={isProMember ? 'var(--primary)' : '#d97706'} />
+                  {isProMember ? '专业版' : '免费版'}
+                  {!isProMember && <span style={{ marginLeft: 'auto', color: 'var(--primary)', fontSize: '0.78rem' }}>升级</span>}
                 </div>
+                {subscription && <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>有效期至 {new Date(subscription.currentPeriodEnd).toLocaleDateString('zh-CN')}</div>}
               </div>
 
               <div style={{ padding: '8px' }}>
                 <button 
-                  onClick={() => { setActiveDrawer('upgrade'); setShowUserMenu(false); }}
+                  onClick={() => { setWechatPayment(null); setActiveDrawer('membership'); setShowUserMenu(false); }}
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', width: '100%', background: 'transparent', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', transition: 'background 0.2s' }}
                   onMouseOver={e => e.currentTarget.style.background = 'var(--background)'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <Crown size={16} color="var(--primary)" /> {copy.upgrade}
+                  <Crown size={16} color="var(--primary)" /> {isProMember ? '会员详情与续费' : copy.upgrade}
                 </button>
                 <button 
                   onClick={() => { setActiveDrawer('profile'); setShowUserMenu(false); }}
@@ -1284,8 +1311,10 @@ export default function DashboardClient() {
                 <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                   {user?.username || '用户'}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                  {user?.email || 'user@example.com'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: isProMember ? 'var(--primary)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  <Crown size={12} />
+                  <span>{isProMember ? '专业版' : '免费版'}</span>
+                  {!isProMember && <span style={{ color: 'var(--primary)', fontWeight: 700 }}>· 升级</span>}
                 </div>
               </div>
             </div>
@@ -1591,75 +1620,172 @@ export default function DashboardClient() {
           </div>
         )}
 
-        {/* Custom Confirm Modal for Delete */}
-        {deleteConfirmDialog.isOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })}></div>
-            <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', zIndex: 1, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Trash2 size={24} style={{ color: 'var(--danger, #ef4444)' }} />
-                {copy.deleteTitle}
-              </h3>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
-                {copy.deleteText}
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button 
-                  onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })}
-                  style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 500 }}
-                >
-                  {copy.cancel}
-                </button>
-                <button 
-                  onClick={executeDeleteTask}
-                  style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'var(--danger, #ef4444)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
-                >
-                  {copy.confirmDelete}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        
         </div>
         )}
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div style={{ padding: '40px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-              <h1 style={{ fontSize: '1.8rem' }}>{t('dashboard.overview')}</h1>
+          <div style={{ height: '100%', minHeight: 0, padding: '20px 24px', overflow: 'hidden', display: 'grid', gridTemplateRows: 'auto auto minmax(220px, 1fr) minmax(180px, .78fr)', gap: '14px' }}>
+            <div>
+              <h1 style={{ fontSize: '1.55rem', marginBottom: '5px' }}>{t('dashboard.overview')}</h1>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.88rem' }}>{overviewCopy.subtitle}</p>
             </div>
-            {/* Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-              <div className="glass-card" style={{ padding: '24px', background: 'white', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '16px', borderRadius: '50%' }}><FileText color="var(--primary)" size={24} /></div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '14px' }}>
+              <div className="glass-card" style={{ padding: '18px', background: 'white', display: 'flex', alignItems: 'center', gap: '13px' }}>
+                <div style={{ width: '42px', height: '42px', display: 'grid', placeItems: 'center', background: 'var(--primary-light)', borderRadius: '12px', color: 'var(--primary)' }}><MessageSquare size={20} /></div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>总处理文件数</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{stats.totalFiles} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>份</span></div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '3px' }}>{overviewCopy.conversations}</div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800 }}>{Number(stats.totalConversations || 0).toLocaleString(locale)}</div>
                 </div>
               </div>
-              <div className="glass-card" style={{ padding: '24px', background: 'white', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '50%' }}><Activity color="#d97706" size={24} /></div>
+              <div className="glass-card" style={{ padding: '18px', background: 'white', display: 'flex', alignItems: 'center', gap: '13px' }}>
+                <div style={{ width: '42px', height: '42px', display: 'grid', placeItems: 'center', background: '#eff6ff', borderRadius: '12px', color: '#2563eb' }}><FileText size={20} /></div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>累计消耗 Credits</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{stats.totalConsumed}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '3px' }}>{overviewCopy.tasks}</div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800 }}>{Number(stats.totalFiles || 0).toLocaleString(locale)}</div>
                 </div>
               </div>
-              <div className="glass-card" style={{ padding: '24px', background: 'white', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ background: '#e0e7ff', padding: '16px', borderRadius: '50%' }}><Clock color="#4f46e5" size={24} /></div>
+              <div className="glass-card" style={{ padding: '18px', background: 'white', display: 'flex', alignItems: 'center', gap: '13px' }}>
+                <div style={{ width: '42px', height: '42px', display: 'grid', placeItems: 'center', background: '#fff7ed', borderRadius: '12px', color: '#ea580c' }}><Activity size={20} /></div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>预估节省时间</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{stats.savedTimeHours} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>小时</span></div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '3px' }}>{overviewCopy.tokens}</div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800 }}>{Number(stats.totalTokens || 0).toLocaleString(locale)}</div>
+                </div>
+              </div>
+              <div className="glass-card" style={{ padding: '18px', background: 'white', display: 'flex', alignItems: 'center', gap: '13px' }}>
+                <div style={{ width: '42px', height: '42px', display: 'grid', placeItems: 'center', background: '#eef2ff', borderRadius: '12px', color: '#4f46e5' }}><Clock size={20} /></div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '3px' }}>{overviewCopy.timeSaved}</div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800 }}>{stats.savedTimeHours} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>{overviewCopy.hours}</span></div>
                 </div>
               </div>
             </div>
+
+            <div style={{ minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1.45fr) minmax(280px, .85fr)', gap: '14px' }}>
+              <section className="glass-card" style={{ minHeight: 0, padding: '18px 20px', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <h2 style={{ fontSize: '0.98rem', margin: '0 0 20px' }}>{overviewCopy.lastSevenDays}</h2>
+                <div style={{ minHeight: '100px', flex: 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, stats.dailyActivity?.length || 7)}, minmax(28px, 1fr))`, alignItems: 'end', gap: '10px' }}>
+                  {(stats.dailyActivity?.length ? stats.dailyActivity : Array.from({ length: 7 }, (_, index) => ({ date: String(index), count: 0 }))).map((item) => {
+                    const maximum = Math.max(1, ...((stats.dailyActivity || []).map((entry) => entry.count)));
+                    const height = item.count ? Math.max(12, Math.round((item.count / maximum) * 90)) : 4;
+                    const date = new Date(`${item.date}T00:00:00`);
+                    return (
+                      <div key={item.date} style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '7px' }}>
+                        <span style={{ color: item.count ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700 }}>{item.count}</span>
+                        <div title={`${item.date}: ${item.count}`} style={{ width: 'min(32px, 70%)', height: `${height}px`, minHeight: '4px', borderRadius: '7px 7px 3px 3px', background: item.count ? 'linear-gradient(180deg, var(--primary), #34d399)' : '#e8edf2', transition: 'height .25s ease' }} />
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric' }).format(date)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="glass-card" style={{ minHeight: 0, padding: '18px 20px', background: 'white', overflow: 'hidden' }}>
+                <h2 style={{ fontSize: '0.98rem', margin: '0 0 18px' }}>{overviewCopy.taskHealth}</h2>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', marginBottom: '14px' }}>
+                  <strong style={{ fontSize: '2rem', letterSpacing: '-0.04em' }}>{stats.completionRate || 0}%</strong>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>{overviewCopy.completionRate}</span>
+                </div>
+                <div style={{ height: '9px', display: 'flex', overflow: 'hidden', borderRadius: '999px', background: '#eef2f5', marginBottom: '18px' }}>
+                  <span style={{ width: `${stats.totalFiles ? ((stats.statusCounts?.completed || 0) / stats.totalFiles) * 100 : 0}%`, background: 'var(--primary)' }} />
+                  <span style={{ width: `${stats.totalFiles ? (((stats.statusCounts?.processing || 0) + (stats.statusCounts?.pending || 0)) / stats.totalFiles) * 100 : 0}%`, background: '#f59e0b' }} />
+                  <span style={{ width: `${stats.totalFiles ? (((stats.statusCounts?.failed || 0) + (stats.statusCounts?.cancelled || 0)) / stats.totalFiles) * 100 : 0}%`, background: '#ef4444' }} />
+                </div>
+                {[
+                  [overviewCopy.completed, stats.statusCounts?.completed || 0, 'var(--primary)'],
+                  [overviewCopy.processing, (stats.statusCounts?.processing || 0) + (stats.statusCounts?.pending || 0), '#f59e0b'],
+                  [overviewCopy.failed, (stats.statusCounts?.failed || 0) + (stats.statusCounts?.cancelled || 0), '#ef4444'],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', fontSize: '0.82rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}><i style={{ width: '7px', height: '7px', borderRadius: '50%', background: color }} />{label}</span>
+                    <b>{Number(value).toLocaleString(locale)}</b>
+                  </div>
+                ))}
+              </section>
+            </div>
+
+            <div style={{ minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(340px, 1.2fr) repeat(2, minmax(220px, .8fr))', gap: '14px' }}>
+              <section className="glass-card" style={{ minHeight: 0, padding: '16px 20px', background: 'white', overflow: 'hidden' }}>
+                <h2 style={{ fontSize: '0.98rem', margin: '0 0 16px' }}>{overviewCopy.creditOverview}</h2>
+                {(() => {
+                  const sevenDayCredits = (stats.dailyActivity || []).reduce((sum, item) => sum + Number(item.credits || 0), 0);
+                  const dailyAverage = sevenDayCredits / 7;
+                  const estimatedDays = dailyAverage > 0 ? Math.floor(Number(data.balance || 0) / dailyAverage) : null;
+                  const maximum = Math.max(1, ...((stats.dailyActivity || []).map((item) => Number(item.credits || 0))));
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px', marginBottom: '17px' }}>
+                        {[
+                          [overviewCopy.currentBalance, Number(data.balance || 0).toLocaleString(locale)],
+                          [overviewCopy.monthUsage, Number(stats.currentMonthCredits || 0).toLocaleString(locale)],
+                          [overviewCopy.lastSevenUsage, sevenDayCredits.toLocaleString(locale)],
+                          [overviewCopy.estimatedDays, estimatedDays === null ? overviewCopy.noEstimate : `${Math.min(9999, estimatedDays).toLocaleString(locale)}${estimatedDays > 9999 ? '+' : ''} ${overviewCopy.days}`],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ minWidth: 0 }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: '4px' }}>{label}</div>
+                            <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '1.02rem' }}>{value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ height: '52px', display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', alignItems: 'end', gap: '6px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+                        {(stats.dailyActivity || []).map((item) => (
+                          <span key={item.date} title={`${item.date}: ${Number(item.credits || 0).toLocaleString(locale)} Credits`} style={{ height: `${Math.max(3, Math.round((Number(item.credits || 0) / maximum) * 40))}px`, borderRadius: '4px 4px 2px 2px', background: item.credits ? '#34d399' : '#e8edf2' }} />
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
+              </section>
+
+              <section className="glass-card" style={{ minHeight: 0, padding: '16px 20px', background: 'white', overflow: 'hidden' }}>
+                <h2 style={{ fontSize: '0.98rem', margin: '0 0 13px' }}>{overviewCopy.outputs}</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '9px' }}>
+                  {[
+                    ['Excel', stats.artifactTypes?.excel || 0, <FileSpreadsheet key="excel" size={17} />, '#16a34a', '#f0fdf4'],
+                    ['Word', stats.artifactTypes?.word || 0, <FileText key="word" size={17} />, '#2563eb', '#eff6ff'],
+                    ['PPT', stats.artifactTypes?.ppt || 0, <Presentation key="ppt" size={17} />, '#ea580c', '#fff7ed'],
+                    ['PDF', stats.artifactTypes?.pdf || 0, <FileType2 key="pdf" size={17} />, '#dc2626', '#fef2f2'],
+                  ].map(([label, value, icon, color, background]) => (
+                    <div key={label} style={{ padding: '10px', borderRadius: '10px', background, color }}>
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>{icon}<b style={{ color: 'var(--text-main)' }}>{Number(value).toLocaleString(locale)}</b></span>
+                      <span style={{ display: 'block', marginTop: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="glass-card" style={{ minHeight: 0, padding: '16px 20px', background: 'white', overflow: 'hidden' }}>
+                <h2 style={{ fontSize: '0.98rem', margin: '0 0 13px' }}>{overviewCopy.monthlyEfficiency}</h2>
+                {(() => {
+                  const current = Number(stats.currentMonthTasks || 0);
+                  const previous = Number(stats.previousMonthTasks || 0);
+                  const change = previous ? Math.round(((current - previous) / previous) * 100) : current ? 100 : 0;
+                  const duration = Number(stats.averageTaskSeconds || 0);
+                  return (
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      <div style={{ paddingBottom: '11px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: '4px' }}>{overviewCopy.thisMonthTasks}</div>
+                        <strong style={{ fontSize: '1.35rem' }}>{current.toLocaleString(locale)}</strong>
+                        <span style={{ marginLeft: '8px', color: change > 0 ? 'var(--primary)' : change < 0 ? '#ef4444' : 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700 }}>{change ? `${change > 0 ? '+' : ''}${change}%` : overviewCopy.unchanged}</span>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: '4px' }}>{overviewCopy.averageDuration}</div>
+                        <strong style={{ fontSize: '1.35rem' }}>{duration >= 60 ? `${Math.round(duration / 60)} ${extra.minute}` : `${duration} ${overviewCopy.seconds}`}</strong>
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{overviewCopy.monthComparison}</div>
+                    </div>
+                  );
+                })()}
+              </section>
+            </div>
+
           </div>
         )}
 
         {/* Billing Tab */}
         {activeTab === 'billing' && (
-          <div style={{ height: '100%', minHeight: 0, padding: '20px 24px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ height: '100%', minHeight: 0, padding: '20px 24px', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'clip' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
               <h1 style={{ fontSize: '1.45rem' }}>{t('dashboard.billing')}</h1>
             </div>
@@ -1680,30 +1806,30 @@ export default function DashboardClient() {
                     </div>
                   </div>
                 ) : null}
-                <button type="button" className="btn btn-primary" style={{ padding: '9px 15px', flexShrink: 0 }} onClick={() => setActiveDrawer('upgrade')}>{subscription ? '续费 / 充值' : t('dashboard.wechatTopup')}</button>
+                <button type="button" className="btn btn-primary" style={{ padding: '9px 15px', flexShrink: 0 }} onClick={() => { setWechatPayment(null); setActiveDrawer('recharge'); }}>{t('dashboard.wechatTopup')}</button>
               </div>
             </div>
 
-            <div className="glass-card" style={{ minHeight: 0, flex: 1, background: 'white', padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div className="glass-card" style={{ minHeight: '300px', flex: '1 1 auto', background: 'white', padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}><h2 style={{ fontSize: '1rem' }}>{t('dashboard.details')}</h2></div>
-              <div style={{ minHeight: 0, flex: 1, overflow: 'auto' }}><table style={{ width: '100%', minWidth: '620px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left' }}>
+              <div style={{ minHeight: 0, flex: 1, overflow: 'auto' }}><table style={{ width: '100%', minWidth: '720px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                   <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.time')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.type')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.detail')}</th>
-                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.tokens')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.inputTokens')}</th>
+                    <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.outputTokens')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.amount')}</th>
                     <th style={{ padding: '11px 14px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{t('dashboard.balance')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.records.length === 0 && (
-                    <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>暂无账单记录</td></tr>
+                    <tr><td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>暂无账单记录</td></tr>
                   )}
                   {data.records.map((r) => {
                     const usage = r.metadata?.usage;
-                    const totalTokens = usage?.totalTokens ?? ((usage?.inputTokens || 0) + (usage?.outputTokens || 0));
                     const balanceDelta = r.balanceDelta ?? (['charge', 'refund'].includes(r.type) ? r.amount : -r.amount);
                     const billingTime = formatBillingDateTime(r.createdAt, locale);
                     return (
@@ -1715,7 +1841,8 @@ export default function DashboardClient() {
                         </span>
                       </td>
                       <td style={{ padding: '10px 14px', maxWidth: '360px' }}>{r.description || t('dashboard.balanceChange')}</td>
-                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>{totalTokens ? totalTokens.toLocaleString(locale) : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>{usage ? (usage.inputTokens || 0).toLocaleString(locale) : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>{usage ? (usage.outputTokens || 0).toLocaleString(locale) : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                       <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', fontWeight: 600 }}>{r.amount.toLocaleString(locale)}</td>
                       <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}><span style={{ fontWeight: 700, color: balanceDelta >= 0 ? '#059669' : '#ef4444' }}>{balanceDelta > 0 ? '+' : ''}{balanceDelta.toLocaleString(locale)}</span>{Number.isFinite(r.balanceAfter) ? <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>→ {r.balanceAfter.toLocaleString(locale)}</span> : null}</td>
                     </tr>
@@ -1734,6 +1861,16 @@ export default function DashboardClient() {
                 <span aria-hidden="true" />
               </div>
             </div>
+
+          </div>
+        )}
+
+        {activeTab === 'referral' && (
+          <div style={{ height: '100%', minHeight: 0, padding: '20px 24px', overflowY: 'auto', overflowX: 'clip' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <h1 style={{ fontSize: '1.45rem' }}>{t('dashboard.referral')}</h1>
+            </div>
+            <ReferralCard locale={locale} />
           </div>
         )}
       </main>
@@ -1749,6 +1886,24 @@ export default function DashboardClient() {
         }}
       />
 
+      {/* 删除确认属于整个工作台，不能放在某个页面的条件渲染内部。 */}
+      {deleteConfirmDialog.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.42)', backdropFilter: 'blur(5px)' }} onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })} />
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-task-title" style={{ background: 'white', padding: '28px', borderRadius: '16px', width: '100%', maxWidth: '400px', position: 'relative', zIndex: 1, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <h3 id="delete-task-title" style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '9px' }}>
+              <span style={{ width: '38px', height: '38px', borderRadius: '10px', display: 'grid', placeItems: 'center', background: '#fef2f2' }}><Trash2 size={19} color="#dc2626" /></span>
+              {copy.deleteTitle}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.65 }}>{copy.deleteText}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })} style={{ padding: '10px 18px', borderRadius: '9px', border: '1px solid var(--border)', background: 'white', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>{copy.cancel}</button>
+              <button type="button" onClick={executeDeleteTask} style={{ padding: '10px 18px', borderRadius: '9px', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{copy.confirmDelete}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Global Centered Modal */}
       {activeDrawer && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -1760,13 +1915,13 @@ export default function DashboardClient() {
           />
           
           {/* Modal Panel */}
-          {/* 升级弹窗要放下并排的套餐卡片，比资料/设置弹窗宽得多 */}
-          <div style={{ width: activeDrawer === 'upgrade' ? '880px' : '480px', maxWidth: '100%', maxHeight: '90vh', background: '#fefefe', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative', zIndex: 1, animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ width: activeDrawer === 'membership' ? '820px' : activeDrawer === 'recharge' ? '680px' : '480px', maxWidth: '100%', maxHeight: '90vh', background: '#fefefe', borderRadius: '18px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative', zIndex: 1, animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             
             {/* Modal Header */}
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {activeDrawer === 'upgrade' && <><Crown color="var(--primary)" /> {copy.upgrade}</>}
+                {activeDrawer === 'membership' && <><Crown color="var(--primary)" /> 会员订阅</>}
+                {activeDrawer === 'recharge' && <><CreditCard color="var(--primary)" /> Credits 充值</>}
                 {activeDrawer === 'profile' && <><User color="var(--text-main)" /> {copy.profile}</>}
                 {activeDrawer === 'settings' && <><Settings color="var(--text-main)" /> {copy.settings}</>}
               </h2>
@@ -1783,37 +1938,35 @@ export default function DashboardClient() {
             {/* Modal Content */}
             <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
               
-              {/* UPGRADE PLAN CONTENT */}
-              {activeDrawer === 'upgrade' && (
+              {/* MEMBERSHIP / RECHARGE CONTENT */}
+              {['membership', 'recharge'].includes(activeDrawer) && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {activeDrawer === 'membership' && <>
                   {/* 余额与当前订阅并排，把宽度用起来 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: subscription ? '1fr 1fr' : '1fr', gap: '14px' }}>
-                    <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.1) 100%)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
-                      <div style={{ color: 'var(--text-muted)', marginBottom: '6px', fontSize: '0.9rem' }}>当前可用 Credits</div>
-                      <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1.1 }}>{data.balance.toLocaleString()}</div>
-                    </div>
-                    {subscription ? (
-                      <div style={{ padding: '20px 24px', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(79,70,229,0.25)', background: 'rgba(79,70,229,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ padding: '24px 26px', borderRadius: '16px', color: 'white', background: 'linear-gradient(135deg, #064e3b 0%, #047857 58%, #10b981 120%)', boxShadow: '0 16px 36px -20px rgba(4,120,87,.75)' }}>
+                    {isProMember ? (
+                      <div style={{ padding: '20px 24px', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <div>
-                          <div style={{ color: 'var(--text-muted)', marginBottom: '6px', fontSize: '0.9rem' }}>当前会员</div>
+                          <div style={{ color: 'rgba(255,255,255,.68)', marginBottom: '6px', fontSize: '0.82rem' }}>当前会员</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                            <Crown size={20} color="var(--primary)" />
-                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1.1 }}>{subscription.membershipLevel}</span>
+                            <Crown size={21} color="#fbbf24" />
+                            <span style={{ fontSize: '1.55rem', fontWeight: 800, lineHeight: 1.1 }}>专业版</span>
                           </div>
-                          <div style={{ color: subscription.daysLeft <= 7 ? '#c2410c' : 'var(--text-muted)', fontSize: '0.8rem', marginTop: '6px' }}>
+                          {subscription ? <div style={{ color: subscription.daysLeft <= 7 ? '#fbbf24' : 'rgba(255,255,255,.72)', fontSize: '0.8rem', marginTop: '8px' }}>
                             有效期至 {new Date(subscription.currentPeriodEnd).toLocaleDateString('zh-CN')}（剩余 {subscription.daysLeft} 天）
-                          </div>
+                          </div> : <div style={{ color: 'rgba(255,255,255,.72)', fontSize: '0.8rem', marginTop: '8px' }}>专业版权益已生效</div>}
                         </div>
-                        <div style={{ marginTop: '10px' }}>
-                          <button type="button" className="btn btn-outline" style={{ padding: '6px 11px', fontSize: '0.78rem', whiteSpace: 'nowrap' }} onClick={() => void handleToggleAutoRenew(!subscription.autoRenew)}>
+                        {subscription && <div style={{ marginTop: '10px' }}>
+                          <button type="button" style={{ padding: '7px 12px', fontSize: '0.78rem', whiteSpace: 'nowrap', border: '1px solid rgba(255,255,255,.3)', borderRadius: '8px', color: 'white', background: 'rgba(255,255,255,.1)', cursor: 'pointer' }} onClick={() => void handleToggleAutoRenew(!subscription.autoRenew)}>
                             {subscription.autoRenew ? '关闭续订提醒' : '恢复续订提醒'}
                           </button>
-                          {!subscription.autoRenew && (
-                            <div style={{ marginTop: '7px', fontSize: '0.75rem', color: '#c2410c' }}>已关闭续订，到期后自动降级为免费版</div>
-                          )}
-                        </div>
+                        </div>}
                       </div>
-                    ) : null}
+                    ) : <div>
+                      <div style={{ color: 'rgba(255,255,255,.66)', fontSize: '0.82rem' }}>当前会员</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginTop: '8px' }}><Crown size={22} color="#fbbf24" /><strong style={{ fontSize: '1.55rem' }}>免费版</strong></div>
+                      <p style={{ marginTop: '10px', color: 'rgba(255,255,255,.72)', fontSize: '0.86rem' }}>升级专业版，获得更多 Credits、更高并发与完整办公能力。</p>
+                    </div>}
                   </div>
 
                   <div>
@@ -1821,85 +1974,85 @@ export default function DashboardClient() {
 
                     {plans.length === 0 ? (
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>正在加载套餐…</div>
-                    ) : (
-                      <div style={{ display: 'grid', gap: '14px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${plans.length}, 1fr)`, gap: '12px' }}>
-                          {plans.map((plan) => {
-                            const active = selectedPlanId === plan.id;
-                            return (
-                              <button
-                                key={plan.id}
-                                type="button"
-                                onClick={() => setSelectedPlanId(plan.id)}
-                                style={{ position: 'relative', textAlign: 'left', padding: '18px 20px', border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '14px', background: active ? 'var(--primary-light)' : 'white', cursor: 'pointer', boxShadow: active ? '0 6px 18px -8px rgba(79,70,229,0.45)' : 'none', transition: 'all 0.18s ease' }}
-                              >
-                                {active && <Check size={17} color="var(--primary)" style={{ position: 'absolute', top: '16px', right: '16px' }} />}
-                                <div style={{ fontWeight: 700, fontSize: '1.02rem', color: active ? 'var(--primary)' : 'var(--text-main)' }}>{plan.name}</div>
-                                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'baseline', gap: '3px' }}>
-                                  <span style={{ fontSize: '1.9rem', fontWeight: 800, lineHeight: 1 }}>¥{(plan.monthlyFen / 100).toFixed(0)}</span>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)' }}>/月起</span>
-                                </div>
-                                <ul style={{ margin: '14px 0 0', padding: 0, listStyle: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5, display: 'grid', gap: '7px' }}>
-                                  {plan.highlights.map((item) => (
-                                    <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
-                                      <Check size={13} color="#059669" style={{ flexShrink: 0, marginTop: '3px' }} />
-                                      <span>{item}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </button>
-                            );
-                          })}
+                    ) : (() => {
+                      const plan = plans.find((item) => item.id === selectedPlanId) || plans[0];
+                      const quote = plan?.quotes.find((item) => item.periodMonths === selectedPeriodMonths) || plan?.quotes[0];
+                      if (!plan || !quote) return null;
+                      return (
+                        <div style={{ display: 'grid', gap: '16px' }}>
+                          <div style={{ display: 'grid', gap: '11px' }}>
+                            {plan.quotes.map((item, index) => {
+                              const picked = item.periodMonths === quote.periodMonths;
+                              const monthlyEquivalent = item.amountFen / item.periodMonths / 100;
+                              const recommended = item.periodMonths === 12;
+                              return (
+                                <button
+                                  key={item.periodMonths}
+                                  type="button"
+                                  onClick={() => { setSelectedPlanId(plan.id); setSelectedPeriodMonths(item.periodMonths); }}
+                                  style={{ position: 'relative', width: '100%', display: 'grid', gridTemplateColumns: '54px minmax(0, 1fr) auto', alignItems: 'center', gap: '16px', padding: '18px 20px', textAlign: 'left', border: `2px solid ${picked ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '14px', background: picked ? 'linear-gradient(135deg, rgba(16,185,129,.09), rgba(99,102,241,.07))' : 'white', boxShadow: picked ? '0 10px 28px -18px rgba(5,150,105,.8)' : 'none', cursor: 'pointer', transition: 'border-color .18s ease, background .18s ease, transform .18s ease' }}
+                                >
+                                  <span style={{ width: '26px', height: '26px', borderRadius: '50%', border: `2px solid ${picked ? 'var(--primary)' : '#cbd5e1'}`, background: picked ? 'var(--primary)' : 'white', display: 'grid', placeItems: 'center', color: 'white' }}>{picked && <Check size={15} strokeWidth={3} />}</span>
+                                  <span style={{ minWidth: 0 }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <strong style={{ fontSize: '1.05rem', color: picked ? 'var(--primary)' : 'var(--text-main)' }}>{item.periodLabel}专业版</strong>
+                                      {recommended && <span style={{ padding: '3px 8px', borderRadius: '999px', background: '#111827', color: 'white', fontSize: '0.68rem', fontWeight: 700 }}>最划算</span>}
+                                      {index === 1 && <span style={{ padding: '3px 8px', borderRadius: '999px', background: '#ecfdf5', color: '#047857', fontSize: '0.68rem', fontWeight: 700 }}>热门</span>}
+                                    </span>
+                                    <span style={{ display: 'block', marginTop: '7px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.grantCredits.toLocaleString('zh-CN')} Credits · 并发上限 5 · 优先任务队列</span>
+                                  </span>
+                                  <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    <span style={{ display: 'block', color: 'var(--text-main)', fontSize: '1.4rem', fontWeight: 800 }}>¥{(item.amountFen / 100).toFixed(2)}</span>
+                                    <span style={{ display: 'block', marginTop: '3px', color: 'var(--text-muted)', fontSize: '0.72rem' }}>约 ¥{monthlyEquivalent.toFixed(2)}/月</span>
+                                    {item.savedFen > 0 && <span style={{ display: 'block', marginTop: '5px', color: '#059669', fontSize: '0.72rem', fontWeight: 700 }}>立省 ¥{(item.savedFen / 100).toFixed(2)}</span>}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '15px 18px', borderRadius: '12px', background: '#f8fafc', border: '1px solid var(--border)' }}>
+                            <div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>已选择 {quote.periodLabel}专业版</div>
+                              <div style={{ marginTop: '3px', color: 'var(--text-main)', fontSize: '0.84rem' }}>到账 {quote.grantCredits.toLocaleString('zh-CN')} Credits，有效期 {quote.periodMonths} 个月</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}><span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>应付 </span><strong style={{ color: 'var(--primary)', fontSize: '1.45rem' }}>¥{(quote.amountFen / 100).toFixed(2)}</strong></div>
+                          </div>
+                          <button type="button" onClick={handleSubscribe} disabled={subscribeLoading || (wechatPayment && wechatPayment.status === 'paying')} className="btn btn-primary" style={{ justifyContent: 'center', padding: '14px', borderRadius: '11px', fontSize: '0.95rem' }}>
+                            {subscribeLoading ? <><Loader2 size={16} className="spin-anim" /> 正在创建订单…</> : subscription ? `立即续费 · ¥${(quote.amountFen / 100).toFixed(2)}` : `立即订阅 · ¥${(quote.amountFen / 100).toFixed(2)}`}
+                          </button>
                         </div>
-
-                        {(() => {
-                          const plan = plans.find((item) => item.id === selectedPlanId);
-                          const quote = plan?.quotes.find((item) => item.periodMonths === selectedPeriodMonths) || plan?.quotes[0];
-                          if (!plan || !quote) return null;
-                          return (
-                            <>
-                              {/* 周期选择与费用明细并排：左边选，右边即时看到结果 */}
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
-                                <div style={{ display: 'grid', gap: '8px' }}>
-                                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>订阅周期</div>
-                                  {plan.quotes.map((item) => {
-                                    const picked = item.periodMonths === quote.periodMonths;
-                                    return (
-                                      <button
-                                        key={item.periodMonths}
-                                        type="button"
-                                        onClick={() => setSelectedPeriodMonths(item.periodMonths)}
-                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '11px 14px', border: `1px solid ${picked ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '10px', background: picked ? 'var(--primary-light)' : 'white', color: picked ? 'var(--primary)' : 'var(--text-main)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
-                                      >
-                                        <span>{item.periodLabel}</span>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          {item.savedFen > 0 && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#059669', background: '#d1fae5', padding: '2px 7px', borderRadius: '20px' }}>省 ¥{(item.savedFen / 100).toFixed(0)}</span>}
-                                          <span style={{ fontWeight: 700 }}>¥{(item.amountFen / 100).toFixed(2)}</span>
-                                        </span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                <div style={{ padding: '16px 18px', borderRadius: '12px', background: 'var(--background)', fontSize: '0.85rem', lineHeight: 2.1, color: 'var(--text-muted)' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>应付金额</span><b style={{ color: 'var(--text-main)', fontSize: '1.25rem' }}>¥{(quote.amountFen / 100).toFixed(2)}</b></div>
-                                  {quote.savedFen > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>原价</span><s style={{ color: 'var(--text-muted)' }}>¥{(quote.listAmountFen / 100).toFixed(2)}</s></div>}
-                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>赠送额度</span><b style={{ color: '#059669' }}>{quote.grantCredits.toLocaleString('zh-CN')} Credits</b></div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Token 折扣</span><b style={{ color: 'var(--text-main)' }}>{(plan.discountRate * 10).toFixed(1)} 折</b></div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', marginTop: '6px', paddingTop: '6px' }}><span>{subscription ? '续订后有效期' : '有效期'}</span><b style={{ color: 'var(--text-main)' }}>{quote.periodMonths} 个月</b></div>
-                                </div>
-                              </div>
-                              <button type="button" onClick={handleSubscribe} disabled={subscribeLoading || (wechatPayment && wechatPayment.status === 'paying')} className="btn btn-primary" style={{ justifyContent: 'center', padding: '14px' }}>
-                                {subscribeLoading ? <><Loader2 size={16} className="spin-anim" /> 正在创建订单…</> : subscription ? `续费 ${plan.name} · ¥${(quote.amountFen / 100).toFixed(2)}` : `订阅 ${plan.name} · ¥${(quote.amountFen / 100).toFixed(2)}`}
-                              </button>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
+                  {wechatPayment?.purpose === 'subscription' && ['paying', 'paid'].includes(wechatPayment.status) && (
+                    <div style={{ textAlign: 'center', padding: '22px', border: '1px solid var(--border)', borderRadius: '14px', background: '#f8fafc' }}>
+                      {wechatPayment.status === 'paid' ? <>
+                        <Check size={44} color="#059669" />
+                        <h4 style={{ marginTop: '8px', color: '#059669', fontSize: '1.1rem' }}>会员已开通</h4>
+                        <p style={{ marginTop: '6px', color: 'var(--text-muted)' }}>{wechatPayment.credits?.toLocaleString()} Credits 已到账</p>
+                        <button type="button" className="btn btn-outline" style={{ marginTop: '14px' }} onClick={() => void handlePaymentComplete()}>完成</button>
+                      </> : <>
+                        <Image src={wechatPayment.qrCodeDataUrl} alt="会员订阅微信支付二维码" width={240} height={240} unoptimized style={{ width: '240px', height: '240px', borderRadius: '10px' }} />
+                        <h4 style={{ marginTop: '10px' }}>微信扫码支付 ¥{wechatPayment.amountYuan}</h4>
+                        <p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>支付完成后会员将立即生效，无需手动刷新</p>
+                        <button type="button" className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => setWechatPayment(null)}>取消本次支付</button>
+                      </>}
+                    </div>
+                  )}
+                  </>}
 
-                  {/* 充值与卡密兑换并排，宽屏下不再是一条长长的竖直列表 */}
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'grid', gridTemplateColumns: wechatPayment && ['paying', 'paid'].includes(wechatPayment.status) ? '1fr' : '1fr 1fr', gap: '24px', alignItems: 'start' }}>
+                  {activeDrawer === 'recharge' && <>
+                  <div style={{ padding: '18px 20px', borderRadius: '14px', background: 'linear-gradient(135deg, #ecfdf5, #eef2ff)', border: '1px solid #d1fae5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>本次充值预计到账</div>
+                      <strong style={{ display: 'block', marginTop: '4px', color: 'var(--primary)', fontSize: '1.8rem' }}>{(wechatPayment?.credits || Math.max(0, rechargeAmountYuan || 0) * 1000).toLocaleString()} Credits</strong>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>¥1 = 1,000 Credits</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '4px' }}>当前余额 {data.balance.toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: wechatPayment && ['paying', 'paid'].includes(wechatPayment.status) ? '1fr' : '1fr 1fr', gap: '24px', alignItems: 'start' }}>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--text-main)' }}>微信支付充值</h3>
                     {!wechatPayment || !['paying', 'paid'].includes(wechatPayment.status) ? <div style={{ display: 'grid', gap: '14px' }}>
@@ -1907,7 +2060,7 @@ export default function DashboardClient() {
                       <label style={{ display: 'grid', gap: '7px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>自定义金额（人民币）<input type="number" min="1" max="10000" step="1" value={rechargeAmountYuan} onChange={(event) => setRechargeAmountYuan(Number(event.target.value))} style={{ padding: '13px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: '1rem' }} /></label>
                       <button type="button" onClick={handleWechatRecharge} disabled={wechatPaymentLoading} className="btn btn-primary" style={{ justifyContent: 'center', padding: '13px' }}>{wechatPaymentLoading ? <><Loader2 size={16} className="spin-anim" /> 正在创建订单…</> : '微信扫码支付'}</button>
                     </div> : <div style={{ textAlign: 'center', padding: '18px', border: '1px solid var(--border)', borderRadius: '14px', background: '#f8fafc' }}>
-                      {wechatPayment.status === 'paid' ? <><Check size={42} color="#059669" /><h4 style={{ marginTop: '8px', color: '#059669' }}>{wechatPayment.purpose === 'subscription' ? '会员已开通' : '充值成功'}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)' }}>{wechatPayment.credits?.toLocaleString()} Credits 已到账</p><button type="button" className="btn btn-outline" style={{ marginTop: '14px' }} onClick={() => setWechatPayment(null)}>完成</button></> : <><Image src={wechatPayment.qrCodeDataUrl} alt="微信支付二维码" width={240} height={240} unoptimized style={{ width: '240px', height: '240px', borderRadius: '10px' }} /><h4 style={{ marginTop: '10px' }}>微信扫码支付 ¥{wechatPayment.amountYuan}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{wechatPayment.purpose === 'subscription' ? '支付完成后会员立即生效，无需手动刷新' : '支付完成后将自动到账，无需手动刷新'}</p><button type="button" className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => setWechatPayment(null)}>取消本次支付</button></>}
+                      {wechatPayment.status === 'paid' ? <><Check size={42} color="#059669" /><h4 style={{ marginTop: '8px', color: '#059669' }}>{wechatPayment.purpose === 'subscription' ? '会员已开通' : '充值成功'}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)' }}>{wechatPayment.credits?.toLocaleString()} Credits 已到账</p><button type="button" className="btn btn-outline" style={{ marginTop: '14px' }} onClick={() => void handlePaymentComplete()}>完成</button></> : <><Image src={wechatPayment.qrCodeDataUrl} alt="微信支付二维码" width={240} height={240} unoptimized style={{ width: '240px', height: '240px', borderRadius: '10px' }} /><h4 style={{ marginTop: '10px' }}>微信扫码支付 ¥{wechatPayment.amountYuan}</h4><p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{wechatPayment.purpose === 'subscription' ? '支付完成后会员立即生效，无需手动刷新' : '支付完成后将自动到账，无需手动刷新'}</p><button type="button" className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => setWechatPayment(null)}>取消本次支付</button></>}
                     </div>}
                   </div>
 
@@ -1939,6 +2092,7 @@ export default function DashboardClient() {
                     <p>2. 卡密一经兑换即刻生效，不设有效期。</p>
                     <p>3. 如需大客户专属私有化模型接入方案，请联系官方支持团队。</p>
                   </div>
+                  </>}
                 </div>
               )}
 

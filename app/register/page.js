@@ -1,12 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import BrandMark from '@/app/components/BrandMark';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useI18n } from '../i18n/I18nProvider';
 
+// useSearchParams 会让这棵子树进入 Suspense 边界，所以外面套一层。
+// 用它而不是在 effect 里读 window.location：邀请码在首帧就该定下来，
+// 走 effect 既多一次渲染，服务端与客户端的首帧也会对不上。
 export default function RegisterPage() {
+  return <Suspense fallback={null}><RegisterForm /></Suspense>;
+}
+
+function RegisterForm() {
+  const inviteCode = (useSearchParams().get('invite') || '').trim().toUpperCase();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -69,7 +77,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, code: emailCode })
+        body: JSON.stringify({ email, password, code: emailCode, inviteCode })
       });
       const data = await res.json();
       
@@ -94,6 +102,12 @@ export default function RegisterPage() {
             <BrandMark size={26} /> OfficeGPT
           </div>
           <p style={{ color: 'var(--text-muted)' }}>{t('auth.registerIntro')}</p>
+          {/* 带邀请码进来的人要能看见它生效了，否则填了半天不知道算不算数 */}
+          {inviteCode && (
+            <p style={{ margin: '10px 0 0', padding: '7px 12px', display: 'inline-block', borderRadius: '999px', background: 'var(--primary-light)', color: 'var(--primary)', fontSize: '0.82rem', fontWeight: 600 }}>
+              已使用邀请码 {inviteCode}，绑定手机号后额外获得奖励
+            </p>
+          )}
         </div>
 
         {error && <div style={{ padding: '12px', background: '#fee2e2', color: '#ef4444', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '0.9rem' }}>{error}</div>}

@@ -18,7 +18,6 @@ export async function GET() {
   const { periods } = normalizePlanSettings(planSettings);
   const plans = listPlans(planSettings).map((plan) => ({
     ...plan,
-    discountRate: pricing.discountRates[plan.membershipLevel] ?? 1,
     quotes: periods.map((period) => quotePlan(planSettings, plan.id, period.months)).filter(Boolean),
   }));
   return NextResponse.json({ success: true, plans, periods, creditsPerCny: pricing.creditsPerCny });

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { consumePhoneCode, consumeRateLimit, normalizePhone, requestIp } from '@/lib/auth-security';
+import { grantReferralRewards } from '@/lib/referral-service';
 import BillingRecord from '@/models/BillingRecord';
 import User from '@/models/User';
 
@@ -69,9 +70,20 @@ export async function POST(request) {
     }
   }
 
+  // 邀请奖励也押在这一步：手机号是这套体系里唯一有真实成本的身份。
+  // 发失败不该把已经成功的绑定回滚掉，记日志即可，后台可以补发。
+  let referral = { granted: false };
+  try {
+    referral = await grantReferralRewards(user._id);
+  } catch (error) {
+    console.error('[referral] 奖励发放失败', error);
+  }
+  if (referral.granted) user = await User.findById(user._id);
+
   return NextResponse.json({
     success: true,
     granted,
+    referralGranted: referral.granted ? referral.inviteeGranted : 0,
     user: { phone: user.phone, phoneVerified: true, balance: user.balance },
   });
 }
