@@ -1,24 +1,47 @@
 .page {
+  position: relative;
   min-height: 100vh;
+  margin-top: -76px;
   display: grid;
   place-items: center;
-  padding: 32px;
+  overflow: hidden;
+  padding: 118px 28px 42px;
   background:
-    radial-gradient(circle at 18% 14%, rgba(16, 185, 129, 0.10), transparent 30%),
-    radial-gradient(circle at 84% 82%, rgba(59, 130, 246, 0.08), transparent 32%),
-    #f7faf9;
+    linear-gradient(135deg, #07111f 0%, #0b1728 48%, #0d2430 100%);
 }
+
+.grid { position: absolute; inset: 0; opacity: 0.2; background-image: linear-gradient(rgba(148,163,184,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.12) 1px, transparent 1px); background-size: 54px 54px; mask-image: linear-gradient(to bottom, black, transparent 88%); }
+.glowOne, .glowTwo { position: absolute; border-radius: 999px; filter: blur(2px); pointer-events: none; }
+.glowOne { width: 620px; height: 620px; left: -260px; top: -280px; background: radial-gradient(circle, rgba(16,185,129,.24), transparent 67%); }
+.glowTwo { width: 560px; height: 560px; right: -220px; bottom: -290px; background: radial-gradient(circle, rgba(56,189,248,.16), transparent 68%); }
+
+.shell { position: relative; z-index: 1; width: min(1060px, 100%); min-height: 620px; display: grid; grid-template-columns: minmax(0, 1fr) 500px; overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 30px; background: rgba(255,255,255,.06); box-shadow: 0 34px 100px rgba(0,0,0,.38); backdrop-filter: blur(20px); }
+.visual { position: relative; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; padding: 64px 58px 38px; overflow: hidden; color: white; background: linear-gradient(150deg, rgba(16,185,129,.11), transparent 50%); }
+.visual::after { content: ''; position: absolute; width: 360px; height: 360px; right: -180px; top: -140px; border: 1px solid rgba(110,231,183,.18); border-radius: 50%; box-shadow: 0 0 0 54px rgba(110,231,183,.025), 0 0 0 108px rgba(110,231,183,.02); }
+.visualContent { position: relative; z-index: 1; }
+.eyebrow { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid rgba(110,231,183,.24); border-radius: 999px; color: #a7f3d0; background: rgba(16,185,129,.08); font-size: .76rem; font-weight: 700; }
+.visual h1 { margin: 24px 0 18px; font-size: clamp(2.25rem, 4vw, 3.35rem); line-height: 1.13; letter-spacing: -.045em; }
+.visual h1 span { color: #5ee6bd; }
+.visualContent > p { max-width: 450px; margin: 0; color: #aebbd0; font-size: .98rem; line-height: 1.8; }
+.fileStack { display: grid; gap: 10px; max-width: 390px; margin-top: 48px; }
+.fileCard { display: flex; align-items: center; gap: 13px; padding: 13px 15px; border: 1px solid rgba(255,255,255,.1); border-radius: 14px; background: rgba(255,255,255,.07); box-shadow: 0 8px 24px rgba(0,0,0,.14); backdrop-filter: blur(10px); }
+.fileCard > span { display: grid; gap: 2px; min-width: 0; }
+.fileCard b { color: #eef5ff; font-size: .84rem; }
+.fileCard small { color: #8190a8; font-size: .71rem; }
+.fileCard svg { flex: 0 0 auto; }
+.excel { color: #34d399; }
+.ppt { width: 92%; margin-left: 28px; color: #fb923c; }
+.word { width: 84%; margin-left: 10px; color: #60a5fa; }
+.visualFoot { position: relative; z-index: 1; margin: 32px 0 0; color: #64748b; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 
 .card {
-  width: min(520px, 100%);
-  overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.98);
 }
 
-.formPanel { padding: 58px 64px 46px; }
+.formPanel { width: 100%; padding: 54px 56px 44px; }
 
 .brand { margin-bottom: 34px; }
 .brand p { margin: 10px 0 0; color: #64748b; font-size: 1rem; }
@@ -26,23 +49,68 @@
 .logo span { color: #10b981; }
 
 .error { margin-bottom: 20px; padding: 13px 15px; border: 1px solid #fecaca; border-radius: 12px; color: #dc2626; background: #fef2f2; font-size: 0.9rem; line-height: 1.5; }
+.loginTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 22px; border-radius: 13px; background: #f1f5f9; }
+.loginTabs button { min-height: 38px; border: 0; border-radius: 10px; background: transparent; color: #64748b; font-weight: 650; cursor: pointer; }
+.loginTabs .activeTab { background: white; color: #0f172a; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); }
 .form { display: grid; gap: 20px; }
 .form label { display: grid; gap: 9px; color: #1e293b; font-size: 0.92rem; font-weight: 600; }
 .form input { min-height: 50px; }
+.captchaRow,
+.codeRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.captcha {
+  width: 132px;
+  height: 50px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+}
+.captcha img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.sendCode {
+  min-width: 112px;
+  padding: 0 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 650;
+  cursor: pointer;
+}
+.sendCode:disabled { cursor: not-allowed; opacity: 0.58; }
 .loginButton { width: 100%; min-height: 50px; margin-top: 4px; justify-content: center; border-radius: 14px; font-size: 1rem; }
-.register { margin: 28px 0 0; color: #64748b; font-size: 0.88rem; line-height: 1.6; }
-.register a { color: #059669; font-weight: 650; text-decoration: none; }
-.forgot { margin: 14px 0 0; text-align: right; font-size: 0.84rem; }
-.forgot a { color: #64748b; text-decoration: none; }
-.forgot a:hover { color: #059669; }
+.agreementCheck { display: flex; align-items: flex-start; gap: 9px; margin-top: 22px; color: #64748b; font-size: .8rem; line-height: 1.6; cursor: pointer; }
+.agreementCheck input { width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; flex: 0 0 auto; accent-color: #10b981; }
+.agreementCheck a { color: #059669; font-weight: 600; text-decoration: none; }
+.agreement { margin: 24px 0 0; color: #94a3b8; font-size: 0.8rem; line-height: 1.7; text-align: center; }
+.agreementCheck + .agreement { margin-top: 9px; }
+.agreement a { color: #64748b; text-decoration: none; }
+.agreement a:hover { color: #059669; }
+.modalLayer { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; }
+.modalBackdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(2, 8, 23, .68); backdrop-filter: blur(6px); cursor: default; }
+.agreementModal { position: relative; z-index: 1; width: min(420px, 100%); padding: 30px; border: 1px solid rgba(255,255,255,.14); border-radius: 22px; background: #fff; box-shadow: 0 28px 90px rgba(0,0,0,.34); }
+.modalIcon { width: 44px; height: 44px; display: grid; place-items: center; margin-bottom: 17px; border-radius: 13px; color: #047857; background: #d1fae5; }
+.agreementModal h2 { margin: 0 0 10px; color: #0f172a; font-size: 1.2rem; }
+.agreementModal p { margin: 0; color: #64748b; font-size: .88rem; line-height: 1.75; }
+.modalLinks { display: flex; gap: 18px; margin-top: 14px; }
+.modalLinks a { color: #059669; font-size: .82rem; font-weight: 650; text-decoration: none; }
+.modalActions { display: grid; grid-template-columns: 1fr 1.35fr; gap: 10px; margin-top: 25px; }
+.modalActions > button { min-height: 44px; justify-content: center; }
+.cancelButton { border: 1px solid #e2e8f0; border-radius: 11px; color: #64748b; background: white; font-weight: 600; cursor: pointer; }
 
 @media (max-width: 760px) {
-  .page { align-items: start; padding: 18px; }
-  .card { border-radius: 22px; }
+  .page { align-items: start; min-height: 100vh; margin-top: -64px; padding: 84px 14px 20px; background: linear-gradient(160deg, #07111f, #0b2630); }
+  .shell { display: block; min-height: 0; border-radius: 24px; background: white; }
+  .visual { display: none; }
+  .card { border-radius: 24px; }
   .formPanel { padding: 38px 28px 34px; }
+  .captchaRow { grid-template-columns: minmax(0, 1fr) 112px; }
+  .captcha { width: 112px; }
 }
 
 @media (max-width: 380px) {
   .page { padding: 0; }
-  .card { border-radius: 0; }
+  .shell, .card { border-radius: 0; }
 }

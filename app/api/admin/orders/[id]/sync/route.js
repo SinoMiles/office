@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import { fulfillPaymentOrder } from '@/lib/billing/payment-service';
 import { syncRefund } from '@/lib/billing/refund-service';
@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 // 人工对账入口：以微信侧状态为准，把本地订单和退款单拉齐。
 // 回调丢失、用户报「付了钱没到账」时用这个补救。
 export async function POST(_request, { params }) {
-  const admin = await getCurrentUser();
+  const admin = await getCurrentAdmin();
   if (!admin || admin.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   const { id } = await params;
   await connectToDatabase();

@@ -10,6 +10,7 @@ const TABS = [
   ['wechatPay', '微信支付'],
   ['referral', '邀请奖励'],
   ['recharge', '充值码'],
+  ['runtime', '版本升级'],
 ];
 
 const headingStyle = { fontSize: '1.3rem', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '16px', fontWeight: 700 };
@@ -27,6 +28,9 @@ export default function AdminSettingsPage() {
   const [rechargeValidDays, setRechargeValidDays] = useState(365);
   const [generatedRechargeCode, setGeneratedRechargeCode] = useState('');
   const [wechatPayStatus, setWechatPayStatus] = useState({ configured: false, missing: [] });
+  const [runtimeStatus, setRuntimeStatus] = useState(null);
+  const [runtimeLoading, setRuntimeLoading] = useState(false);
+  const [runtimeRefresh, setRuntimeRefresh] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -55,6 +59,50 @@ export default function AdminSettingsPage() {
     };
     void load();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'runtime') return undefined;
+    let cancelled = false;
+    let pollTimer;
+    const loadRuntime = async () => {
+      setRuntimeLoading(true);
+      try {
+        const response = await fetch('/api/admin/runtime/officecli', { cache: 'no-store' });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.error || '版本检测失败');
+        if (cancelled) return;
+        setRuntimeStatus(payload.runtime);
+        if (payload.runtime.updating || payload.runtime.lastCheck?.state === 'running') {
+          pollTimer = setTimeout(loadRuntime, 2500);
+        }
+      } catch (error) {
+        if (!cancelled) toast.error(error.message || '版本检测失败');
+      } finally {
+        if (!cancelled) setRuntimeLoading(false);
+      }
+    };
+    void loadRuntime();
+    return () => {
+      cancelled = true;
+      clearTimeout(pollTimer);
+    };
+  }, [activeTab, runtimeRefresh]);
+
+  async function upgradeRuntime() {
+    setRuntimeLoading(true);
+    try {
+      const response = await fetch('/api/admin/runtime/officecli', { method: 'POST' });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error || '升级任务启动失败');
+      toast.success(payload.alreadyRunning ? '升级任务正在执行' : '升级任务已启动，完成后会自动切换');
+      setRuntimeStatus((current) => current ? { ...current, updating: true } : current);
+      setRuntimeRefresh((value) => value + 1);
+    } catch (error) {
+      toast.error(error.message || '升级任务启动失败');
+    } finally {
+      setRuntimeLoading(false);
+    }
+  }
 
   async function saveSetting(key) {
     setSavingKey(key);
@@ -183,7 +231,7 @@ export default function AdminSettingsPage() {
           <div style={{ padding: '13px 16px', marginBottom: '18px', border: '1px solid #bfdbfe', borderRadius: '12px', background: '#f0f7ff' }}>
             <div style={{ color: '#1d4ed8', fontWeight: 750 }}>奖励在被邀请人绑定手机号时才发放</div>
             <div style={{ marginTop: '3px', color: '#4b6b96', fontSize: '.78rem', lineHeight: 1.65 }}>
-              注册只需要一个邮箱，成本近乎为零。把奖励押在手机号上，刷邀请就得为每个小号准备一张真实的手机卡。
+              新用户通过手机号验证后才能获得奖励，一个手机号只能绑定一个账号，可有效控制批量注册风险。
             </div>
           </div>
           <div style={{ display: 'grid', gap: '20px', maxWidth: '680px' }}>
@@ -213,6 +261,64 @@ export default function AdminSettingsPage() {
           </div>
           <button type="button" className="btn btn-outline" onClick={() => void generateRechargeCode()}>生成充值码</button>
           {generatedRechargeCode ? <div style={{ marginTop: '14px', padding: '14px', border: '1px dashed var(--primary)', borderRadius: '10px', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}><code style={{ wordBreak: 'break-all', fontWeight: 700 }}>{generatedRechargeCode}</code><button type="button" className="btn btn-outline" onClick={() => { void navigator.clipboard.writeText(generatedRechargeCode); toast.success('已复制'); }}>复制</button></div> : null}
+        </section>
+      )}
+
+      {activeTab === 'runtime' && (
+        <section className="premium-stat-card">
+          <h2 style={headingStyle}><span style={{ color: 'var(--primary)', marginRight: '8px' }}>✦</span>OfficeGPT 工具运行时</h2>
+          {!runtimeStatus ? (
+            <div style={{ color: 'var(--text-muted)', padding: '20px 0' }}>{runtimeLoading ? '正在检测版本...' : '暂时无法读取版本信息'}</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                {[
+                  ['当前版本', runtimeStatus.activeVersion || '未安装'],
+                  ['最新版本', runtimeStatus.latestVersion || '检测失败'],
+                  ['运行方式', runtimeStatus.source === 'managed' ? '自动更新版本' : '项目内置版本'],
+                  ['更新状态', runtimeStatus.updating ? '正在升级' : runtimeStatus.updateAvailable ? '发现新版本' : '已是最新版'],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ padding: '18px', border: '1px solid var(--border)', borderRadius: '13px', background: 'var(--surface)' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '.78rem', marginBottom: '8px' }}>{label}</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 750, color: label === '更新状态' && runtimeStatus.updateAvailable ? '#b45309' : 'var(--text-main)' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ padding: '16px 18px', borderRadius: '13px', background: '#f8fafc', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '.84rem', lineHeight: 1.8 }}>
+                {runtimeStatus.updating ? (
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '7px', color: 'var(--text-main)', fontWeight: 700 }}>
+                      <span>{runtimeStatus.lastCheck?.phase || '正在升级'}</span>
+                      <span>{Math.max(0, Math.min(100, Number(runtimeStatus.lastCheck?.percent || 0)))}%</span>
+                    </div>
+                    <div style={{ height: '8px', overflow: 'hidden', borderRadius: '999px', background: '#e2e8f0' }}>
+                      <div style={{ height: '100%', width: `${Math.max(2, Math.min(100, Number(runtimeStatus.lastCheck?.percent || 0)))}%`, borderRadius: 'inherit', background: 'var(--primary)', transition: 'width .3s ease' }} />
+                    </div>
+                    {runtimeStatus.lastCheck?.download?.total ? (
+                      <div style={{ marginTop: '6px', fontSize: '.76rem' }}>
+                        已下载 {(runtimeStatus.lastCheck.download.received / 1024 / 1024).toFixed(1)} / {(runtimeStatus.lastCheck.download.total / 1024 / 1024).toFixed(1)} MB
+                        {runtimeStatus.lastCheck.download.bytesPerSecond ? ` · ${(runtimeStatus.lastCheck.download.bytesPerSecond / 1024).toFixed(0)} KB/s` : ''}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div><b style={{ color: 'var(--text-main)' }}>自动更新：</b>{runtimeStatus.automatic.enabled ? '已启用' : '已关闭'}，每 {runtimeStatus.automatic.intervalHours} 小时检查一次，新版本发布满 {runtimeStatus.automatic.minimumReleaseAgeHours} 小时后才会安装。</div>
+                <div><b style={{ color: 'var(--text-main)' }}>上次检查：</b>{runtimeStatus.lastCheck?.checkedAt ? new Date(runtimeStatus.lastCheck.checkedAt).toLocaleString('zh-CN', { hour12: false }) : '暂无记录'}</div>
+                {runtimeStatus.lastCheck?.error ? <div style={{ color: '#b91c1c' }}><b>上次失败：</b>{runtimeStatus.lastCheck.error}</div> : null}
+                {runtimeStatus.checkError ? <div style={{ color: '#b45309' }}><b>在线检测：</b>{runtimeStatus.checkError}</div> : null}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '4px' }}>
+                <button type="button" className="btn btn-outline" disabled={runtimeLoading || runtimeStatus.updating} onClick={() => setRuntimeRefresh((value) => value + 1)}>
+                  {runtimeLoading && !runtimeStatus.updating ? '检测中...' : '检查更新'}
+                </button>
+                <button type="button" className="btn btn-primary" disabled={runtimeLoading || runtimeStatus.updating || (!runtimeStatus.updateAvailable && runtimeStatus.source === 'managed')} onClick={() => void upgradeRuntime()}>
+                  {runtimeStatus.updating ? '升级中...' : runtimeStatus.source !== 'managed' ? '启用自动更新版本' : '立即升级'}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
     </div>

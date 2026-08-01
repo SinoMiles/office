@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import PaymentOrder from '@/models/PaymentOrder';
 import RefundRecord from '@/models/RefundRecord';
@@ -12,7 +12,7 @@ function positiveInteger(value, fallback) {
 }
 
 export async function GET(request) {
-  const admin = await getCurrentUser();
+  const admin = await getCurrentAdmin();
   if (!admin || admin.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   await connectToDatabase();
 
@@ -31,7 +31,7 @@ export async function GET(request) {
   };
 
   const [orders, total, stats] = await Promise.all([
-    PaymentOrder.find(query).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).populate('userId', 'email membershipLevel').lean(),
+    PaymentOrder.find(query).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).populate('userId', 'phone membershipLevel').lean(),
     PaymentOrder.countDocuments(query),
     PaymentOrder.aggregate([
       { $match: { status: { $in: ['paid', 'partial_refunded', 'refunded'] } } },
@@ -70,7 +70,7 @@ export async function GET(request) {
       refundedYuan: (order.refundedFen || 0) / 100,
       refundableYuan: (order.amountFen - (order.refundedFen || 0)) / 100,
       credits: order.credits,
-      user: order.userId ? { id: String(order.userId._id), email: order.userId.email, membershipLevel: order.userId.membershipLevel } : null,
+      user: order.userId ? { id: String(order.userId._id), phone: order.userId.phone, membershipLevel: order.userId.membershipLevel } : null,
       createdAt: order.createdAt,
       paidAt: order.paidAt,
       errorMessage: order.errorMessage,

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
+import { normalizePhone } from '@/lib/phone';
 
 export async function PUT(req, { params }) {
   try {
-    const admin = await getCurrentUser();
+    const admin = await getCurrentAdmin();
     if (!admin || admin.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
@@ -13,9 +14,8 @@ export async function PUT(req, { params }) {
     const { id } = await params;
     const updateData = await req.json();
 
-    if (!updateData.email) {
-      return NextResponse.json({ error: '邮箱是必填项' }, { status: 400 });
-    }
+    const phone = normalizePhone(updateData.phone);
+    if (!phone) return NextResponse.json({ error: '请输入正确的手机号' }, { status: 400 });
     if (updateData.membershipLevel && !['FREE', 'PRO'].includes(updateData.membershipLevel)) {
       return NextResponse.json({ error: '会员等级只支持 FREE 或 PRO' }, { status: 400 });
     }
@@ -26,20 +26,21 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: '未找到该用户' }, { status: 404 });
     }
 
-    // Check email uniqueness if changing email
-    if (user.email !== updateData.email) {
-      const existing = await User.findOne({ email: updateData.email });
+    if (user.phone !== phone) {
+      const existing = await User.findOne({ phone });
       if (existing) {
-        return NextResponse.json({ error: '该邮箱已被其他账号使用' }, { status: 400 });
+        return NextResponse.json({ error: '该手机号已被其他账号使用' }, { status: 400 });
       }
     }
 
-    user.email = updateData.email;
-    if (updateData.role) user.role = updateData.role;
+    user.phone = phone;
+    user.email = `phone-${phone}@account.officegpt.invalid`;
+    user.phoneVerifiedAt ||= new Date();
     if (updateData.membershipLevel) user.membershipLevel = updateData.membershipLevel;
     if (updateData.balance !== undefined) user.balance = updateData.balance;
     if (updateData.password) {
       user.password = updateData.password; // pre-save hook handles hashing
+      user.phonePasswordEnabledAt = new Date();
     }
 
     await user.save();
@@ -52,7 +53,7 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const admin = await getCurrentUser();
+    const admin = await getCurrentAdmin();
     if (!admin || admin.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }

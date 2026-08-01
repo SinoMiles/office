@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import Task from '@/models/Task';
+import { aioncoreHeaders } from '@/lib/aioncore/bridge-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ async function proxy(request, context) {
   const headers = new Headers(request.headers);
   headers.delete('host');
   headers.delete('cookie');
+  headers.set('Authorization', aioncoreHeaders(String(user._id)).get('Authorization'));
   const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer();
   const response = await fetch(target, { method: request.method, headers, body, redirect: 'manual' });
   const responseHeaders = new Headers(response.headers);

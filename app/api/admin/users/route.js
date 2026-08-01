@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
+import { normalizePhone } from '@/lib/phone';
+import { randomBytes } from 'node:crypto';
 
 export async function GET() {
   try {
-    const admin = await getCurrentUser();
+    const admin = await getCurrentAdmin();
     if (!admin || admin.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     await connectToDatabase();
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    const users = await User.find({ role: 'user' }).select('-password -email').sort({ createdAt: -1 });
     
     return NextResponse.json({ success: true, users });
   } catch (error) {
@@ -20,15 +22,16 @@ export async function GET() {
 }
 export async function POST(req) {
   try {
-    const admin = await getCurrentUser();
+    const admin = await getCurrentAdmin();
     if (!admin || admin.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { email, password, role, membershipLevel, balance } = await req.json();
+    const { phone: rawPhone, password, membershipLevel, balance } = await req.json();
+    const phone = normalizePhone(rawPhone);
 
-    if (!email || !password) {
-      return NextResponse.json({ error: '邮箱和密码是必填项' }, { status: 400 });
+    if (!phone) {
+      return NextResponse.json({ error: '请输入正确的手机号' }, { status: 400 });
     }
     if (membershipLevel && !['FREE', 'PRO'].includes(membershipLevel)) {
       return NextResponse.json({ error: '会员等级只支持 FREE 或 PRO' }, { status: 400 });
@@ -36,15 +39,19 @@ export async function POST(req) {
 
     await connectToDatabase();
     
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ phone });
     if (existingUser) {
-      return NextResponse.json({ error: '该邮箱已被注册' }, { status: 400 });
+      return NextResponse.json({ error: '该手机号已被注册' }, { status: 400 });
     }
 
     const newUser = new User({
-      email,
-      password, // User.pre('save') will hash this
-      role: role || 'user',
+      email: `phone-${phone}@account.officegpt.invalid`,
+      phone,
+      phoneVerifiedAt: new Date(),
+      phoneSignupAt: new Date(),
+      password: password || randomBytes(24).toString('base64url'),
+      ...(password ? { phonePasswordEnabledAt: new Date() } : {}),
+      role: 'user',
       membershipLevel: membershipLevel || 'FREE',
       balance: balance || 0
     });

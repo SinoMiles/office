@@ -5,6 +5,7 @@
   "aioncoreVersion": "v0.1.52",
   "scripts": {
     "prepare:aioncore": "node scripts/prepare-aioncore.mjs",
+    "update:officecli": "node scripts/update-officecli.mjs",
     "infra:up": "docker compose up -d mongo gotenberg",
     "infra:down": "docker compose stop mongo gotenberg",
     "dev": "node scripts/run-server.mjs development",

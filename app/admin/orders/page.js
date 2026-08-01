@@ -181,7 +181,7 @@ export default function AdminOrdersPage() {
                     {order.errorMessage && <div style={{ color: '#ef4444', fontSize: '0.72rem', marginTop: '3px' }}>{order.errorMessage}</div>}
                   </td>
                   <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
-                    <div>{order.user?.email || '—'}</div>
+                    <div>{order.user?.phone || '—'}</div>
                     {order.user && <span className={`badge badge-${order.user.membershipLevel?.toLowerCase() || 'free'}`}>{order.user.membershipLevel}</span>}
                   </td>
                   <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
@@ -248,7 +248,7 @@ export default function AdminOrdersPage() {
             <div style={{ padding: '24px', display: 'grid', gap: '16px' }}>
               <div style={{ background: 'var(--background)', padding: '14px', borderRadius: '10px', fontSize: '0.85rem', lineHeight: 1.8 }}>
                 <div>订单号：<code>{refundDialog.order?.outTradeNo}</code></div>
-                <div>用户：{refundDialog.order?.user?.email}</div>
+                <div>用户：{refundDialog.order?.user?.phone || '—'}</div>
                 <div>可退金额：<b>¥{refundDialog.order?.refundableYuan.toFixed(2)}</b></div>
                 {refundDialog.order?.purpose === 'subscription' && <div style={{ color: '#c2410c' }}>⚠ 全额退款将同时撤销该用户的会员权益</div>}
               </div>

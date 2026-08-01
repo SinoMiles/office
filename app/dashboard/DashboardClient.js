@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { LayoutDashboard, CreditCard, Gift, LogOut, FileSpreadsheet, Activity, Clock, FileText, FileType2, ImageIcon, Sparkles, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Shield, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2 } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Gift, LogOut, FileSpreadsheet, Activity, Clock, FileText, FileType2, ImageIcon, Sparkles, Zap, Plus, MessageSquare, Send, Paperclip, Loader2, Presentation, User, Settings, Crown, ChevronUp, X, Moon, Bell, Bot, FileJson, MoreVertical, Pin, PinOff, Edit2, Trash2, StopCircle, ArrowDown, Check, Copy, FolderOpen, Maximize2, Minimize2, UploadCloud } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TaskProgress from '@/app/components/TaskProgress';
 import Thinking from '@/app/components/Thinking';
@@ -12,11 +12,12 @@ import WorkspaceBrowser from '@/app/components/WorkspaceBrowser';
 import GenericFilePreview from '@/app/components/GenericFilePreview';
 import ChatMarkdown from '@/app/components/ChatMarkdown';
 import { useAioncoreChat } from '@/app/hooks/useAioncoreChat';
-import PhoneBindDialog from '@/app/components/PhoneBindDialog';
 import ReferralCard from '@/app/components/ReferralCard';
+import PhonePasswordForm from '@/app/components/PhonePasswordForm';
 import { attachArtifactsToMessages, taskArtifactViews } from '@/lib/office/artifacts';
 import { useI18n } from '@/app/i18n/I18nProvider';
 import { dashboardCopy, dashboardExtra, dashboardOverviewCopy, dashboardSuggestions } from '@/app/i18n/dashboardCopy';
+import { movedTowardHistory, resolveFollowLatest } from '@/lib/chat/scroll-policy';
 
 function dashboardTabFromPath(pathname) {
   if (pathname?.endsWith('/referral')) return 'referral';
@@ -91,7 +92,6 @@ export default function DashboardClient() {
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState(null); // 'profile' | 'settings' | 'membership' | 'recharge' | null
-  const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
   const [resizingSplit, setResizingSplit] = useState(false);
@@ -117,6 +117,7 @@ export default function DashboardClient() {
   const [selectedPlanId, setSelectedPlanId] = useState('PRO');
   const [selectedPeriodMonths, setSelectedPeriodMonths] = useState(1);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [creditPrompt, setCreditPrompt] = useState(null);
   const activeArtifactId = activeArtifact?.id;
   const activeArtifactUrl = activeArtifact?.previewUrl;
   const activeArtifactGeneric = Boolean(activeArtifact?.generic);
@@ -157,6 +158,7 @@ export default function DashboardClient() {
   const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState([]);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const fileDragDepthRef = useRef(0);
   const [hoveredConversationTurn, setHoveredConversationTurn] = useState(null);
   const [activeConversationTurn, setActiveConversationTurn] = useState(0);
   const [processLoading, setProcessLoading] = useState(false);
@@ -170,6 +172,7 @@ export default function DashboardClient() {
   const promptInputRef = useRef(null);
   const chatScrollRef = useRef(null);
   const followLatestRef = useRef(true);
+  const lastChatScrollTopRef = useRef(0);
   const conversationJumpingRef = useRef(false);
   const previewPanelRef = useRef(null);
   
@@ -537,6 +540,8 @@ export default function DashboardClient() {
 
   const handleChatScroll = useCallback((event) => {
     const element = event.currentTarget;
+    const movedUp = movedTowardHistory(lastChatScrollTopRef.current, element.scrollTop);
+    lastChatScrollTopRef.current = element.scrollTop;
     const viewportTop = element.getBoundingClientRect().top;
     let nearestTurn = 0;
     let nearestDistance = Number.POSITIVE_INFINITY;
@@ -553,12 +558,20 @@ export default function DashboardClient() {
     }
     if (conversationJumpingRef.current) return;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    const nextFollowLatest = followLatestRef.current
-      ? distanceFromBottom < 180
-      : distanceFromBottom < 32;
+    const nextFollowLatest = resolveFollowLatest({
+      following: followLatestRef.current,
+      distanceFromBottom,
+      movedTowardHistory: movedUp,
+    });
     if (nextFollowLatest === followLatestRef.current) return;
     followLatestRef.current = nextFollowLatest;
     setFollowLatest(nextFollowLatest);
+  }, []);
+
+  const pauseFollowLatest = useCallback(() => {
+    if (!followLatestRef.current) return;
+    followLatestRef.current = false;
+    setFollowLatest(false);
   }, []);
 
   const jumpToLatest = useCallback(() => {
@@ -709,21 +722,25 @@ export default function DashboardClient() {
       if (!response.ok || !payload.order) return;
       setWechatPayment((current) => current?.id === wechatPayment.id ? { ...current, ...payload.order } : current);
       if (payload.order.status === 'paid') {
-        toast.success(payload.order.purpose === 'subscription'
-          ? `会员已开通，赠送 ${payload.order.credits.toLocaleString()} Credits 已到账`
-          : `充值成功，已到账 ${payload.order.credits.toLocaleString()} Credits`);
+        const paidPurpose = payload.order.purpose;
+        setWechatPayment(null);
+        setActiveDrawer(null);
         void fetch('/api/user/billing?page=1&pageSize=20').then((billingResponse) => billingResponse.json()).then((billingPayload) => {
           if (!billingPayload.success) return;
           setData({ records: billingPayload.records, balance: billingPayload.balance });
           setBillingPagination(billingPayload.pagination);
+          if (billingPayload.balance > 0) setCreditPrompt(null);
         });
-        if (payload.order.purpose === 'subscription') {
+        if (paidPurpose === 'subscription') {
           void refreshSubscription();
           // 会员等级变了，顶部头像旁的等级徽章需要跟着刷新。
           void fetch('/api/auth/me').then((meResponse) => meResponse.json()).then((mePayload) => {
             if (mePayload?.user) setUser(mePayload.user);
           }).catch(() => undefined);
         }
+        toast.success(paidPurpose === 'subscription'
+          ? `会员已开通，赠送 ${payload.order.credits.toLocaleString()} Credits 已到账`
+          : `充值成功，已到账 ${payload.order.credits.toLocaleString()} Credits`);
       }
     }, 2500);
     return () => window.clearInterval(poll);
@@ -891,15 +908,34 @@ export default function DashboardClient() {
     e.target.value = '';
   };
 
-  const handleFileDrop = (event) => {
+  const hasDraggedFiles = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
+
+  const handleFileDragEnter = (event) => {
+    if (!hasDraggedFiles(event)) return;
     event.preventDefault();
+    fileDragDepthRef.current += 1;
+    setIsDraggingFiles(true);
+  };
+
+  const handleFileDragOver = (event) => {
+    if (!hasDraggedFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setIsDraggingFiles(true);
+  };
+
+  const handleFileDrop = (event) => {
+    if (!hasDraggedFiles(event)) return;
+    event.preventDefault();
+    fileDragDepthRef.current = 0;
     setIsDraggingFiles(false);
     addFiles(event.dataTransfer.files);
   };
 
   const handleDragLeave = (event) => {
-    if (event.currentTarget.contains(event.relatedTarget)) return;
-    setIsDraggingFiles(false);
+    event.preventDefault();
+    fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1);
+    if (fileDragDepthRef.current === 0) setIsDraggingFiles(false);
   };
 
   const startNewChat = () => {
@@ -966,12 +1002,6 @@ export default function DashboardClient() {
   const handleProcess = async () => {
     if (!prompt.trim() || isGenerating) return;
 
-    // 未绑定手机号直接弹绑定框，不必先把文件传上去再被后端退回来
-    if (user && user.phoneVerified === false) {
-      setPhoneDialogOpen(true);
-      return;
-    }
-
     const currentPrompt = prompt;
     const currentFiles = files;
     const parentTaskId = activeTaskId;
@@ -987,6 +1017,8 @@ export default function DashboardClient() {
     setPrompt('');
     setFiles([]);
     generationObservedRef.current = false;
+    followLatestRef.current = true;
+    setFollowLatest(true);
     setProcessLoading(true);
 
     try {
@@ -1009,11 +1041,18 @@ export default function DashboardClient() {
 
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
-        if (resData.code === 'PHONE_REQUIRED') setPhoneDialogOpen(true);
+        if (resData.code === 'PHONE_REQUIRED') {
+          toast.error('请使用手机号验证码重新登录');
+          router.push('/login');
+        }
+        if (response.status === 403 && String(resData.error || '').includes('余额不足')) {
+          setCreditPrompt({ message: resData.error || '当前 Credits 不足，暂时无法执行该任务。' });
+        }
         throw new Error(resData.error || '处理失败');
       }
 
       const resData = await response.json();
+      setCreditPrompt(null);
       
       setActiveTaskId(resData.taskId);
 
@@ -1332,7 +1371,22 @@ export default function DashboardClient() {
           <div ref={splitRowRef} style={{ flex: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden', userSelect: resizingSplit ? 'none' : undefined, cursor: resizingSplit ? 'col-resize' : undefined }}>
 
             {/* Left Column (Chat Area + Input) */}
-            <div style={{ flex: showRightPanel ? `0 0 ${chatWidth}%` : 1, width: showRightPanel ? `${chatWidth}%` : 'auto', minWidth: showRightPanel ? '360px' : 0, maxWidth: showRightPanel ? `${chatWidth}%` : '100%', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: resizingSplit ? 'none' : 'flex-basis 0.25s ease', position: 'relative' }}>
+            <div
+              onDragEnter={handleFileDragEnter}
+              onDragOver={handleFileDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleFileDrop}
+              style={{ flex: showRightPanel ? `0 0 ${chatWidth}%` : 1, width: showRightPanel ? `${chatWidth}%` : 'auto', minWidth: showRightPanel ? '360px' : 0, maxWidth: showRightPanel ? `${chatWidth}%` : '100%', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: resizingSplit ? 'none' : 'flex-basis 0.25s ease', position: 'relative' }}
+            >
+            {isDraggingFiles && (
+              <div aria-hidden="true" style={{ position: 'absolute', inset: '10px', zIndex: 20, display: 'grid', placeItems: 'center', pointerEvents: 'none', border: '2px dashed var(--primary)', borderRadius: '18px', background: 'rgba(236, 253, 245, .9)', boxShadow: '0 16px 50px rgba(16, 185, 129, .16)', backdropFilter: 'blur(4px)' }}>
+                <div style={{ display: 'grid', justifyItems: 'center', gap: '10px', color: 'var(--primary)', textAlign: 'center' }}>
+                  <span style={{ width: '54px', height: '54px', display: 'grid', placeItems: 'center', borderRadius: '16px', background: 'white', boxShadow: '0 8px 24px rgba(16, 185, 129, .16)' }}><UploadCloud size={28} /></span>
+                  <strong style={{ fontSize: '1rem' }}>松开即可添加文件</strong>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>支持 PDF、Office 文件和常见图片，最多 10 个</span>
+                </div>
+              </div>
+            )}
             
             {/* 聊天区与预览区之间的拖拽分隔条。绝对定位贴在聊天列右缘，
                 不占布局位置，往左拖让预览更宽，往右最多拖到一半。 */}
@@ -1354,7 +1408,7 @@ export default function DashboardClient() {
             {/* minHeight:0 不能少—— flex 列容器的子项默认 min-height:auto，
                 会阻止它收缩到内容高度以下，overflowY:auto 因此形同虚设，
                 溢出被推给祖先元素，表现为聊天区外面又套了一层滚动条。 */}
-            <div ref={chatScrollRef} onScroll={handleChatScroll} style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding .2s ease' }}>
+            <div ref={chatScrollRef} onScroll={handleChatScroll} onWheel={(event) => { if (event.deltaY < 0) pauseFollowLatest(); }} style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '32px', transition: 'padding .2s ease' }}>
               {renderMessages.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '0 20px' }}>
                   <Sparkles size={48} color="var(--primary)" style={{ marginBottom: '24px', opacity: 0.8 }} />
@@ -1519,13 +1573,22 @@ export default function DashboardClient() {
 
             {/* Input Area */}
             <div style={{ padding: '24px 0', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              {creditPrompt && (
+                <div role="alert" style={{ marginBottom: '10px', padding: '13px 15px', display: 'flex', alignItems: 'center', gap: '14px', border: '1px solid #fed7aa', borderRadius: '14px', background: 'linear-gradient(135deg, #fff7ed, #fffbeb)', boxShadow: '0 8px 24px rgba(154,52,18,.08)' }}>
+                  <span style={{ width: '34px', height: '34px', flex: '0 0 auto', display: 'grid', placeItems: 'center', borderRadius: '10px', color: '#c2410c', background: '#ffedd5' }}><Zap size={17} /></span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <strong style={{ display: 'block', color: '#9a3412', fontSize: '0.88rem' }}>Credits 不足，任务尚未开始</strong>
+                    <span style={{ display: 'block', marginTop: '2px', color: '#9a5b34', fontSize: '0.76rem', lineHeight: 1.5 }}>{creditPrompt.message}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '7px', flexShrink: 0 }}>
+                    <button type="button" onClick={() => { setWechatPayment(null); setActiveDrawer('membership'); }} style={{ padding: '8px 11px', border: '1px solid #fdba74', borderRadius: '9px', background: 'white', color: '#c2410c', fontSize: '0.78rem', fontWeight: 650, cursor: 'pointer' }}>开通会员</button>
+                    <button type="button" onClick={() => { setWechatPayment(null); setActiveDrawer('recharge'); }} className="btn btn-primary" style={{ padding: '8px 11px', borderRadius: '9px', fontSize: '0.78rem' }}>充值积分</button>
+                  </div>
+                </div>
+              )}
               {activeTaskId && !showRightPanel && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}><button type="button" onClick={() => { setShowRightPanel(true); setSidebarCollapsed(true); setRightPanelMode('workspace'); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: '9px', background: 'white', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}><FolderOpen size={15} /> {copy.workspace}</button></div>}
               
               <div
-                onDragEnter={(event) => { event.preventDefault(); setIsDraggingFiles(true); }}
-                onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setIsDraggingFiles(true); }}
-                onDragLeave={handleDragLeave}
-                onDrop={handleFileDrop}
                 style={{ display: 'flex', flexDirection: 'column', minHeight: files.length ? '132px' : '84px', background: isDraggingFiles ? 'var(--primary-light)' : 'white', border: `1px solid ${isDraggingFiles ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', transition: 'min-height 0.2s, background 0.2s, border-color 0.2s', overflow: 'hidden' }}
               >
                 {files.length > 0 && (
@@ -1875,17 +1938,6 @@ export default function DashboardClient() {
         )}
       </main>
       
-      <PhoneBindDialog
-        open={phoneDialogOpen}
-        onClose={() => setPhoneDialogOpen(false)}
-        onBound={(payload) => {
-          setPhoneDialogOpen(false);
-          setUser((current) => current ? { ...current, phone: payload.user?.phone, phoneVerified: true } : current);
-          toast.success(payload.granted ? `绑定成功，${payload.granted.toLocaleString('zh-CN')} Credits 已到账` : '手机号绑定成功');
-          void fetchData();
-        }}
-      />
-
       {/* 删除确认属于整个工作台，不能放在某个页面的条件渲染内部。 */}
       {deleteConfirmDialog.isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -1900,6 +1952,24 @@ export default function DashboardClient() {
               <button type="button" onClick={() => setDeleteConfirmDialog({ isOpen: false, taskId: null })} style={{ padding: '10px 18px', borderRadius: '9px', border: '1px solid var(--border)', background: 'white', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>{copy.cancel}</button>
               <button type="button" onClick={executeDeleteTask} style={{ padding: '10px 18px', borderRadius: '9px', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{copy.confirmDelete}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {wechatPayment?.purpose === 'subscription' && wechatPayment.status === 'paying' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 11000, display: 'grid', placeItems: 'center', padding: '20px' }}>
+          <button type="button" aria-label="关闭会员支付" onClick={() => setWechatPayment(null)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0, background: 'rgba(2,8,23,.62)', backdropFilter: 'blur(7px)' }} />
+          <div role="dialog" aria-modal="true" aria-label="会员订阅微信支付" style={{ position: 'relative', zIndex: 1, width: '390px', maxWidth: '100%', padding: '28px', borderRadius: '22px', background: 'white', boxShadow: '0 30px 90px rgba(0,0,0,.34)', textAlign: 'center' }}>
+            <button type="button" onClick={() => setWechatPayment(null)} aria-label="关闭" style={{ position: 'absolute', top: '13px', right: '13px', width: '32px', height: '32px', display: 'grid', placeItems: 'center', border: 0, borderRadius: '9px', background: '#f8fafc', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={17} /></button>
+            <span style={{ width: '44px', height: '44px', margin: '0 auto 12px', display: 'grid', placeItems: 'center', borderRadius: '13px', color: '#047857', background: '#d1fae5' }}><Crown size={22} /></span>
+            <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.18rem' }}>微信扫码开通专业版</h3>
+            <p style={{ margin: '7px 0 17px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>请使用微信扫描二维码完成支付</p>
+            <div style={{ width: '252px', height: '252px', margin: '0 auto', padding: '6px', border: '1px solid var(--border)', borderRadius: '16px', background: 'white', boxShadow: '0 10px 28px rgba(15,23,42,.08)' }}>
+              <Image src={wechatPayment.qrCodeDataUrl} alt="会员订阅微信支付二维码" width={240} height={240} unoptimized style={{ display: 'block', width: '240px', height: '240px', borderRadius: '10px' }} />
+            </div>
+            <div style={{ marginTop: '17px', color: 'var(--text-main)' }}>支付金额 <strong style={{ color: 'var(--primary)', fontSize: '1.3rem' }}>¥{wechatPayment.amountYuan}</strong></div>
+            <p style={{ margin: '7px 0 0', color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.6 }}>支付成功后将自动关闭窗口、刷新会员状态并发放赠送 Credits</p>
+            <button type="button" className="btn btn-outline" onClick={() => setWechatPayment(null)} style={{ width: '100%', marginTop: '18px', justifyContent: 'center' }}>取消支付</button>
           </div>
         </div>
       )}
@@ -2024,21 +2094,6 @@ export default function DashboardClient() {
                       );
                     })()}
                   </div>
-                  {wechatPayment?.purpose === 'subscription' && ['paying', 'paid'].includes(wechatPayment.status) && (
-                    <div style={{ textAlign: 'center', padding: '22px', border: '1px solid var(--border)', borderRadius: '14px', background: '#f8fafc' }}>
-                      {wechatPayment.status === 'paid' ? <>
-                        <Check size={44} color="#059669" />
-                        <h4 style={{ marginTop: '8px', color: '#059669', fontSize: '1.1rem' }}>会员已开通</h4>
-                        <p style={{ marginTop: '6px', color: 'var(--text-muted)' }}>{wechatPayment.credits?.toLocaleString()} Credits 已到账</p>
-                        <button type="button" className="btn btn-outline" style={{ marginTop: '14px' }} onClick={() => void handlePaymentComplete()}>完成</button>
-                      </> : <>
-                        <Image src={wechatPayment.qrCodeDataUrl} alt="会员订阅微信支付二维码" width={240} height={240} unoptimized style={{ width: '240px', height: '240px', borderRadius: '10px' }} />
-                        <h4 style={{ marginTop: '10px' }}>微信扫码支付 ¥{wechatPayment.amountYuan}</h4>
-                        <p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>支付完成后会员将立即生效，无需手动刷新</p>
-                        <button type="button" className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => setWechatPayment(null)}>取消本次支付</button>
-                      </>}
-                    </div>
-                  )}
                   </>}
 
                   {activeDrawer === 'recharge' && <>
@@ -2104,34 +2159,11 @@ export default function DashboardClient() {
                       {user?.username?.[0]?.toUpperCase() || 'U'}
                     </div>
                     <h3 style={{ fontSize: '1.4rem', fontWeight: 600, marginBottom: '4px' }}>{user?.username || copy.user}</h3>
-                    <p style={{ color: 'var(--text-muted)' }}>{user?.email || 'user@example.com'}</p>
+                    <p style={{ color: 'var(--text-muted)' }}>{user?.phone || '手机号用户'}</p>
                   </div>
 
-                  <div>
-                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' }}>{copy.accountAccess}</h4>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--background)', borderRadius: 'var(--radius-md)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Shield size={20} color={user?.role === 'admin' ? '#ef4444' : 'var(--primary)'} />
-                        <span style={{ fontWeight: 500 }}>{copy.role}</span>
-                      </div>
-                      <span style={{ background: user?.role === 'admin' ? '#fee2e2' : 'var(--primary-light)', color: user?.role === 'admin' ? '#ef4444' : 'var(--primary)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600 }}>
-                        {user?.role === 'admin' ? copy.admin : copy.member}
-                      </span>
-                    </div>
-                  </div>
+                  <PhonePasswordForm />
 
-                  {user?.role === 'admin' && (
-                    <div style={{ marginTop: '12px' }}>
-                      <button 
-                        onClick={() => router.push('/admin')}
-                        style={{ width: '100%', padding: '14px', background: 'white', border: '1px solid #ef4444', color: '#ef4444', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-                        onMouseOver={e => e.currentTarget.style.background = '#fee2e2'}
-                        onMouseOut={e => e.currentTarget.style.background = 'white'}
-                      >
-                        进入后台管理系统
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
 

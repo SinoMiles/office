@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
 import BillingRecord from '@/models/BillingRecord';
 
 export async function POST(req) {
   try {
-    const admin = await getCurrentUser();
+    const admin = await getCurrentAdmin();
     if (!admin || admin.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }

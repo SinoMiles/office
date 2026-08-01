@@ -140,6 +140,10 @@ export function useAioncoreChat() {
     clientRef.current = client;
     const subscriptions = [
       client.on('realtime.connected', () => applyRuntimeEvent('realtime.connected', {})),
+      client.on('realtime.error', (payload) => {
+        chatWarn('generation', 'realtime generation failed', payload);
+        applyRuntimeEvent('realtime.error', payload);
+      }),
       client.on('realtime.disconnected', (payload) => {
         applyRuntimeEvent('realtime.disconnected', payload);
       }),

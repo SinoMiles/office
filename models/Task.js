@@ -14,6 +14,7 @@ const AttachmentSchema = new mongoose.Schema({
   filePath: { type: String, required: true },
   size: { type: Number, default: 0 },
   mimeType: { type: String },
+  uploadedMtimeMs: { type: Number },
 }, { _id: false });
 
 const TaskSchema = new mongoose.Schema({

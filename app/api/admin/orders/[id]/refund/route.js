@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import { createRefund } from '@/lib/billing/refund-service';
 import PaymentOrder from '@/models/PaymentOrder';
@@ -7,7 +7,7 @@ import PaymentOrder from '@/models/PaymentOrder';
 export const runtime = 'nodejs';
 
 export async function POST(request, { params }) {
-  const admin = await getCurrentUser();
+  const admin = await getCurrentAdmin();
   if (!admin || admin.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   const { id } = await params;
   const { amountYuan, reason } = await request.json().catch(() => ({}));

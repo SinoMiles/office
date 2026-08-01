@@ -16,11 +16,14 @@ export default function TopNav({ isLoggedIn }) {
   const [scrolled, setScrolled] = useState(false);
   const { locale, t } = useI18n();
   const homePath = localizedPath(locale, '/');
+  const toolsPath = localizedPath(locale, '/tools');
+  const loginPath = localizedPath(locale, '/login');
 
   // 浏览器地址栏里带语言前缀（/zh-cn、/en），而链接写的是不带前缀的路径。
   // 之前直接拿 pathname === '/tools' 比较，永远不成立，选中态从来没亮过。
   const routePath = (pathname || '/').replace(/^\/(zh-cn|en)(?=\/|$)/, '') || '/';
   const isHome = routePath === '/';
+  const usesDarkNav = isHome || routePath === '/login';
 
   useEffect(() => {
     const handleState = (event) => setDashboardSidebarCollapsed(Boolean(event.detail?.collapsed));
@@ -77,12 +80,12 @@ export default function TopNav({ isLoggedIn }) {
   // 首页整屏顶部是深色 Hero，导航因此常驻深色主题：置顶全透明浮在 Hero 上，
   // 滚动后转深色磨砂（若切成白玻璃，会在深色 Hero 上闪出一条白条）。
   // 其余页面底色是浅的，用常规的白色磨砂玻璃。
-  const overHero = isHome && !scrolled;
-  const navClass = `site-nav${isHome ? ' on-dark' : ''}${overHero ? '' : ' is-glass'}`;
+  const overHero = usesDarkNav && !scrolled;
+  const navClass = `site-nav${usesDarkNav ? ' on-dark' : ''}${overHero ? '' : ' is-glass'}`;
 
   return (
     <nav className={navClass}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', width: '100%', padding: '0 24px', gap: '48px' }}>
+      <div className="site-nav-inner" style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', width: '100%', padding: '0 24px', gap: '48px' }}>
 
         {/* Left: Logo */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -92,8 +95,8 @@ export default function TopNav({ isLoggedIn }) {
         </div>
 
         {/* Center: Menu */}
-        <div style={{ display: 'flex', gap: '8px', fontSize: '0.95rem', fontWeight: 600 }}>
-          <Link href="/tools" className="premium-nav-link" style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', ...(routePath === '/tools' ? { color: 'var(--primary)', background: overHero ? 'rgba(110,231,183,.14)' : 'var(--primary-light)' } : null) }}>
+        <div className="site-nav-menu" style={{ display: 'flex', gap: '8px', fontSize: '0.95rem', fontWeight: 600 }}>
+          <Link href={toolsPath} className="premium-nav-link" style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', ...(routePath.startsWith('/tools') ? { color: 'var(--primary)', background: overHero ? 'rgba(110,231,183,.14)' : 'var(--primary-light)' } : null) }}>
             {t('nav.documents')}
             <span style={{ 
               position: 'absolute', 
@@ -113,17 +116,16 @@ export default function TopNav({ isLoggedIn }) {
               FREE
             </span>
           </Link>
-          <Link href="/pricing" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none', ...(routePath === '/pricing' ? { color: 'var(--primary)', background: overHero ? 'rgba(110,231,183,.14)' : 'var(--primary-light)' } : null) }}>{t('nav.pricing')}</Link>
-          <Link href="/#features" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none' }}>{t('nav.features')}</Link>
-          <Link href="/#faq" className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none' }}>{t('nav.solutions')}</Link>
+          <Link href={`${homePath}#features`} className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none' }}>{t('nav.features')}</Link>
+          <Link href={`${homePath}#faq`} className="premium-nav-link" style={{ padding: '8px 16px', borderRadius: '20px', textDecoration: 'none' }}>{t('nav.solutions')}</Link>
         </div>
 
         {/* Right: Actions */}
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', alignItems: 'center' }}>
-          <LanguageSwitcher />
+        <div className="site-nav-actions" style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', alignItems: 'center' }}>
+          <LanguageSwitcher compact />
           {!isLoggedIn ? (
             <>
-              <Link href="/login" className="nav-login" style={{ textDecoration: 'none', fontWeight: 600, fontSize: '0.95rem', padding: '8px 16px' }}>{t('nav.login')}</Link>
+              <Link href={loginPath} className="nav-login" style={{ textDecoration: 'none', fontWeight: 600, fontSize: '0.95rem', padding: '8px 16px' }}>{t('nav.login')}</Link>
             </>
           ) : null}
         </div>

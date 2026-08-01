@@ -73,7 +73,7 @@ export default function AdminHeader({ user }) {
               <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '4px', fontWeight: 600 }}>Administrator</div>
             </div>
             
-            <form action="/api/auth/logout" method="POST">
+            <form action="/api/admin/auth/logout" method="POST">
               <button type="submit" style={{ 
                 display: 'flex', 
                 alignItems: 'center', 

@@ -25,6 +25,9 @@ Environment=AIONCORE_DATA_DIR=/opt/officegpt/shared/aioncore-data
 Environment=AIONCORE_WORK_DIR=/opt/officegpt/shared/workspaces
 Environment=AIONCORE_LOG_DIR=/opt/officegpt/shared/aioncore-logs
 Environment=UPLOAD_DIR=/opt/officegpt/shared/uploads
+Environment=OFFICECLI_RUNTIME_DIR=/opt/officegpt/shared/officecli-runtime
+Environment=OFFICECLI_BIN=/opt/officegpt/shared/officecli-runtime/current/node_modules/@officecli/officecli/vendor/officecli
+Environment=PATH=/opt/officegpt/shared/officecli-runtime/current/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/node scripts/run-server.mjs production
 Restart=always
 RestartSec=5

@@ -8,6 +8,7 @@ import { getAioncoreBaseUrl } from './lib/aioncore/config.js';
 import { startAioncore, stopAioncore } from './lib/aioncore/launcher.js';
 import { chatError, chatLog, chatWarn } from './lib/aioncore/logger.js';
 import Task from './models/Task.js';
+import { createAioncoreBridgeToken } from './lib/aioncore/bridge-auth.js';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOST || '0.0.0.0';
@@ -132,7 +133,9 @@ server.on('upgrade', (request, socket, head) => {
   proxyServer.handleUpgrade(request, socket, head, (client) => {
     const upstreamUrl = getAioncoreBaseUrl().replace(/^http/, 'ws') + '/ws';
     chatLog('proxy:ws', `browser connected; opening upstream ${upstreamUrl}`);
-    const upstream = new WebSocket(upstreamUrl);
+    const upstream = new WebSocket(upstreamUrl, {
+      headers: { Authorization: `Bearer ${createAioncoreBridgeToken(identity.id)}` },
+    });
     const pending = [];
     const ownershipCache = new Map();
     // 归属一旦成立就不会被撤销，可以长时间缓存。

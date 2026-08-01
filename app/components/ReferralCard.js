@@ -21,7 +21,7 @@ export default function ReferralCard({ locale = 'zh-CN' }) {
 
   if (!data?.enabled) return null;
 
-  const link = `${window.location.origin}/register?invite=${data.code}`;
+  const link = `${window.location.origin}/login?invite=${data.code}`;
   const copy = async (value, kind) => {
     try {
       await navigator.clipboard.writeText(value);

@@ -7,6 +7,7 @@ import FAQ from './components/FAQ';
 import HeroShowcase from './components/HeroShowcase';
 import { useI18n } from './i18n/I18nProvider';
 import { homeCopy } from './i18n/homeCopy';
+import { localizedPath } from './i18n/publicSeo';
 
 const CATEGORY_VISUALS = [
   { icon: Zap, tint: '#f59e0b', soft: 'rgba(245, 158, 11, 0.12)', href: '/tools#tool-category-0' },
@@ -20,6 +21,9 @@ const STEP_ICONS = [Upload, MessageSquare, Download];
 export default function LandingPage() {
   const { locale } = useI18n();
   const copy = homeCopy[locale] || homeCopy['zh-CN'];
+  const loginPath = `${localizedPath(locale, '/login')}?next=${encodeURIComponent('/dashboard')}`;
+  const toolsPath = localizedPath(locale, '/tools');
+  const pricingPath = localizedPath(locale, '/pricing');
 
   return (
     // 上移一个导航高度，让深色 Hero 延伸到透明导航的背后。不这样做的话，
@@ -46,10 +50,10 @@ export default function LandingPage() {
               </h1>
 
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '26px', justifyContent: 'center' }}>
-                <a href="/api/auth/entry" className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                <Link href={loginPath} className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
                   {copy.hero.cta} <ArrowRight size={18} />
-                </a>
-                <Link href="/tools" className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                </Link>
+                <Link href={toolsPath} className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
                   {copy.heroSecondary}
                 </Link>
               </div>
@@ -66,7 +70,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------- 能力总览 ---------------- */}
-      <section style={{ padding: '104px 0', background: 'var(--background)' }}>
+      <section className="landing-section" style={{ padding: '104px 0', background: 'var(--background)' }}>
         <div className="container">
           <div style={{ maxWidth: '720px', marginBottom: '52px' }}>
             <span className="section-eyebrow">{copy.catalog[0]}</span>
@@ -79,7 +83,7 @@ export default function LandingPage() {
               const visual = CATEGORY_VISUALS[index] || CATEGORY_VISUALS[0];
               const Icon = visual.icon;
               return (
-                <Link key={title} href={visual.href} className="cat-card">
+                <Link key={title} href={`${toolsPath}${visual.href.slice('/tools'.length)}`} className="cat-card">
                   <span style={{ display: 'inline-flex', width: '46px', height: '46px', borderRadius: '13px', background: visual.soft, color: visual.tint, alignItems: 'center', justifyContent: 'center' }}>
                     <Icon size={22} />
                   </span>
@@ -92,7 +96,7 @@ export default function LandingPage() {
           </div>
 
           <div style={{ marginTop: '36px', display: 'flex', justifyContent: 'center' }}>
-            <Link href="/tools" className="btn btn-outline" style={{ padding: '12px 22px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <Link href={toolsPath} className="btn btn-outline" style={{ padding: '12px 22px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               {copy.catalogCta} <ArrowUpRight size={17} />
             </Link>
           </div>
@@ -100,7 +104,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------- 工作流 ---------------- */}
-      <section id="features" style={{ padding: '104px 0', background: 'var(--surface)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+      <section id="features" className="landing-section" style={{ padding: '104px 0', background: 'var(--surface)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
         <div className="container">
           <div style={{ maxWidth: '720px', marginBottom: '52px' }}>
             <span className="section-eyebrow">{copy.workflow[0]}</span>
@@ -131,7 +135,7 @@ export default function LandingPage() {
       {/* ---------------- 定价引导 ----------------
           原来首页内嵌了一份硬编码的套餐卡，和 /pricing 页读取的真实套餐
           目录会各说各话。这里只保留导流，价格以 /pricing 为唯一口径。 */}
-      <section id="pricing" style={{ padding: '104px 0', background: 'var(--background)' }}>
+      <section id="pricing" className="landing-section" style={{ padding: '104px 0', background: 'var(--background)' }}>
         <div className="container">
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '26px', padding: 'clamp(38px, 5vw, 62px)', background: 'linear-gradient(135deg, #0b1220 0%, #16233c 55%, #10362f 100%)', color: '#e8edf7' }}>
             <div aria-hidden="true" style={{ position: 'absolute', top: '-40%', right: '-10%', width: '520px', height: '520px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,.30), transparent 65%)' }} />
@@ -144,12 +148,12 @@ export default function LandingPage() {
               </h2>
               <p style={{ color: '#9aa8c2', lineHeight: 1.8, margin: '0 0 30px' }}>{copy.pricingTeaser[2]}</p>
               <div style={{ display: 'flex', gap: '13px', flexWrap: 'wrap' }}>
-                <Link href="/pricing" className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                <Link href={pricingPath} className="btn-hero btn-hero-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
                   {copy.pricingTeaser[3]} <ArrowRight size={18} />
                 </Link>
-                <a href="/api/auth/entry" className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                <Link href={loginPath} className="btn-hero btn-hero-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
                   {copy.hero.cta}
-                </a>
+                </Link>
               </div>
             </div>
           </div>

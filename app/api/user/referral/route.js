@@ -6,12 +6,9 @@ import User from '@/models/User';
 
 export const runtime = 'nodejs';
 
-// 邀请码脱敏后的邮箱：既让邀请人认得出是谁，又不至于把完整地址暴露出去。
-function maskEmail(email = '') {
-  const [name, domain] = String(email).split('@');
-  if (!domain) return '匿名用户';
-  const head = name.slice(0, 2);
-  return `${head}${'*'.repeat(Math.max(1, name.length - 2))}@${domain}`;
+function maskPhone(phone = '') {
+  const value = String(phone);
+  return /^\d{11}$/.test(value) ? `${value.slice(0, 3)}****${value.slice(-4)}` : '匿名用户';
 }
 
 export async function GET() {
@@ -24,7 +21,7 @@ export async function GET() {
 
   const code = await ensureInviteCode(user._id);
   const invitees = await User.find({ invitedBy: user._id })
-    .select('email createdAt referralRewardedAt')
+    .select('phone createdAt referralRewardedAt')
     .sort({ createdAt: -1 })
     .limit(50)
     .lean();
@@ -43,7 +40,7 @@ export async function GET() {
     pendingCount: invitees.length - rewarded.length,
     earnedCredits: rewarded.length * settings.inviterCredits,
     invitees: invitees.map((item) => ({
-      email: maskEmail(item.email),
+      email: maskPhone(item.phone),
       joinedAt: item.createdAt,
       rewarded: Boolean(item.referralRewardedAt),
     })),

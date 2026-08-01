@@ -6,12 +6,16 @@ import {
   buildOfficeWebAgentContext,
 } from '../lib/aioncore/request-policy.js';
 
-test('conversation extra carries hidden response policy and clears automatic-skill exclusions', () => {
+test('conversation extra injects the OfficeGPT skill and excludes the upstream automatic skill', () => {
   const extra = buildConversationExtra({ workspace: '/tmp/workspace' });
   assert.equal(extra.workspace, '/tmp/workspace');
   assert.equal(extra.context, OFFICEWEB_AGENT_CONTEXT);
   assert.equal(extra.product_locale, 'zh-CN');
-  assert.deepEqual(extra.exclude_auto_inject_skills, []);
+  assert.deepEqual(extra.exclude_auto_inject_skills, ['officecli']);
+  assert.match(extra.context, /<officegpt_skill>/);
+  assert.match(extra.context, /Never check whether OfficeGPT/);
+  assert.match(extra.context, /Never use Python/);
+  assert.doesNotMatch(extra.context, /curl -fsSL|install\.ps1/);
 });
 
 test('agent language policy follows the latest user message with a locale fallback', () => {

@@ -5,6 +5,7 @@ import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { releaseTaskReservation, settleTaskCredits } from '@/lib/billing/service';
 import { readConversationUsage, subtractUsage } from '@/lib/aioncore/session-usage';
+import { aioncoreHeaders } from '@/lib/aioncore/bridge-auth';
 
 const AIONCORE_URL = getAioncoreBaseUrl();
 
@@ -46,6 +47,7 @@ export async function GET() {
 
   try {
     const response = await fetch(`${AIONCORE_URL}/api/conversations/${encodeURIComponent(task.aionConversationId)}`, {
+      headers: aioncoreHeaders(String(user._id)),
       signal: AbortSignal.timeout(5000),
     });
 

@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
 import SystemSetting from '@/models/SystemSetting';
-import { signToken } from '@/lib/auth';
+import { SESSION_MAX_AGE_SECONDS, signToken } from '@/lib/auth';
 import BillingRecord from '@/models/BillingRecord';
 
 export async function GET(req) {
@@ -59,7 +59,7 @@ export async function GET(req) {
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7
+      maxAge: SESSION_MAX_AGE_SECONDS
     });
 
     return response;

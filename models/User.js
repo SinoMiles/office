@@ -8,6 +8,8 @@ const UserSchema = new mongoose.Schema({
   // 一个号码只能挂在一个账号上，小号成本就从「换个邮箱」变成「换张卡」。
   phone: { type: String, sparse: true, unique: true, index: true },
   phoneVerifiedAt: { type: Date },
+  phoneSignupAt: { type: Date },
+  phonePasswordEnabledAt: { type: Date },
   wechatOpenId: { type: String, sparse: true, index: true },
   // 邀请码在首次被查看时惰性生成，不在注册时就占号 —— 大多数账号从不分享。
   inviteCode: { type: String, sparse: true, unique: true, index: true },

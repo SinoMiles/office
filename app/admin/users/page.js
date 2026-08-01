@@ -11,10 +11,10 @@ export default function AdminUsersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null); // null for create, object for edit
   const [formData, setFormData] = useState({
-    email: '', password: '', role: 'user', membershipLevel: 'FREE', balance: 0
+    phone: '', password: '', membershipLevel: 'FREE', balance: 0
   });
 
-  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, email: '' });
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, account: '' });
   const [rechargeDialog, setRechargeDialog] = useState({ isOpen: false, userId: null, amountStr: '' });
 
   async function fetchUsers() {
@@ -40,16 +40,15 @@ export default function AdminUsersPage() {
     if (user) {
       setEditingUser(user);
       setFormData({
-        email: user.email,
+        phone: user.phone || '',
         password: '', // Don't show existing password
-        role: user.role,
         membershipLevel: user.membershipLevel,
         balance: user.balance
       });
     } else {
       setEditingUser(null);
       setFormData({
-        email: '', password: '', role: 'user', membershipLevel: 'FREE', balance: 0
+        phone: '', password: '', membershipLevel: 'FREE', balance: 0
       });
     }
     setModalOpen(true);
@@ -62,8 +61,7 @@ export default function AdminUsersPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email) return toast.error('邮箱必填');
-    if (!editingUser && !formData.password) return toast.error('创建用户时密码必填');
+    if (!/^1\d{10}$/.test(formData.phone)) return toast.error('请输入正确的手机号');
 
     const payload = { ...formData };
     if (!payload.password) delete payload.password; // Don't send empty password on edit
@@ -91,13 +89,13 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleDeleteClick = (id, email) => {
-    setDeleteDialog({ isOpen: true, id, email });
+  const handleDeleteClick = (id, account) => {
+    setDeleteDialog({ isOpen: true, id, account });
   };
 
   const executeDelete = async () => {
     const { id } = deleteDialog;
-    setDeleteDialog({ isOpen: false, id: null, email: '' });
+    setDeleteDialog({ isOpen: false, id: null, account: '' });
     if (!id) return;
     
     try {
@@ -167,26 +165,27 @@ export default function AdminUsersPage() {
 
       <div className="premium-stat-card" style={{ padding: '0', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
-          <table className="premium-table">
+          <table className="premium-table admin-users-table">
+            <colgroup>
+              <col style={{ width: '24%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '24%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>邮箱账号</th>
-                <th>角色</th>
+                <th>手机号</th>
                 <th>会员等级</th>
                 <th>当前余额（Credits）</th>
                 <th>注册时间</th>
-                <th style={{ textAlign: 'right', paddingRight: '24px' }}>操作</th>
+                <th className="admin-users-actions">操作</th>
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
                 <tr key={u._id}>
-                  <td style={{ fontWeight: 500, color: 'var(--text-main)' }}>{u.email}</td>
-                  <td>
-                    <span className={`badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}`}>
-                      {u.role.toUpperCase()}
-                    </span>
-                  </td>
+                  <td style={{ fontWeight: 600, color: 'var(--text-main)', fontFamily: u.phone ? 'ui-monospace, monospace' : undefined }}>{u.phone || (u.role === 'admin' ? '管理员账号' : '—')}</td>
                   <td>
                     <span className={`badge badge-${u.membershipLevel?.toLowerCase() || 'free'}`}>
                       {u.membershipLevel || 'FREE'}
@@ -194,7 +193,7 @@ export default function AdminUsersPage() {
                   </td>
                   <td style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '1.1rem', color: u.balance > 0 ? 'var(--primary)' : 'var(--text-main)' }}>{u.balance.toLocaleString()}</td>
                   <td style={{ color: 'var(--text-muted)' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                  <td style={{ textAlign: 'right', paddingRight: '24px' }}>
+                  <td className="admin-users-actions">
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       <button 
                         onClick={() => handleRechargeClick(u._id)}
@@ -211,7 +210,7 @@ export default function AdminUsersPage() {
                         <Edit size={16} />
                       </button>
                       <button 
-                        onClick={() => handleDeleteClick(u._id, u.email)}
+                        onClick={() => handleDeleteClick(u._id, u.phone || '该用户')}
                         style={{ padding: '8px', background: 'transparent', border: '1px solid #fee2e2', borderRadius: '8px', color: '#ef4444', cursor: 'pointer' }}
                         title="删除"
                       >
@@ -222,7 +221,7 @@ export default function AdminUsersPage() {
                 </tr>
               ))}
               {users.length === 0 && (
-                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>暂无用户</td></tr>
+                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>暂无用户</td></tr>
               )}
             </tbody>
           </table>
@@ -249,22 +248,15 @@ export default function AdminUsersPage() {
             
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>邮箱账号</label>
-                <input required type="email" className="input-base" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>手机号</label>
+                <input required type="tel" inputMode="numeric" maxLength={11} className="input-base" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 11)})} placeholder="请输入 11 位手机号" />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>密码 {editingUser && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>(留空表示不修改)</span>}</label>
-                <input type="password" placeholder={editingUser ? '留空不修改' : '必填'} className="input-base" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>登录密码 <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>({editingUser ? '留空表示不修改' : '可选，用户也可使用短信登录'})</span></label>
+                <input type="password" placeholder={editingUser ? '留空不修改' : '选填'} className="input-base" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
               </div>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>角色</label>
-                  <select className="input-base" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
+              <div>
+                <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>会员等级</label>
                   <select className="input-base" value={formData.membershipLevel} onChange={e => setFormData({...formData, membershipLevel: e.target.value})}>
                     <option value="FREE">FREE</option>
@@ -289,18 +281,18 @@ export default function AdminUsersPage() {
       {/* Delete Confirm Dialog */}
       {deleteDialog.isOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setDeleteDialog({ isOpen: false, id: null, email: '' })}></div>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setDeleteDialog({ isOpen: false, id: null, account: '' })}></div>
           <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', zIndex: 1, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Trash2 size={24} style={{ color: 'var(--danger, #ef4444)' }} />
               删除确认
             </h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
-              确定要永久删除用户 <strong>{deleteDialog.email}</strong> 吗？<br/>注意：相关日志仍会保留以便审计。
+              确定要永久删除用户 <strong>{deleteDialog.account}</strong> 吗？<br/>注意：相关日志仍会保留以便审计。
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button 
-                onClick={() => setDeleteDialog({ isOpen: false, id: null, email: '' })}
+                onClick={() => setDeleteDialog({ isOpen: false, id: null, account: '' })}
                 style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 500 }}
               >
                 取消

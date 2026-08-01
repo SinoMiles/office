@@ -8,8 +8,12 @@ import Task from '@/models/Task';
 import { getAioncoreBaseUrl } from '@/lib/aioncore/config';
 import { chatError, chatLog } from '@/lib/aioncore/logger';
 import { buildConversationExtra } from '@/lib/aioncore/request-policy';
+import { buildAioncoreMessagePayload } from '@/lib/aioncore/message-payload';
 import { publicErrorMessage } from '@/lib/aioncore/public-error';
 import { releaseTaskReservation, reserveTaskCredits } from '@/lib/billing/service';
+import { convertLegacyXls, isLegacyXls } from '@/lib/office/legacy-xls';
+import { stageUploadedFile } from '@/lib/workspace/input-files';
+import { aioncoreHeaders } from '@/lib/aioncore/bridge-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -64,29 +68,18 @@ export async function POST(request) {
     logStage('settings.loaded');
     const billing = settings.find((item) => item.key === 'billing')?.value || {};
     billingUserId = user._id;
-
-    // Fetch AionCore providers to find the matching provider ID
-    let aionModelPayload = null;
-    try {
-      const providersRes = await fetch(`${AIONCORE_URL}/api/providers`);
-      logStage(`providers.response status=${providersRes.status}`);
-      if (providersRes.ok) {
-        const providersJson = await providersRes.json();
-        if (providersJson.success && Array.isArray(providersJson.data)) {
-          // Find deepseek provider from AionCore
-          const deepseekProvider = providersJson.data.find(p => p.platform === 'deepseek' && p.models?.includes('deepseek-v4-flash'));
-          if (deepseekProvider) {
-            aionModelPayload = {
-              provider_id: deepseekProvider.id,
-              model: 'deepseek-v4-flash',
-              use_model: 'deepseek-v4-flash'
-            };
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch AionCore providers:', err);
-    }
+    const coreUserId = String(user._id);
+    const coreHeaders = (initial = {}) => aioncoreHeaders(coreUserId, initial);
+    const llm = settings.find((item) => item.key === 'llm')?.value || {};
+    const configuredModel = llm.model || process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+    // The model provider is a platform-level secret owned by Core's system
+    // account. Conversations remain user-scoped, while the runtime resolves
+    // this shared provider internally without exposing its credential.
+    const aionModelPayload = {
+      provider_id: 'deepseek',
+      model: configuredModel,
+      use_model: configuredModel,
+    };
 
     // Create a unique aionConversationId for the whole task chain, or inherit
     let aionConversationId = parentTask?.aionConversationId;
@@ -98,7 +91,7 @@ export async function POST(request) {
       
       const convRes = await fetch(`${AIONCORE_URL}/api/conversations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: coreHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(15000),
       });
@@ -111,7 +104,7 @@ export async function POST(request) {
       // the instruction in conversation context instead of polluting user text.
       const policyRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: coreHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ extra: buildConversationExtra({ product_locale: productLocale }), merge_extra: true }),
         signal: AbortSignal.timeout(10000),
       });
@@ -119,7 +112,7 @@ export async function POST(request) {
     }
 
     const runtimeRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
-      signal: AbortSignal.timeout(10000),
+      headers: coreHeaders(), signal: AbortSignal.timeout(10000),
     });
     if (runtimeRes.ok) {
       const runtimePayload = await runtimeRes.json();
@@ -144,31 +137,93 @@ export async function POST(request) {
     const reservedBilling = await reserveTaskCredits({
       taskId: task._id,
       userId: user._id,
-      model: aionModelPayload?.model || 'deepseek-v4-flash',
+      model: aionModelPayload?.model || configuredModel,
       membershipLevel: user.membershipLevel,
       billingSettings: billing,
     });
     logStage('billing.reserved', { conversation_id: aionConversationId });
 
+    // Resolve and persist the canonical conversation workspace before handling
+    // attachments. AionCore's upload endpoint returns a temporary intake path;
+    // document work and preview discovery must both use the workspace copy.
+    let aionWorkspace = '';
+    try {
+      const conversationRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
+        headers: coreHeaders(), signal: AbortSignal.timeout(5000),
+      });
+      if (conversationRes.ok) {
+        const conversationPayload = await conversationRes.json();
+        aionWorkspace = conversationPayload.data?.extra?.workspace || conversationPayload.data?.workspace || '';
+      }
+      if (!aionWorkspace) throw new Error('OfficeGPT 会话工作区尚未准备完成');
+      task.workspace = aionWorkspace;
+      await task.save();
+      void fetch(`${AIONCORE_URL}/api/fs/office-watch/start`, {
+        method: 'POST',
+        headers: coreHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ workspace: aionWorkspace }),
+        signal: AbortSignal.timeout(5000),
+      }).then((watchRes) => {
+        chatLog('preview', `workspace watcher start response ${watchRes.status}`, { conversation_id: aionConversationId });
+      }).catch((error) => {
+        chatError('preview', 'workspace watcher did not start in time', error);
+      });
+    } catch (error) {
+      chatError('preview', 'failed to prepare workspace', error);
+      throw new Error('OfficeGPT 暂时无法准备文件工作区，请稍后重试');
+    }
+    logStage('workspace.ready available=true', { conversation_id: aionConversationId });
+
     let filename = parentTask?.filename || '';
     const uploadedAttachments = [];
+    const messageAttachments = [];
     for (const file of files) {
       if (file.size > MAX_UPLOAD_BYTES) throw new Error(`文件 ${file.name} 不能超过 25MB`);
-      const safeFilename = path.basename(file.name).replace(/[^\p{L}\p{N}._-]+/gu, '_');
-      const extension = path.extname(safeFilename).toLowerCase();
+      const originalSafeFilename = path.basename(file.name).replace(/[^\p{L}\p{N}._-]+/gu, '_');
+      const extension = path.extname(originalSafeFilename).toLowerCase();
       if (!ALLOWED_EXTENSIONS.has(extension)) throw new Error(`不支持文件格式：${file.name}`);
+      let safeFilename = originalSafeFilename;
+      let uploadFile = file;
+      let uploadSize = file.size;
+      let uploadMimeType = file.type;
+      if (isLegacyXls(originalSafeFilename)) {
+        const converted = convertLegacyXls(Buffer.from(await file.arrayBuffer()), originalSafeFilename);
+        if (converted.buffer.length > MAX_UPLOAD_BYTES) throw new Error(`文件 ${file.name} 转换后不能超过 25MB`);
+        safeFilename = converted.filename;
+        uploadFile = new Blob([converted.buffer], { type: converted.mimeType });
+        uploadSize = converted.buffer.length;
+        uploadMimeType = converted.mimeType;
+        chatLog('attachments', `converted legacy workbook ${originalSafeFilename} -> ${safeFilename}`, { conversation_id: aionConversationId, sheets: converted.sheetCount });
+      }
       const uploadData = new FormData();
-      uploadData.append('file', file);
+      uploadData.append('file', uploadFile, safeFilename);
       uploadData.append('file_name', safeFilename);
       uploadData.append('conversation_id', aionConversationId);
       const aioncoreRes = await fetch(`${AIONCORE_URL}/api/fs/upload`, {
         method: 'POST',
+        headers: coreHeaders(),
         body: uploadData,
         signal: AbortSignal.timeout(60000),
       });
       if (!aioncoreRes.ok) throw new Error(`上传附件失败：${file.name}`);
       const resJson = await aioncoreRes.json();
-      uploadedAttachments.push({ filename: safeFilename, filePath: resJson.data, size: file.size, mimeType: file.type });
+      const staged = await stageUploadedFile({
+        sourcePath: resJson.data,
+        workspace: aionWorkspace,
+        taskId: task._id,
+        filename: safeFilename,
+      });
+      uploadedAttachments.push({
+        filename: safeFilename,
+        filePath: staged.filePath,
+        size: uploadSize,
+        mimeType: uploadMimeType,
+        uploadedMtimeMs: staged.uploadedMtimeMs,
+      });
+      messageAttachments.push({
+        filename: safeFilename,
+        uploadPath: resJson.data,
+      });
     }
     if (uploadedAttachments.length) {
       filename = uploadedAttachments[0].filename;
@@ -179,45 +234,14 @@ export async function POST(request) {
     }
     logStage(`attachments.ready count=${uploadedAttachments.length}`, { conversation_id: aionConversationId });
 
-    // Return successfully so frontend can spawn WebSocket connection
-    // Mirror AionUi WebUI: start the workspace Office watcher before generation
-    // so newly created pptx/docx/xlsx files cannot race ahead of fileAdded.
-    let aionWorkspace = '';
-    try {
-      const conversationRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (conversationRes.ok) {
-        const conversationPayload = await conversationRes.json();
-        aionWorkspace = conversationPayload.data?.extra?.workspace || conversationPayload.data?.workspace || '';
-      }
-      if (aionWorkspace) {
-        task.workspace = aionWorkspace;
-        await task.save();
-        void fetch(`${AIONCORE_URL}/api/fs/office-watch/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workspace: aionWorkspace }),
-          signal: AbortSignal.timeout(5000),
-        }).then((watchRes) => {
-          chatLog('preview', `workspace watcher start response ${watchRes.status}`, { conversation_id: aionConversationId });
-        }).catch((error) => {
-          chatError('preview', 'workspace watcher did not start in time', error);
-        });
-      }
-    } catch (error) {
-      chatError('preview', 'failed to start workspace Office watcher', error);
-    }
-    logStage(`workspace.ready available=${Boolean(aionWorkspace)}`, { conversation_id: aionConversationId });
-
     // Tell AionCore to start generating
     const aiRes = await fetch(`${AIONCORE_URL}/api/conversations/${aionConversationId}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      headers: coreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(buildAioncoreMessagePayload({
         content: prompt,
-        files: uploadedAttachments.map((attachment) => attachment.filePath),
-      }),
+        attachments: messageAttachments,
+      })),
       signal: AbortSignal.timeout(20000),
     });
     logStage(`message.response status=${aiRes.status}`, { conversation_id: aionConversationId });

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { generateRechargeCode, hashRechargeCode } from '@/lib/billing/recharge-code';
 import RechargeCode from '@/models/RechargeCode';
 
 export async function GET() {
-  const admin = await getCurrentUser();
+  const admin = await getCurrentAdmin();
   if (!admin || admin.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   await connectToDatabase();
   const codes = await RechargeCode.find().sort({ createdAt: -1 }).limit(100).select('-codeHash').lean();
@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const admin = await getCurrentUser();
+  const admin = await getCurrentAdmin();
   if (!admin || admin.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   const body = await request.json();
   const amount = Number(body.amount);

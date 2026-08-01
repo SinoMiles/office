@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import User from '@/models/User';
 import Task from '@/models/Task';
@@ -24,7 +24,7 @@ function changeRate(current, previous) {
 }
 
 export async function GET(request) {
-  const admin = await getCurrentUser();
+  const admin = await getCurrentAdmin();
   if (!admin || admin.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 
   await connectToDatabase();
@@ -59,7 +59,7 @@ export async function GET(request) {
     Task.aggregate([{ $match: { userId: { $in: customerUserIds }, createdAt: { $gte: rangeStart, $lt: tomorrowStart } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Shanghai' } }, value: { $sum: 1 } } }]),
     Task.aggregate([{ $match: { createdAt: { $gte: rangeStart, $lt: tomorrowStart }, userId: { $in: customerUserIds } } }, { $group: { _id: { date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Shanghai' } }, userId: '$userId' } } }, { $group: { _id: '$_id.date', value: { $sum: 1 } } }]),
     PaymentOrder.aggregate([{ $match: { status: 'paid', paidAt: { $gte: rangeStart, $lt: tomorrowStart } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt', timezone: 'Asia/Shanghai' } }, value: { $sum: '$amountFen' } } }]),
-    PaymentOrder.find().sort({ createdAt: -1 }).limit(30).populate('userId', 'email').lean(),
+    PaymentOrder.find().sort({ createdAt: -1 }).limit(30).populate('userId', 'phone').lean(),
   ]);
 
   const maps = [dailyUsers, dailyTasks, dailyActiveUsers, dailyRevenue].map((rows) => new Map(rows.map((row) => [row._id, row.value])));
@@ -84,7 +84,7 @@ export async function GET(request) {
     },
     daily,
     payments: paymentOrders.map((order) => ({
-      id: String(order._id), outTradeNo: order.outTradeNo, email: order.userId?.email || '未知用户',
+      id: String(order._id), outTradeNo: order.outTradeNo, phone: order.userId?.phone || '未知用户',
       amount: order.amountFen / 100, credits: order.credits, status: order.status,
       createdAt: order.createdAt, paidAt: order.paidAt,
     })),

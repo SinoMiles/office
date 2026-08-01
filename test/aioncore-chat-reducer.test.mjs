@@ -205,6 +205,51 @@ test('sanitizeAssistantText still drops a path label left empty by cleaning', ()
   assert.equal(sanitizeAssistantText('结果已生成。\n文件路径：\n下一段。'), '结果已生成。\n下一段。');
 });
 
+test('history selection matches uploaded prompts without exposing file transport metadata', () => {
+  const messages = normalizeHistoryMessages([
+    { position: 'right', type: 'text', content: { content: '你好' } },
+    { position: 'left', type: 'text', content: { content: '你好，有什么可以帮你？' } },
+    { position: 'right', type: 'text', content: { content: '这是什么数据\n\n[[AION_FILES]]\nC:\\temp\\工作簿.xlsx' } },
+    { position: 'left', type: 'text', content: { content: '这是销售数据。' } },
+  ]);
+
+  const selected = sliceHistoryThroughPrompts(messages, ['你好', '这是什么数据']);
+  assert.equal(selected.length, 4);
+  assert.equal(selected.at(-1).content.content, '这是销售数据。');
+});
+
+test('realtime errors release a generation that failed before streaming', () => {
+  const started = reduceRuntime(createRuntimeState(), 'local.send');
+  const failed = reduceRuntime(started, 'realtime.error', { error: 'Provider not found' });
+  assert.equal(failed.state, 'error');
+  assert.equal(failed.isProcessing, false);
+  assert.equal(failed.canSendMessage, true);
+  assert.equal(failed.activeTurnId, null);
+  assert.match(failed.error, /Provider not found/);
+});
+
+test('internal Microcompact notices never reach chat text or thinking', () => {
+  const notice = 'Microcompact: cleared 7 tool results (~2563 tokens freed)';
+  assert.equal(sanitizeAssistantText(`正在分析。\n${notice}\n继续处理。`), '正在分析。\n继续处理。');
+  const [assistant] = mapMessagesToUi([
+    { msg_id: 'thinking-compact', type: 'thinking', data: { content: notice } },
+    { msg_id: 'text-compact', type: 'text', data: { content: `完成。\n${notice}` } },
+  ], { isProcessing: false });
+  assert.equal(assistant.thought.description, '');
+  assert.equal(assistant.content, '完成。');
+});
+
+test('absolute server workspace paths are redacted from visible text and thinking', () => {
+  const windows = '工作目录是 D:\\office\\storage\\workspaces\\conversations\\users\\system_default_user\\2026\\08\\01\\aionrs-temp-208c48e5,上传文件为 工作簿.xlsx。';
+  assert.equal(sanitizeAssistantText(windows), '工作目录是 workspace,上传文件为 工作簿.xlsx。');
+  const unix = 'Working directory: /srv/office/storage/workspaces/conversations/users/u1/aionrs-temp-123; continue.';
+  assert.equal(sanitizeAssistantText(unix), 'Working directory: workspace; continue.');
+  const [assistant] = mapMessagesToUi([
+    { msg_id: 'thinking-path', type: 'thinking', data: { content: windows } },
+  ], { isProcessing: true });
+  assert.doesNotMatch(assistant.thought.description, /system_default_user|aionrs-temp|[A-Za-z]:\\/u);
+});
+
 test('streamed deltas rebuild Markdown structure intact', () => {
   // AionCore 发的是极细粒度增量（"##"、" "、"\n\n"、"-" 这种）。
   const deltas = ['##', ' ', '标题', '\n\n', '-', ' ', '甲', '\n', '-', ' ', '乙'];
@@ -213,4 +258,13 @@ test('streamed deltas rebuild Markdown structure intact', () => {
   }), []);
   const ui = mapMessagesToUi(merged.map((message) => ({ ...message, role: 'assistant' })), { isProcessing: false });
   assert.equal(ui[0].content, '## 标题\n\n- 甲\n- 乙');
+});
+
+test('streamed Markdown keeps repeated delimiter deltas verbatim', () => {
+  const deltas = ['**', '字段结构（每张表一致）', '**', '\n\n', '| 字段 |', ' 说明 |', '\n', '|---|', '---|'];
+  const merged = deltas.reduce((messages, content) => mergeStreamMessages(messages, {
+    msg_id: 'markdown-1', type: 'text', data: { content },
+  }), []);
+  const ui = mapMessagesToUi(merged.map((message) => ({ ...message, role: 'assistant' })), { isProcessing: true });
+  assert.equal(ui[0].content, '**字段结构（每张表一致）**\n\n| 字段 | 说明 |\n|---|---|');
 });
