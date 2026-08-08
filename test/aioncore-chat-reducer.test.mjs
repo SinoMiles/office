@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   createRuntimeState,
   mapMessagesToUi,
+  mergeHistoryMessages,
   mergeStreamMessages,
   normalizeHistoryMessages,
   reduceRuntime,
@@ -203,6 +204,24 @@ test('sanitizeAssistantText keeps the blank lines Markdown needs', () => {
 
 test('sanitizeAssistantText still drops a path label left empty by cleaning', () => {
   assert.equal(sanitizeAssistantText('结果已生成。\n文件路径：\n下一段。'), '结果已生成。\n下一段。');
+});
+
+test('late history pages preserve the optimistic turn already visible to the user', () => {
+  const history = [
+    { conversation_id: 'c1', msg_id: 'u1', type: 'text', role: 'user', content: { content: '第一问' } },
+    { conversation_id: 'c1', msg_id: 'a1', type: 'text', role: 'assistant', content: { content: '第一答' } },
+  ];
+  const optimistic = {
+    conversation_id: 'c1', msg_id: 'local-user-new', type: 'text', role: 'user', content: { content: '第二问' },
+  };
+  const merged = mergeHistoryMessages([...history, optimistic], history, 'c1');
+  assert.deepEqual(merged.map((message) => message.msg_id), ['u1', 'a1', 'local-user-new']);
+});
+
+test('history merge does not leak pending messages from another conversation', () => {
+  const stale = { conversation_id: 'old', msg_id: 'local-user-old', type: 'text', role: 'user' };
+  const history = [{ conversation_id: 'new', msg_id: 'u-new', type: 'text', role: 'user' }];
+  assert.deepEqual(mergeHistoryMessages([stale], history, 'new'), history);
 });
 
 test('history selection matches uploaded prompts without exposing file transport metadata', () => {

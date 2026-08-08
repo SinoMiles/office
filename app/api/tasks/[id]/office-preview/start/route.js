@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import { startWatch } from '@/lib/office/watch-manager';
 import Task from '@/models/Task';
+import { isTransientWorkspaceArtifact } from '@/lib/workspace/artifact-names';
 
 const OFFICE_EXTENSIONS = new Set(['.pptx', '.docx', '.xlsx', '.xls']);
 
@@ -14,7 +15,9 @@ export async function POST(request, { params }) {
   const { filePath, workspace } = await request.json();
   const resolvedFile = path.resolve(String(filePath || ''));
   const resolvedWorkspace = path.resolve(String(workspace || ''));
-  if (!resolvedFile.startsWith(`${resolvedWorkspace}${path.sep}`) || !OFFICE_EXTENSIONS.has(path.extname(resolvedFile).toLowerCase())) {
+  if (!resolvedFile.startsWith(`${resolvedWorkspace}${path.sep}`)
+    || !OFFICE_EXTENSIONS.has(path.extname(resolvedFile).toLowerCase())
+    || isTransientWorkspaceArtifact(path.relative(resolvedWorkspace, resolvedFile))) {
     return NextResponse.json({ error: '无效的 Office 预览文件' }, { status: 400 });
   }
 

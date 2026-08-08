@@ -5,11 +5,13 @@ import { createAioncoreRealtimeClient } from '@/lib/api/aioncore-ws';
 import {
   createRuntimeState,
   mapMessagesToUi,
+  mergeHistoryMessages,
   mergeStreamMessages,
   reduceRuntime,
 } from '@/lib/aioncore/chat-reducer';
 import { chatLog, chatWarn } from '@/lib/aioncore/logger';
 import { autoConfirmPermission, buildAutoConfirmation, listPendingPermissions } from '@/lib/aioncore/auto-confirm';
+import { isTransientWorkspaceArtifact } from '@/lib/workspace/artifact-names';
 
 export function useAioncoreChat() {
   const [messages, setMessages] = useState([]);
@@ -84,7 +86,7 @@ export function useAioncoreChat() {
 
   const openOfficePreview = useCallback((event) => {
     const normalizedPath = String(event.file_path || '').replaceAll('\\', '/').replace(/^\/private\/(tmp|var)(?=\/)/, '/$1');
-    if (!normalizedPath || officeOpenTimersRef.current.has(normalizedPath)) return;
+    if (!normalizedPath || isTransientWorkspaceArtifact(normalizedPath) || officeOpenTimersRef.current.has(normalizedPath)) return;
     const timer = window.setTimeout(() => {
       officeOpenTimersRef.current.delete(normalizedPath);
       void startOfficePreview({ ...event, file_path: normalizedPath });
@@ -161,9 +163,11 @@ export function useAioncoreChat() {
       }),
       client.on('chat:history:page', (payload) => {
         if (Array.isArray(payload?.items)) {
+          if (payload.conversation_id && payload.conversation_id !== conversationIdRef.current) return;
           chatLog('history', `loaded ${payload.items.length} message(s)`, payload);
-          messagesRef.current = payload.items;
-          setMessages(payload.items);
+          const next = mergeHistoryMessages(messagesRef.current, payload.items, conversationIdRef.current);
+          messagesRef.current = next;
+          setMessages(next);
         }
       }),
       client.on('chat:turn:state', (payload) => {

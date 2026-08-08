@@ -59,3 +59,27 @@ test('automatic backup files are not exposed as generated artifacts', async (t) 
   assert.equal(isAutomaticBackup('report-backup.docx'), true);
   assert.equal(isAutomaticBackup('backuplan.xlsx'), false);
 });
+
+test('reconciliation removes transient and missing persisted artifacts', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'office-transient-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const result = path.join(root, '工作簿.xlsx');
+  const transient = path.join(root, '.工作簿.batchprep-123.xlsx');
+  await fs.writeFile(result, 'result');
+  await fs.writeFile(transient, 'temporary');
+  await fs.mkdir(path.join(root, '.officegpt', 'tmp'), { recursive: true });
+  await fs.writeFile(path.join(root, '.officegpt', 'tmp', 'hidden.xlsx'), 'hidden');
+  const task = {
+    workspace: root,
+    createdAt: new Date(0),
+    attachments: [],
+    artifacts: [
+      { filePath: transient, filename: path.basename(transient) },
+      { filePath: path.join(root, 'missing.xlsx'), filename: 'missing.xlsx' },
+    ],
+  };
+
+  await reconcileTaskArtifacts(task);
+  assert.deepEqual(task.artifacts.map((item) => item.filename), ['工作簿.xlsx']);
+  assert.equal(task.outputFile, result);
+});

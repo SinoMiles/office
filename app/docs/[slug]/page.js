@@ -6,7 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { headers } from 'next/headers';
 import { normalizeLocale } from '@/app/i18n/config';
-import { publicMetadata } from '@/app/i18n/publicSeo';
+import { chineseOnlyMetadata } from '@/app/i18n/publicSeo';
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
@@ -20,9 +20,12 @@ export async function generateMetadata({ params }) {
     }
   }
 
-  const shared = publicMetadata(locale, `/docs/${doc.slug}`);
-  const title = locale === 'zh-CN' ? `${doc.title} - 帮助文档 | OfficeGPT` : `OfficeGPT Help Center`;
-  return { ...shared, title, description: locale === 'zh-CN' ? `阅读关于 ${doc.title} 的详细介绍。` : shared.description, openGraph: { ...shared.openGraph, title } };
+  return chineseOnlyMetadata(
+    locale,
+    `/docs/${doc.slug}`,
+    `${doc.title} - 帮助文档 | OfficeGPT`,
+    `阅读关于 ${doc.title} 的详细介绍。`,
+  );
 }
 
 export function generateStaticParams() {

@@ -4,10 +4,6 @@ import { getSiteUrl } from '@/lib/seo';
 import { SUPPORTED_LOCALES } from '@/app/i18n/config';
 import { languageAlternates, localizedPath } from '@/app/i18n/publicSeo';
 
-// 构建时间作为 lastModified 的基准。此前完全没有这个字段，爬虫无法判断
-// 哪些页面值得重新抓取，会拉低重爬频率。
-const BUILD_TIME = new Date();
-
 function priorityFor(path) {
   if (path === '/') return 1;
   if (path === '/pricing') return 0.9;
@@ -25,16 +21,24 @@ function changeFrequencyFor(path) {
 
 export default function sitemap() {
   const baseUrl = getSiteUrl();
-  const paths = [
-    ...['/', '/tools', '/pricing', '/about', '/docs', '/privacy', '/terms'],
+  const localizedPaths = [
+    ...['/', '/tools', '/pricing'],
     ...getAllTools().filter((tool) => !tool.comingSoon).map((tool) => `/tools/${tool.id}`),
+  ];
+  const chineseOnlyPaths = [
+    '/about', '/privacy', '/terms',
     ...getAllDocs().map((doc) => `/docs/${doc.slug}`),
   ];
-  return paths.flatMap((path) => SUPPORTED_LOCALES.map(({ code }) => ({
+  const localizedEntries = localizedPaths.flatMap((path) => SUPPORTED_LOCALES.map(({ code }) => ({
     url: `${baseUrl}${localizedPath(code, path)}`,
-    lastModified: BUILD_TIME,
     changeFrequency: changeFrequencyFor(path),
     priority: priorityFor(path),
     alternates: { languages: Object.fromEntries(Object.entries(languageAlternates(path)).map(([locale, href]) => [locale, `${baseUrl}${href}`])) },
   })));
+  const chineseEntries = chineseOnlyPaths.map((path) => ({
+    url: `${baseUrl}${localizedPath('zh-CN', path)}`,
+    changeFrequency: changeFrequencyFor(path),
+    priority: priorityFor(path),
+  }));
+  return [...localizedEntries, ...chineseEntries];
 }

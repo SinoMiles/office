@@ -155,6 +155,8 @@ export default function DashboardClient() {
 
   // Chat UI states
   const [messages, setMessages] = useState([]);
+  const messagesStateRef = useRef([]);
+  const conversationClaimedRef = useRef(false);
   const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState([]);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
@@ -164,6 +166,7 @@ export default function DashboardClient() {
   const [processLoading, setProcessLoading] = useState(false);
   const isGenerating = processLoading || aionIsProcessing;
   const [activeTaskId, setActiveTaskId] = useState(null); // Tracks the current conversational thread context
+  const restoredTaskIdRef = useRef(null);
   const messagesEndRef = useRef(null);
   const artifactRefs = useRef(new Map());
   const conversationTurnRefs = useRef(new Map());
@@ -195,6 +198,10 @@ export default function DashboardClient() {
   useEffect(() => {
     resizePromptInput(promptInputRef.current);
   }, [prompt, resizePromptInput]);
+
+  useEffect(() => {
+    messagesStateRef.current = messages;
+  }, [messages]);
 
   // 流式正文在渲染期派生，不再由 effect 回写 messages。
   // 以前每来一帧就 setMessages 一次，而滚动 effect 又依赖 messages，
@@ -400,7 +407,7 @@ export default function DashboardClient() {
   useEffect(() => {
     let cancelled = false;
     fetch('/api/tasks/active').then((res) => res.json()).then((payload) => {
-      if (cancelled || !payload.task) return;
+      if (cancelled || !payload.task || conversationClaimedRef.current || messagesStateRef.current.length) return;
       const task = payload.task;
       setActiveTaskId(task._id);
       setProcessLoading(true);
@@ -938,11 +945,27 @@ export default function DashboardClient() {
     if (fileDragDepthRef.current === 0) setIsDraggingFiles(false);
   };
 
+  const writeConversationLocation = useCallback((taskId, { replace = false } = {}) => {
+    const url = new URL(window.location.href);
+    url.pathname = '/dashboard';
+    url.searchParams.delete('intent');
+    if (taskId) url.searchParams.set('conversation', taskId);
+    else url.searchParams.delete('conversation');
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextUrl === currentUrl) return;
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', nextUrl);
+  }, []);
+
   const startNewChat = () => {
+    conversationClaimedRef.current = true;
+    setActiveTab('workspace');
     setMessages([]);
     setFiles([]);
     setPrompt('');
     setActiveTaskId(null);
+    restoredTaskIdRef.current = null;
+    writeConversationLocation(null);
     navigateToTab('workspace');
     setShowRightPanel(false);
     setSidebarCollapsed(false);
@@ -951,10 +974,14 @@ export default function DashboardClient() {
   };
 
   const loadHistoryTask = useCallback(async (task, { navigate = true } = {}) => {
+    conversationClaimedRef.current = true;
     setActiveTaskId(task._id);
+    restoredTaskIdRef.current = task._id;
     if (navigate && window.location.pathname !== '/dashboard') {
       setActiveTab('workspace');
-      router.push('/dashboard', { scroll: false });
+      router.push(`/dashboard?conversation=${encodeURIComponent(task._id)}`, { scroll: false });
+    } else if (navigate) {
+      writeConversationLocation(task._id);
     }
     setMessages([{ role: 'ai', content: '', loading: true }]);
     const payload = await fetch(`/api/tasks/${task._id}/conversation`).then((res) => res.json()).catch(() => null);
@@ -981,7 +1008,28 @@ export default function DashboardClient() {
     setActiveArtifact(null);
     setShowRightPanel(false);
     setSidebarCollapsed(false);
-  }, [attachmentArtifacts, loadConversation, router]);
+  }, [attachmentArtifacts, loadConversation, router, writeConversationLocation]);
+
+  useEffect(() => {
+    if (pathname !== '/dashboard') return;
+    const taskId = new URLSearchParams(window.location.search).get('conversation');
+    if (!taskId || restoredTaskIdRef.current === taskId) return;
+    restoredTaskIdRef.current = taskId;
+    let cancelled = false;
+    fetch(`/api/tasks/${encodeURIComponent(taskId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || '历史会话不存在');
+        if (!cancelled) await loadHistoryTask(payload.task, { navigate: false });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        restoredTaskIdRef.current = null;
+        writeConversationLocation(null, { replace: true });
+        toast.error(error.message || '历史会话恢复失败');
+      });
+    return () => { cancelled = true; };
+  }, [loadHistoryTask, pathname, writeConversationLocation]);
 
   const handleCancel = async () => {
     if (!activeTaskId) return;
@@ -1006,14 +1054,17 @@ export default function DashboardClient() {
     const currentFiles = files;
     const parentTaskId = activeTaskId;
     const requestStartedAt = Date.now();
+    conversationClaimedRef.current = true;
     
     // Optimistically add user message and an empty AI loading message
-    const newMessages = [
-      ...renderMessages,
-      { role: 'user', content: currentPrompt, filename: currentFiles[0]?.name || null, filenames: currentFiles.map((item) => item.name) },
-      { role: 'ai', content: '', loading: true }
-    ];
-    setMessages(newMessages);
+    setMessages((current) => {
+      const base = renderMessages.length > current.length ? renderMessages : current;
+      return [
+        ...base,
+        { role: 'user', content: currentPrompt, filename: currentFiles[0]?.name || null, filenames: currentFiles.map((item) => item.name) },
+        { role: 'ai', content: '', loading: true },
+      ];
+    });
     setPrompt('');
     setFiles([]);
     generationObservedRef.current = false;
@@ -1055,6 +1106,8 @@ export default function DashboardClient() {
       setCreditPrompt(null);
       
       setActiveTaskId(resData.taskId);
+      restoredTaskIdRef.current = resData.taskId;
+      writeConversationLocation(resData.taskId, { replace: Boolean(parentTaskId) });
 
       // 发送那一刻任务还没创建，拿不到 taskId，附件描述只能等这里回填 ——
       // 补上之后刚发出去的那条消息里的文件也能点开预览，不必等刷新。

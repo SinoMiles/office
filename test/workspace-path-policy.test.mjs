@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { isUserVisibleDocument, normalizeWorkspacePath, previewType, resolveWorkspaceEntry } from '../lib/workspace/path-policy.js';
+import { isTransientWorkspaceArtifact } from '../lib/workspace/artifact-names.js';
 
 test('workspace paths reject traversal and unrelated absolute paths', () => {
   assert.throws(() => resolveWorkspaceEntry('/tmp/work', '../secret'), /PATH_OUTSIDE_WORKSPACE/);
@@ -23,4 +24,14 @@ test('generic preview type covers common generated files', () => {
   assert.equal(previewType('notes.md'), 'markdown');
   assert.equal(previewType('chart.png'), 'image');
   assert.equal(previewType('script.py'), 'text');
+});
+
+test('temporary document-engine files never become user artifacts', () => {
+  for (const filename of [
+    '.report.batchprep-123.xlsx',
+    '~$report.xlsx',
+    '.officegpt/tmp/report.xlsx',
+    'report.partial.xlsx.tmp',
+  ]) assert.equal(isTransientWorkspaceArtifact(filename), true, filename);
+  assert.equal(isTransientWorkspaceArtifact('季度.report.xlsx'), false);
 });
