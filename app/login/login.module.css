@@ -81,8 +81,9 @@
 }
 .sendCode:disabled { cursor: not-allowed; opacity: 0.58; }
 .loginButton { width: 100%; min-height: 50px; margin-top: 4px; justify-content: center; border-radius: 14px; font-size: 1rem; }
-.agreementCheck { display: flex; align-items: flex-start; gap: 9px; margin-top: 22px; color: #64748b; font-size: .8rem; line-height: 1.6; cursor: pointer; }
+.agreementCheck { display: flex; align-items: flex-start; gap: 9px; margin-top: 22px; color: #64748b; font-size: .78rem; line-height: 1.6; cursor: pointer; }
 .agreementCheck input { width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; flex: 0 0 auto; accent-color: #10b981; }
+.agreementCheck span { white-space: nowrap; }
 .agreementCheck a { color: #059669; font-weight: 600; text-decoration: none; }
 .agreement { margin: 24px 0 0; color: #94a3b8; font-size: 0.8rem; line-height: 1.7; text-align: center; }
 .agreementCheck + .agreement { margin-top: 9px; }

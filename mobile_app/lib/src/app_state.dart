@@ -72,6 +72,22 @@ class ChatState extends ChangeNotifier {
   final List<Map<String, dynamic>> _pendingOfficeEvents = [];
   String? _finishingTaskId;
 
+  static const _maxFiles = 10;
+  static const _maxFileBytes = 25 * 1024 * 1024;
+  static const _maxTotalBytes = 100 * 1024 * 1024;
+  static const _supportedExtensions = {
+    'pdf',
+    'xlsx',
+    'xls',
+    'csv',
+    'docx',
+    'pptx',
+    'png',
+    'jpg',
+    'jpeg',
+    'webp',
+  };
+
   Future<void> refreshConversations() async {
     try {
       conversations = await api.conversations();
@@ -120,18 +136,7 @@ class ChatState extends ChangeNotifier {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       withData: kIsWeb,
-      allowedExtensions: [
-        'pdf',
-        'xlsx',
-        'xls',
-        'csv',
-        'docx',
-        'pptx',
-        'png',
-        'jpg',
-        'jpeg',
-        'webp',
-      ],
+      allowedExtensions: [..._supportedExtensions],
       type: FileType.custom,
     );
     if (result == null) return;
@@ -139,28 +144,63 @@ class ChatState extends ChangeNotifier {
   }
 
   Future<void> pickImages() async {
-    final images = await ImagePicker().pickMultiImage(imageQuality: 95);
+    final images = await ImagePicker().pickMultiImage(
+      imageQuality: 82,
+      maxWidth: 2400,
+      maxHeight: 2400,
+    );
     addFiles(await Future.wait(images.map(_platformFile)));
   }
 
   Future<void> takePhoto() async {
     final image = await ImagePicker().pickImage(
       source: ImageSource.camera,
-      imageQuality: 95,
+      imageQuality: 82,
+      maxWidth: 2400,
+      maxHeight: 2400,
     );
     if (image != null) addFiles([await _platformFile(image)]);
   }
 
-  Future<PlatformFile> _platformFile(XFile file) async =>
-      PlatformFile(name: file.name, path: file.path, size: await file.length());
+  Future<PlatformFile> _platformFile(XFile file) async {
+    final extension = file.name.split('.').last.toLowerCase();
+    final isImage = {'png', 'jpg', 'jpeg', 'webp'}.contains(extension);
+    return PlatformFile(
+      name: file.name,
+      path: file.path,
+      size: await file.length(),
+      bytes: isImage ? await file.readAsBytes() : null,
+    );
+  }
 
   void addFiles(List<PlatformFile> files) {
     final keys = pendingFiles.map((e) => '${e.name}:${e.size}').toSet();
-    pendingFiles = [
-      ...pendingFiles,
-      ...files.where((file) => keys.add('${file.name}:${file.size}')),
-    ].take(10).toList();
+    final nextFiles = List<PlatformFile>.from(pendingFiles);
+    var totalBytes = nextFiles.fold<int>(0, (sum, file) => sum + file.size);
+    final rejected = <String>[];
+
+    for (final file in files) {
+      final extension =
+          file.extension?.toLowerCase() ??
+          file.name.split('.').last.toLowerCase();
+      if (!_supportedExtensions.contains(extension)) {
+        rejected.add('${file.name}：不支持的文件类型');
+      } else if (file.size > _maxFileBytes) {
+        rejected.add('${file.name}：单个文件不能超过 25MB');
+      } else if (!keys.add('${file.name}:${file.size}')) {
+        continue;
+      } else if (nextFiles.length >= _maxFiles) {
+        rejected.add('${file.name}：每次最多添加 10 个文件');
+      } else if (totalBytes + file.size > _maxTotalBytes) {
+        rejected.add('${file.name}：本次文件总大小不能超过 100MB');
+      } else {
+        nextFiles.add(file);
+        totalBytes += file.size;
+      }
+    }
+    pendingFiles = nextFiles;
     uploadFailed = false;
+    error = rejected.isEmpty ? null : rejected.join('\n');
     notifyListeners();
   }
 

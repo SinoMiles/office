@@ -801,7 +801,7 @@ class _Composer extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             const Text(
-              '最多选择 10 个文件，发送前可以继续添加或删除。',
+              '最多 10 个文件；单个不超过 25MB，合计不超过 100MB。',
               style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -1016,9 +1016,37 @@ class _PendingFile extends StatelessWidget {
   const _PendingFile({required this.file, required this.onDelete});
   final PlatformFile file;
   final VoidCallback onDelete;
+
+  String get _extension =>
+      (file.extension ?? file.name.split('.').last).toLowerCase();
+  bool get _isImage =>
+      const {'png', 'jpg', 'jpeg', 'webp'}.contains(_extension);
+  IconData get _icon {
+    if (const {'xlsx', 'xls', 'csv'}.contains(_extension))
+      return Icons.table_chart_rounded;
+    if (_extension == 'pptx') return Icons.slideshow_rounded;
+    if (_extension == 'pdf') return Icons.picture_as_pdf_rounded;
+    if (_isImage) return Icons.image_outlined;
+    return Icons.description_outlined;
+  }
+
+  Color get _color {
+    if (const {'xlsx', 'xls', 'csv'}.contains(_extension))
+      return const Color(0xFF059669);
+    if (_extension == 'pptx') return const Color(0xFFEA580C);
+    if (_extension == 'pdf') return const Color(0xFFDC2626);
+    if (_isImage) return const Color(0xFF7C3AED);
+    return const Color(0xFF2563EB);
+  }
+
+  String get _size {
+    if (file.size < 1024 * 1024) return '${(file.size / 1024).ceil()}KB';
+    return '${(file.size / (1024 * 1024)).toStringAsFixed(1)}MB';
+  }
+
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.only(left: 11, right: 3),
+    padding: const EdgeInsets.only(left: 8, right: 3),
     decoration: BoxDecoration(
       color: Colors.white,
       border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -1026,19 +1054,44 @@ class _PendingFile extends StatelessWidget {
     ),
     child: Row(
       children: [
-        const Icon(
-          Icons.insert_drive_file_outlined,
-          size: 18,
-          color: officeGreen,
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: _color.withValues(alpha: .1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: _isImage && file.bytes != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(file.bytes!, fit: BoxFit.cover),
+                )
+              : Icon(_icon, size: 17, color: _color),
         ),
         const SizedBox(width: 7),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 150),
-          child: Text(
-            file.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12.5),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                file.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '${_extension.toUpperCase()} · $_size',
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ],
           ),
         ),
         IconButton(

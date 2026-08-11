@@ -16,7 +16,7 @@ const copy = {
     captcha: '图形验证码', captchaPlaceholder: '输入图中 4 位数字', captchaAlt: '图形验证码', refreshCaptcha: '刷新图形验证码', captchaLoading: '加载中', captchaRequired: '请先填写图形验证码',
     smsCode: '短信验证码', smsPlaceholder: '请输入 6 位验证码', resendIn: '{seconds}s 后重发', sending: '发送中…', sendCode: '获取验证码', sendFailed: '验证码发送失败',
     loggingIn: '登录中…', login: '登 录', loginFailed: '登录失败，请稍后重试', networkError: '网络错误，请稍后重试',
-    agreementPrefix: '我已阅读并同意', terms: '服务条款', and: '和', privacy: '隐私政策',
+    agreementPrefix: '同意', terms: '服务条款', and: '及', privacy: '隐私政策',
     bonus: '新用户通过短信登录后自动获赠 10,000 Credits。',
     closeAgreement: '关闭协议确认', agreementTitle: '请确认服务协议',
     agreementDescription: '登录 OfficeGPT 前，请阅读并同意《服务条款》和《隐私政策》。点击同意后将自动勾选，并继续本次登录。',
