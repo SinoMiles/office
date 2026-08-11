@@ -15,12 +15,13 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const version = process.env.AIONCORE_VERSION || packageJson.aioncoreVersion;
 if (!version) throw new Error('package.json 缺少 aioncoreVersion');
+const repository = process.env.AIONCORE_REPOSITORY || packageJson.aioncoreRepository || 'iOfficeAI/AionCore';
 
 const platform = process.env.AIONCORE_TARGET_PLATFORM || process.platform;
 const arch = process.env.AIONCORE_TARGET_ARCH || process.arch;
 const assetName = getAioncoreAssetName(version, platform, arch);
 const tag = version.startsWith('v') ? version : `v${version}`;
-const releaseBase = `https://github.com/iOfficeAI/AionCore/releases/download/${tag}`;
+const releaseBase = `https://github.com/${repository}/releases/download/${tag}`;
 const runtimeDir = getAioncoreRuntimeDir(projectRoot, tag, platform, arch);
 const binaryPath = getAioncoreBinaryPath(projectRoot, tag, platform, arch);
 const manifestPath = path.join(runtimeDir, 'manifest.json');

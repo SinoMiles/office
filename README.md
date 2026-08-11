@@ -18,7 +18,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## AionCore
 
-OfficeWeb 不在 Git 中保存 AionCore 二进制。与 AionUi 一致，构建或部署阶段按 `package.json#aioncoreVersion` 下载当前系统架构的官方 Release，校验 SHA-256，并准备 managed resources：
+OfficeWeb 不在 Git 中保存 AionCore 二进制。构建或部署阶段按 `package.json#aioncoreVersion` 和 `package.json#aioncoreRepository` 下载当前系统架构的 Release，校验 SHA-256，并准备 managed resources：
 
 ```bash
 npm run prepare:aioncore
